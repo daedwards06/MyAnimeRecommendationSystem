@@ -1,0 +1,1 @@
+# Data Directory\n\nStructure for raw and processed anime datasets.\n\n- raw/: Original downloads (DO NOT MODIFY).\n- interim/: Temporary transformation outputs.\n- processed/: Final cleaned feature tables & splits.\n\nAdd licensing notes and source attribution here.

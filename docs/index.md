@@ -1,0 +1,1 @@
+# Project Documentation\n\nThis site (or folder) will hold expanded documentation:\n- Data catalog\n- Modeling decisions\n- Evaluation methodology\n- Deployment notes\n\nMore pages to be added as the project matures.
