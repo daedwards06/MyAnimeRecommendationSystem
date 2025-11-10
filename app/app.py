@@ -1,0 +1,1 @@
+"""Streamlit application entrypoint (placeholder)."""\nimport streamlit as st\n\nst.title("My Anime Recommendation System")\nst.write("App scaffold: models and data loading to be implemented.")
