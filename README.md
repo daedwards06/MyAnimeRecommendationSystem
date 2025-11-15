@@ -65,6 +65,32 @@ python scripts/fetch_jikan.py `
 
 See also: `docs/running_context.md` for a live snapshot of project status and key paths.
 
+## Build Phase 2 artifacts
+
+Generate features, signals, and splits (auto-detects latest metadata):
+
+```powershell
+python scripts/build_features.py --data-version "2025-11-14-tagfix"
+```
+
+Artifacts are written under `data/processed/` (items, TF-IDF + vectorizer, embeddings, user features, indices, feature_stats.json, slices, train/val/test, artifacts_manifest.json).
+
+## Train a quick CF baseline (LightFM)
+
+Train and evaluate a LightFM WARP model on the splits:
+
+```powershell
+python scripts/train_lightfm_baseline.py `
+	--epochs 5 `
+	--loss warp `
+	--no-components 64 `
+	--k 10 `
+	--num-threads 8 `
+	--save-model data/processed/models/lightfm_warp_e5_c64.pkl
+```
+
+This reports Precision@K and Recall@K on validation and test.
+
 ## Proposal
 
 See `PROJECT_PROPOSAL.md` for the full professional plan, roadmap, timeline, and deliverables.
