@@ -1,0 +1,12 @@
+{
+  "data_version": "2025-11-14-tagfix",
+  "vectorizer_path": "data\\processed\\features\\tfidf_vectorizer.joblib",
+  "artifacts": {
+    "interactions": 7813730,
+    "items": 13037,
+    "user_features": 73515,
+    "user_index": 73515,
+    "item_index": 11200,
+    "tfidf_features": 1170
+  }
+}

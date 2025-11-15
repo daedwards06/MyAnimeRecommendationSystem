@@ -1,6 +1,6 @@
 # Running Context (Live Project Snapshot)
 
-Last updated: 2025-11-10
+Last updated: 2025-11-14
 
 > Purpose: This document is a concise, living summary of the project state so any new chat/session can quickly regain context without rereading long-form artifacts or scrolling history.
 
@@ -14,7 +14,7 @@ Last updated: 2025-11-10
 | Phase | Focus | Status |
 |-------|-------|--------|
 | 1 | Data acquisition & enrichment (Kaggle + Jikan) | COMPLETE |
-| 2 | Cleaning & feature engineering | Pending |
+| 2 | Cleaning & feature engineering | COMPLETE (wrap-up enhancements added) |
 | 3 | Baseline recommenders (CF/content) | Pending |
 | 4 | Hybrid + optimization (weights, Optuna) | Pending |
 | 5 | Evaluation & explainability | Pending |
@@ -31,10 +31,10 @@ Reference: Full strategic detail lives in `PROJECT_PROPOSAL.md` (authoritative r
 | Jikan raw JSON cache | `data/raw/jikan/<id>.json` | Jikan API | Cached per MAL ID (UTF-8) |
 | Enriched metadata parquet (latest) | `data/processed/anime_metadata.parquet` | Consolidated | Overwritten on updates |
 | Enriched metadata snapshot | `data/processed/anime_metadata_<suffix>.parquet` | Consolidated | Versioned via `--snapshot-suffix` |
+| Normalized metadata (genres/themes lists) | `data/processed/anime_metadata_normalized.parquet` | Derived from enriched | Auxiliary for Phase 2 |
 
-Latest enrichment snapshot suffix: `202511_full` (completed).
-Rows: 12,297 | Columns: 18 | 404 missing IDs: see fetch counters (logged at runtime).
-Checkpoint interval used: 300 IDs. Throttle: 0.70s + jitter.
+Latest enrichment snapshot suffix: `202511_full` (completed). Additional discovery/fetch runs added new titles with snapshots like `202511_new`, `202511_range`; base metadata updated accordingly.
+Current enriched metadata (base): 13,037 rows, ~26 columns (includes `title_display`, English/Japanese variants). Checkpoint interval: 300 IDs. Throttle: 0.70s + jitter.
 
 ## 4. Key Decisions & Rationale
 | Decision | Rationale | Date |
@@ -47,18 +47,30 @@ Checkpoint interval used: 300 IDs. Throttle: 0.70s + jitter.
 
 (Add new rows as decisions occur.)
 
-## 5. Current Phase Deep Dive (Phase 1)
-- Status: Enrichment complete; metadata snapshot finalized.
-- Achieved: 12,297 records processed; null distribution captured in catalog.
-- Residual Risks: Score/rank nulls for unreleased or unrated titles; large aired_to null count for ongoing shows.
-- Next: Transition to Phase 2 (cleaning & feature engineering).
+## 5. Current Phase Deep Dive (Phase 2)
+- Status: Phase 2 complete; features and splits generated. Wrap-up enhancements included for Phase 3 readiness.
+- Achieved (latest build 2025-11-14):
+	- Clean interactions: 7,813,730 rows; user-aware splits train/val/test: 5,470,724 / 1,171,503 / 1,171,503
+	- Multi-hot features: 13,037 x 74 (includes `anime_id`; 21 genre + 52 theme columns)
+	- TF-IDF features: 13,037 x 1,171 (1,170 tfidf_* + `anime_id`); vectorizer saved to `data/processed/features/tfidf_vectorizer.joblib`
+	- Embeddings: 13,037 x 385 (384 dims + `anime_id`) via all-MiniLM-L6-v2
+	- Items table with popularity, recency, cold-start flags (+ optional `data_version`)
+	- User features: `data/processed/user_features.parquet` (counts, mean rating, recency, genre diversity)
+	- ID indices: `data/processed/user_index.parquet`, `data/processed/item_index.parquet`
+	- Feature scaling snapshot: `data/processed/feature_stats.json` (mean/std/min/max for numeric signals)
+	- Quality slices: `data/processed/slices/items_slices.parquet` + summary JSON
+	- Artifacts manifest: `data/processed/artifacts_manifest.json` (sizes, paths, `data_version`)
+- Residual Risks: TF-IDF stored dense for parquet compatibility; may switch to sparse NPZ if size grows.
+- Next: Begin Phase 3 baselines and CF modeling.
 
 ## 6. Near-Term Tasks (High Priority Queue)
-1. Finish enrichment run & verify parquet row count matches unique IDs fetched.
-2. Update `docs/data_catalog.md` with actual dtypes, null counts, row counts.
-3. Add initial EDA notebook: distribution of genres, episodes, MAL score vs popularity.
-4. Define feature lists (content embeddings, interaction stats) concretely in `docs/features.md`.
-5. Implement preliminary CF baseline (Surprise SVD / KNNBasic) using ratings.
+1. Implement popularity baseline evaluation script and run (DONE — see `scripts/evaluate_baselines.py`).
+2. Train LightFM WARP baseline (NEW — see `scripts/train_lightfm_baseline.py`) and record val/test Precision@10/Recall@10.
+3. Add CF baselines: Surprise KNNBasic and SVD on `train.parquet`; evaluate on `val/test`.
+4. Content-only recommender from embeddings/TF-IDF; simple user profiles.
+5. Prepare hybrid blending and Optuna setup.
+6. Update `docs/features.md` as artifacts evolve; keep counts in sync.
+7. Integrate negative sampling into training data prep using `src/eval/neg_sampling.py`.
 
 ## 7. Pending / Backlog (Selected)
 - LightFM implicit matrix factorization prototype.
@@ -129,12 +141,14 @@ When a significant event occurs (decision, phase change, major artifact creation
 ### Quick Session Summary (Rolling)
 - 2025-11-09: Enrichment running; encoding + datetime fix applied.
 - 2025-11-10: Full enrichment completed; catalog updated; Phase 1 marked COMPLETE.
+- 2025-11-13: EDA fixed for genres/themes (stored as numpy arrays); saved `anime_metadata_normalized.parquet`.
+- 2025-11-14: Phase 2 pipeline completed; artifacts saved; TF-IDF vectorizer persisted. Wrap-up: user features, indices, scaling stats, quality slices, versions manifest; discovery/fetch enhancements; title variants stored. Tag parsing fix applied for list-like metadata; TF-IDF now 1,170 features on 13,037 items. LightFM baseline trainer added.
 
 (Replace or append daily summaries; keep last 5 only.)
 
 ---
 ## 16. Next Trigger
-Begin Phase 2: implement cleaning refinements and generate first feature matrices (genres multi-hot, preliminary embeddings stub).
+Begin Phase 3: implement baselines (popularity, TF-IDF/embeddings similarity) and CF models (Surprise KNN/SVD), then hybridization.
 
 ---
 End of running context.

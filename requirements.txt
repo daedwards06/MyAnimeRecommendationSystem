@@ -1,1 +1,16 @@
-pandas==2.2.2\nnumpy==1.26.4\nscikit-learn==1.5.2\nstreamlit==1.38.0\nsentence-transformers==2.7.0\nsurprise==0.1\nlightfm==1.17\nimplicit==0.7.2\noptuna==3.6.1\nmatplotlib==3.9.2\nseaborn==0.13.2\nplotly==5.24.1\npytest==8.3.2\nhttpx==0.27.2\n*** End Patch
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.2
+pyarrow==16.1.0
+streamlit==1.38.0
+sentence-transformers==2.7.0
+torch>=2.2,<2.5
+surprise==0.1
+lightfm==1.17
+implicit==0.7.2
+optuna==3.6.1
+matplotlib==3.9.2
+seaborn==0.13.2
+plotly==5.24.1
+pytest==8.3.2
+httpx==0.27.2

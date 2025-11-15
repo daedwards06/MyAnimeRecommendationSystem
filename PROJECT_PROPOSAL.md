@@ -25,9 +25,12 @@ Technologies and final deliverables:
   - Source data from public datasets (e.g., MyAnimeList/Kaggle exports) and metadata APIs if allowed by TOS.
   - Define schemas, keys, and ID mappings (anime_id, user_id).
   - Create data catalog (dataset summary, field descriptions, provenance).
+  - Implement Jikan metadata fetch script with caching, throttling, retries, and checkpointing.
+  - Establish metadata snapshot versioning policy (e.g., `anime_metadata_<YYYYMM_or_tag>.parquet`) and refresh cadence.
 - Deliverables
   - Raw data snapshot in `data/raw/` with README on licensing and fields.
   - Data catalog markdown (`docs/data_catalog.md`).
+  - `DATA_SOURCES.md` documenting attribution, terms of use, update policy, and enrichment approach.
 - Recommended tools/libraries
   - Requests/httpx (if API used), Pandas, PyYAML for data catalog.
 
@@ -41,10 +44,14 @@ Technologies and final deliverables:
     - Genres/tags: multi‑hot and TF‑IDF vectors
     - Synopsis text: sentence embeddings via `sentence-transformers`
     - Popularity/recency features
+  - Identify titles introduced after the frozen Kaggle snapshot (post‑snapshot/new MAL IDs) and flag for content‑only recommendations.
+  - Implement a content‑only recommendation path for new items (no ratings), leveraging content features and popularity priors.
   - Create train/validation/test splits (user‑aware, optionally time‑based). Persist as `parquet`.
 - Deliverables
   - `data/processed/` parquet files (users, items, interactions, feature matrices).
   - Feature documentation with shapes and value ranges.
+  - Vectorizer artifact persisted for inference: `data/processed/features/tfidf_vectorizer.joblib`.
+  - User features, user/item index mappings, feature scaling snapshot (JSON), quality slices, and artifacts manifest for Phase 3 readiness.
 - Recommended tools/libraries
   - Pandas, NumPy, scikit‑learn, `sentence-transformers`, scikit‑learn’s TfidfVectorizer.
 
@@ -66,6 +73,7 @@ Technologies and final deliverables:
 - Deliverables
   - Reproducible training scripts in `src/` and experiment notebooks in `notebooks/`.
   - Serialized models/artifacts in `models/` with versioning.
+  - Baseline CF trainer scripts (e.g., `scripts/train_lightfm_baseline.py`) with standard metrics (Precision@K, Recall@K).
 - Recommended tools/libraries
   - Surprise, LightFM, implicit, scikit‑learn, Optuna, joblib.
 
@@ -76,6 +84,7 @@ Technologies and final deliverables:
   - Metrics: RMSE/MAE for explicit rating prediction; Precision@K, Recall@K, MAP, NDCG for top‑N.
   - Split strategies: user‑based holdout; consider temporal splits to avoid leakage.
   - Ablations: CF only vs content only vs hybrid; impact of synopsis embeddings; cold‑start analysis.
+  - Trend‑shift analysis: evaluate changes in genre/theme popularity over time and assess impact on recommendation quality.
   - Calibration and fairness checks (e.g., avoid over‑promoting only popular titles).
 - Deliverables
   - `reports/` with metric tables/plots and decision rationale.
@@ -88,6 +97,7 @@ Technologies and final deliverables:
   - Deliver an interactive, portfolio‑ready Streamlit app with fast responses and clear explanations.
 - Core tasks
   - UI: search by title, choose seed anime/user, filters (genre, year, maturity), “Why recommended?” explainer.
+  - UI badges/indicators for cold‑start or content‑only items to set expectations and explain limited personalization.
   - Backend: load precomputed factors/indices; cosine similarity search; top‑N generation; caching layer.
   - Data layer: small, optimized artifacts (sparse matrices, FAISS/Annoy index for embeddings if needed).
   - Deployment: Streamlit Community Cloud or Hugging Face Spaces; optional Docker image.
@@ -193,6 +203,5 @@ Technologies and final deliverables:
 ---
 
 Next steps
-- Initialize repo structure (`data/`, `src/`, `notebooks/`, `app/`, `tests/`, `docs/`, `reports/`).
-- Draft `requirements.txt` with minimal, pinned packages and create the first EDA notebook.
-- Implement baselines, then iterate toward the hybrid model and Streamlit prototype.
+- Phase 2 complete: artifacts and helper utilities are in place for modeling (TF‑IDF vectorizer saved; user/item indices; scaling stats; manifest).
+- Begin Phase 3: run CF baselines (e.g., LightFM WARP via `scripts/train_lightfm_baseline.py`), add Surprise KNN/SVD and implicit ALS, then iterate toward hybrid.

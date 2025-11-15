@@ -3,27 +3,27 @@
 > Living checklist derived from `PROJECT_PROPOSAL.md`. Mark items as you progress. Suggested notation: `[x]` done, `[~]` in progress, `[!]` blocked.
 
 ## Phase 1 — Data Discovery & Acquisition
-- [ ] Source datasets (Kaggle/MAL export, metadata API)
-- [ ] Verify licensing & attribution (update `data/README.md`)
-- [ ] Define canonical data schema (anime_id, user_id, rating, genres, synopsis, timestamps?)
-- [ ] Implement ingestion script (`scripts/download_data.py`)
-- [ ] Create data catalog (`docs/data_catalog.md`)
-- [ ] Data quality / EDA notebook (missingness, duplicates, sparsity, rating dist.)
- - [ ] Jikan metadata fetch script (`scripts/fetch_jikan.py`)
- - [ ] Jikan raw JSON snapshot & versioning policy (`data/raw/jikan/`, monthly snapshots)
+- [x] Source datasets (Kaggle/MAL export, metadata API)
+- [x] Verify licensing & attribution (update `data/README.md`)
+- [x] Define canonical data schema (anime_id, user_id, rating, genres, synopsis, timestamps?)
+- [x] Implement ingestion script (`scripts/download_data.py`)
+- [x] Create data catalog (`docs/data_catalog.md`)
+- [x] Data quality / EDA notebook (missingness, duplicates, sparsity, rating dist.)
+ - [x] Jikan metadata fetch script (`scripts/fetch_jikan.py`)
+ - [x] Jikan raw JSON snapshot & versioning policy (`data/raw/jikan/`, monthly snapshots)
 
 ## Phase 2 — Data Cleaning & Feature Engineering
-- [ ] Cleaning pipeline (`src/data/cleaning.py`)
-- [ ] Genre/tag parsing & normalization
-- [ ] Multi-hot encoding (genres/tags)
-- [ ] TF-IDF vectors (tags/keywords)
-- [ ] Synopsis embeddings (`sentence-transformers`)
-- [ ] Popularity & recency features
-- [ ] Train/val/test split (user-aware + optional time split)
-- [ ] Feature documentation (`docs/features.md`)
- - [ ] Normalize Jikan metadata → parquet (`data/processed/anime_metadata.parquet`)
- - [ ] Identify and flag new titles (post-snapshot) for content-only recommendations
- - [ ] Metadata feature extraction (genres/themes/demographics/studios)
+- [x] Cleaning pipeline (`src/data/cleaning.py`)
+- [x] Genre/tag parsing & normalization
+- [x] Multi-hot encoding (genres/tags)
+- [x] TF-IDF vectors (tags/keywords)
+- [x] Synopsis embeddings (`sentence-transformers`)
+- [x] Popularity & recency features
+- [x] Train/val/test split (user-aware + optional time split)
+- [x] Feature documentation (`docs/features.md`)
+ - [x] Normalize Jikan metadata → parquet (`data/processed/anime_metadata.parquet`)
+ - [x] Identify and flag new titles (post-snapshot) for content-only recommendations
+ - [x] Metadata feature extraction (genres/themes/demographics/studios)
 
 ## Phase 3 — Model Development
 - [ ] Popularity baseline recommender
@@ -31,6 +31,7 @@
 - [ ] User-Item kNN (Surprise KNNBasic)
 - [ ] Matrix factorization SVD (Surprise)
 - [ ] Implicit ALS model (`implicit` library)
+- [x] LightFM WARP baseline trainer script (`scripts/train_lightfm_baseline.py`)
 - [ ] Content embedding similarity (synopsis embeddings)
 - [ ] Hybrid blending logic (weighted / rank fusion)
 - [ ] Hyperparameter tuning (Optuna study optimizing NDCG/MAP@K)
@@ -95,4 +96,5 @@
 3. Update this checklist weekly; remove or defer optional items if timeline tight.
 4. Record metric improvements with date stamps in `reports/` for portfolio narrative.
 
-**Last Updated:** <!-- timestamp placeholder -->
+**Last Updated:** 2025-11-14
+**This Section Updated:** 2025-11-14
