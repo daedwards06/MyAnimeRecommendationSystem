@@ -77,20 +77,67 @@ Technologies and final deliverables:
 - Recommended tools/libraries
   - Surprise, LightFM, implicit, scikit‑learn, Optuna, joblib.
 
-### Phase 4 — Evaluation & Optimization
-- Objectives
-  - Quantify recommendation quality and justify design decisions.
-- Core tasks
-  - Metrics: RMSE/MAE for explicit rating prediction; Precision@K, Recall@K, MAP, NDCG for top‑N.
-  - Split strategies: user‑based holdout; consider temporal splits to avoid leakage.
-  - Ablations: CF only vs content only vs hybrid; impact of synopsis embeddings; cold‑start analysis.
-  - Trend‑shift analysis: evaluate changes in genre/theme popularity over time and assess impact on recommendation quality.
-  - Calibration and fairness checks (e.g., avoid over‑promoting only popular titles).
-- Deliverables
-  - `reports/` with metric tables/plots and decision rationale.
-  - Reusable evaluation module in `src/eval/`.
-- Recommended tools/libraries
-  - scikit‑learn, pandas, matplotlib/seaborn, mlflow or a simple CSV log for experiments.
+#### Phase 3 — Final status (2025-11-21)
+
+- Baselines complete: Popularity, genre/tag TF-IDF similarity, content embeddings (synopsis), cold-start content-only path.
+- Collaborative filtering: MF (FunkSVD via NumPy SGD) stable (lr=0.005, reg=0.05, 64 factors); Item kNN (centered rating-weighted user profiles with shrinkage + popularity prior) implemented (low standalone ranking quality but contributes diversity).
+- Hybrid: Weighted blend + Reciprocal Rank Fusion implemented; initial popularity-heavy tuned weights replaced by diversity-aware Optuna tuning (coverage reward + popularity cap) yielding balanced weights frozen in `src/models/constants.py`:
+  - mf=0.93078, knn=0.06625, pop=0.00297 (normalized)
+- Metrics instrumentation: NDCG@K, MAP@K, item coverage, Gini index integrated across evaluators; explanations (per-source score contributions) available for hybrid examples.
+- Artifact management: Versioned model saver uses UTC-aware timestamps; manifest updated with latest serialized kNN & MF artifacts.
+- Libraries: Replaced Surprise/implicit with lightweight sklearn/numpy due to environment constraints while preserving core CF capabilities.
+
+Final unified evaluation (K=10, users=1000):
+| Model | NDCG@10 | MAP@10 | Coverage@10 | Gini@10 |
+|-------|---------|--------|-------------|---------|
+| MF (FunkSVD) | 0.05036 | 0.03900 | 0.071 | 0.784 |
+| Hybrid (Balanced) | 0.04973 | 0.03844 | 0.066 | 0.791 |
+| Popularity | 0.04120 | 0.02785 | 0.006 | 0.726 |
+| Item kNN | 0.00169 | 0.00131 | 0.118 | 0.728 |
+
+Interpretation: Balanced hybrid preserves ~99% of MF NDCG while widening item exposure compared to popularity baseline and retaining acceptable diversity. Item kNN underperforms on accuracy but boosts hybrid coverage slightly; popularity alone is strong but narrow.
+
+Phase 3 completion criteria met: baselines, CF models, hybrid strategies, tuning (accuracy & diversity), artifacts, and reporting. Remaining experimental models (implicit ALS, LightFM WARP deep tuning) deferred unless needed for portfolio narrative.
+
+Transition to Phase 4: Focus shifts to evaluation storytelling—plotting metric curves vs K, ablations (CF vs content vs hybrid), diversity trade-offs, temporal validation, and preparation for app integration.
+
+### Phase 4 — Evaluation & Analysis (Kickoff 2025-11-22)
+Objectives
+  - Transform raw metric logs into persuasive, portfolio-ready evaluation artifacts (plots, ablations, explanations) that justify design choices and hybrid trade‑offs.
+  - Validate robustness (temporal split), quantify diversity exposure, and establish CI/lint quality gates before app integration.
+
+Core Kickoff Tasks (High ROI)
+  - Plot metric curves: NDCG@K and MAP@K vs K for Popularity, MF, Hybrid (balanced weights), Content TF‑IDF.
+  - Plot diversity curves: Coverage@K and Gini@K vs K to illustrate concentration vs exposure.
+  - Ablation table: Popularity vs MF vs Hybrid vs Content (TF‑IDF) with relative lift % (e.g., Hybrid vs Popularity NDCG improvement).
+  - Hybrid explanation examples: per‑source contribution breakdown for top 3 recommended items (attach to report).
+
+Rigor & Validation
+  - Temporal split sanity check: train on earlier partition, validate on later; compare deltas to current unified slice to detect leakage or drift.
+  - Cold‑start recap: integrate existing content‑only evaluation into Phase 4 report section (new item exposure & qualitative examples).
+  - (Optional) Fairness / genre exposure quick scan: distribution of genre tags across recommendations vs catalog.
+
+Infrastructure & Quality
+  - CI setup: GitHub Actions workflow (install deps, run pytest, run ruff/black checks).
+  - Pre‑commit hooks: ruff (lint), black (format), end‑of‑file and trailing whitespace filters.
+  - Evaluation plotting script (`scripts/plot_phase4_metrics.py`) and ablation generator (`scripts/generate_phase4_ablation.py`).
+  - Report artifact: `reports/phase4_evaluation.md` consolidating curves, tables, explanation snippets, temporal comparison.
+
+Stretch (Optional / Defer)
+  - Implicit ALS prototype & comparative curves (only if adds narrative value beyond MF).
+  - LightFM deeper tuning (display WARP vs MF/Hybrid performance; diversity impact).
+  - Novelty/popularity bias plot (long‑tail exposure metric vs baseline).
+
+Exit Criteria (Phase 4 Completion)
+  - Curves (NDCG/MAP, Coverage/Gini) committed.
+  - Ablation table with relative lifts published.
+  - Explanation examples integrated in evaluation report.
+  - Temporal robustness documented (pass/fail + interpretation).
+  - CI pipeline green (tests + lint); pre‑commit hooks active.
+  - Phase 4 report (`reports/phase4_evaluation.md`) referenced in main `README.md` / proposal.
+
+Recommended tools/libraries
+  - pandas, numpy, matplotlib/seaborn/plotly for plotting; scikit‑learn metrics (existing); ruff, black, pytest, GitHub Actions for CI; optional implicit/LightFM for stretch.
 
 ### Phase 5 — App Development & Deployment
 - Objectives
@@ -203,5 +250,6 @@ Technologies and final deliverables:
 ---
 
 Next steps
-- Phase 2 complete: artifacts and helper utilities are in place for modeling (TF‑IDF vectorizer saved; user/item indices; scaling stats; manifest).
-- Begin Phase 3: run CF baselines (e.g., LightFM WARP via `scripts/train_lightfm_baseline.py`), add Surprise KNN/SVD and implicit ALS, then iterate toward hybrid.
+- Run Optuna studies for hybrid weights and MF; freeze defaults and re-evaluate on a unified slice.
+- Refresh the Phase 3 report top table; include cold-start metrics and explanation examples.
+- Serialize current artifacts with a version suffix and update the manifest; proceed toward Phase 4 (evaluation visuals, ablations).

@@ -25,26 +25,63 @@
  - [x] Identify and flag new titles (post-snapshot) for content-only recommendations
  - [x] Metadata feature extraction (genres/themes/demographics/studios)
 
-## Phase 3 — Model Development
-- [ ] Popularity baseline recommender
-- [ ] Genre similarity baseline (cosine TF-IDF/multi-hot)
-- [ ] User-Item kNN (Surprise KNNBasic)
-- [ ] Matrix factorization SVD (Surprise)
-- [ ] Implicit ALS model (`implicit` library)
+## Phase 3 — Model Development (Closed 2025-11-21)
+- [x] Popularity baseline recommender
+- [x] Genre similarity baseline (cosine TF-IDF/multi-hot)
+- [x] Item kNN (sklearn profile-cosine; replaced Surprise KNNBasic)
+- [x] Matrix factorization (FunkSVD via NumPy SGD; replaced Surprise SVD)
+- [ ] Implicit ALS model (`implicit` library)  
 - [x] LightFM WARP baseline trainer script (`scripts/train_lightfm_baseline.py`)
-- [ ] Content embedding similarity (synopsis embeddings)
-- [ ] Hybrid blending logic (weighted / rank fusion)
-- [ ] Hyperparameter tuning (Optuna study optimizing NDCG/MAP@K)
-- [ ] Model serialization to `models/` (versioned artifacts)
-- [ ] Experiment tracking (CSV/JSON or MLflow)
+- [x] Content embedding similarity (synopsis embeddings)
+- [x] Hybrid blending logic (weighted / rank fusion)
+- [x] Hyperparameter tuning (Optuna studies: MF params + hybrid weights with diversity/coverage objective)
+- [x] Model serialization to `models/` (versioned artifacts)
+- [x] Experiment tracking (CSV/JSON or MLflow)
 
-## Phase 4 — Evaluation & Optimization
-- [ ] Metrics module (`src/eval/metrics.py`: RMSE, MAE, Precision@K, Recall@K, MAP, NDCG)
-- [ ] Evaluation script/notebook (compare all models)
-- [ ] Ablation studies (CF vs content vs hybrid)
-- [ ] Cold-start analysis (new users/items)
-- [ ] Coverage & diversity metrics
-- [ ] Reporting visuals saved to `reports/` (curves, bars, heatmaps)
+Final status (2025-11-21):
+- Shared split/sampler utility (`src/eval/splits.py`) in use across all evaluators.
+- Diversity & coverage metrics (item coverage, Gini) integrated (`src/eval/metrics_extra.py`).
+- Hybrid tuning completed: initial popularity-heavy blend replaced by diversity-aware Optuna run with coverage reward & popularity cap; balanced weights frozen in `src/models/constants.py` as mf=0.93078, knn=0.06625, pop=0.00297.
+- MF (FunkSVD) remains strongest single model on NDCG; balanced hybrid nearly matches MF while improving coverage vs popularity baseline.
+- Artifact versioning script (`scripts/save_artifacts.py`) updated to use timezone-aware UTC timestamps.
+- Report (`reports/phase3_summary.md`) now shows final unified slice metrics (users=1000) including coverage & Gini.
+- All Phase 3 core objectives achieved; remaining experimental models (Implicit ALS) deferred to optional backlog.
+
+Phase 3 next actions (rolled into Phase 4):
+- Comparative plots (NDCG/MAP vs K, coverage, diversity trends).
+- Ablation table (MF vs Hybrid vs Popularity vs Content).
+- Temporal/recency split sanity check.
+- Optional: introduce ALS or LightFM only if it adds portfolio narrative (defer if marginal).
+
+## Phase 4 — Evaluation & Analysis (Kickoff 2025-11-22)
+Goal: Turn raw metric tables into persuasive evaluation artifacts (plots, ablations, explanations) that set up Phase 5 app narrative.
+
+### Core Kickoff (High ROI)
+- [ ] Plot metric curves (NDCG@K, MAP@K vs K) for Popularity, MF, Hybrid, Content TF-IDF
+- [ ] Plot coverage & Gini vs K (diversity trade-offs)
+- [ ] Ablation table (Popularity vs MF vs Hybrid vs Content) with relative lifts
+- [ ] Integrated hybrid explanation examples (per-source score shares for top 3 recommendations)
+
+### Rigor & Validation
+- [ ] Temporal split sanity check (train on earlier, validate on later) -> confirm stability
+- [ ] Cold-start recap (already implemented) summarize in Phase 4 report section
+
+### Infrastructure
+- [ ] CI + lint (GitHub Actions: tests + ruff/black)
+- [ ] Pre-commit hooks (ruff, black) configured
+- [ ] Phase 4 doc updates (proposal, running_context, summary report Phase 4 section)
+
+### Stretch (Optional, Defer if Time-Constrained)
+- [ ] Fairness / genre exposure quick check
+- [ ] Implicit ALS prototype (only if adds clear narrative boost)
+- [ ] LightFM deeper tuning & comparison plot
+- [ ] Novelty / popularity bias plot
+
+### Exit Criteria (Phase 4 Completion)
+- Curves & ablations published in `reports/phase4_evaluation.md`
+- Balanced hybrid justified vs MF & Popularity with lift metrics
+- Temporal robustness confirmed or documented
+- CI green (tests + lint) and explanation examples integrated
 
 ## Phase 5 — App Development & Deployment
 - [ ] Data/model loading utilities (caching artifacts)
@@ -96,5 +133,5 @@
 3. Update this checklist weekly; remove or defer optional items if timeline tight.
 4. Record metric improvements with date stamps in `reports/` for portfolio narrative.
 
-**Last Updated:** 2025-11-14
-**This Section Updated:** 2025-11-14
+**Last Updated:** 2025-11-21
+**This Section Updated:** 2025-11-21
