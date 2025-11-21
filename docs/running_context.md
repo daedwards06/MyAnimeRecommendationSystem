@@ -1,6 +1,6 @@
 # Running Context (Live Project Snapshot)
 
-Last updated: 2025-11-14
+Last updated: 2025-11-21
 
 > Purpose: This document is a concise, living summary of the project state so any new chat/session can quickly regain context without rereading long-form artifacts or scrolling history.
 
@@ -15,10 +15,10 @@ Last updated: 2025-11-14
 |-------|-------|--------|
 | 1 | Data acquisition & enrichment (Kaggle + Jikan) | COMPLETE |
 | 2 | Cleaning & feature engineering | COMPLETE (wrap-up enhancements added) |
-| 3 | Baseline recommenders (CF/content) | Pending |
-| 4 | Hybrid + optimization (weights, Optuna) | Pending |
-| 5 | Evaluation & explainability | Pending |
-| 6 | Deployment (Streamlit + optional API) | Pending |
+| 3 | Baseline recommenders (CF/content + hybrid tuning) | COMPLETE |
+| 4 | Evaluation & analysis (plots, ablations, explanations, temporal check, CI) | KICKOFF / IN PROGRESS |
+| 5 | App development (Streamlit UI, inference, explainability surfacing) | Pending |
+| 6 | Documentation & portfolio polish | Pending |
 
 Reference: Full strategic detail lives in `PROJECT_PROPOSAL.md` (authoritative roadmap). This context file distills the active snapshot.
 
@@ -47,30 +47,33 @@ Current enriched metadata (base): 13,037 rows, ~26 columns (includes `title_disp
 
 (Add new rows as decisions occur.)
 
-## 5. Current Phase Deep Dive (Phase 2)
-- Status: Phase 2 complete; features and splits generated. Wrap-up enhancements included for Phase 3 readiness.
-- Achieved (latest build 2025-11-14):
-	- Clean interactions: 7,813,730 rows; user-aware splits train/val/test: 5,470,724 / 1,171,503 / 1,171,503
-	- Multi-hot features: 13,037 x 74 (includes `anime_id`; 21 genre + 52 theme columns)
-	- TF-IDF features: 13,037 x 1,171 (1,170 tfidf_* + `anime_id`); vectorizer saved to `data/processed/features/tfidf_vectorizer.joblib`
-	- Embeddings: 13,037 x 385 (384 dims + `anime_id`) via all-MiniLM-L6-v2
-	- Items table with popularity, recency, cold-start flags (+ optional `data_version`)
-	- User features: `data/processed/user_features.parquet` (counts, mean rating, recency, genre diversity)
-	- ID indices: `data/processed/user_index.parquet`, `data/processed/item_index.parquet`
-	- Feature scaling snapshot: `data/processed/feature_stats.json` (mean/std/min/max for numeric signals)
-	- Quality slices: `data/processed/slices/items_slices.parquet` + summary JSON
-	- Artifacts manifest: `data/processed/artifacts_manifest.json` (sizes, paths, `data_version`)
-- Residual Risks: TF-IDF stored dense for parquet compatibility; may switch to sparse NPZ if size grows.
-- Next: Begin Phase 3 baselines and CF modeling.
+## 5. Phase 3 Summary (Closed) & Transition
+- Status: Phase 3 closed (2025-11-21). All baseline CF/content models implemented; hybrid recommender tuned with diversity-aware objective; artifacts versioned.
+- Final hybrid weights (balanced accuracy + coverage) frozen in `src/models/constants.py`: mf=0.93078, knn=0.06625, pop=0.00297.
+- Item kNN remains low-performing on ranking metrics but contributes to hybrid diversity marginally.
+- Diversity-aware Optuna tuning applied (coverage reward + popularity cap) to counter prior popularity-heavy blend.
+- Final unified slice metrics (K=10, users=1000):
+	- MF (FunkSVD): NDCG≈0.05036, MAP≈0.03900, Coverage≈0.071
+	- Hybrid Weighted (balanced): NDCG≈0.04973, MAP≈0.03844, Coverage≈0.066, Gini≈0.791
+	- Popularity: NDCG≈0.04120, Coverage≈0.006
+	- Item kNN: Coverage leader (≈0.118) but weak NDCG.
+- Artifacts saved with UTC-aware timestamps via `scripts/save_artifacts.py`; manifest updated.
+- Report updated (`reports/phase3_summary.md`) with final metrics table and historical snapshots retained for provenance.
 
-## 6. Near-Term Tasks (High Priority Queue)
-1. Implement popularity baseline evaluation script and run (DONE — see `scripts/evaluate_baselines.py`).
-2. Train LightFM WARP baseline (NEW — see `scripts/train_lightfm_baseline.py`) and record val/test Precision@10/Recall@10.
-3. Add CF baselines: Surprise KNNBasic and SVD on `train.parquet`; evaluate on `val/test`.
-4. Content-only recommender from embeddings/TF-IDF; simple user profiles.
-5. Prepare hybrid blending and Optuna setup.
-6. Update `docs/features.md` as artifacts evolve; keep counts in sync.
-7. Integrate negative sampling into training data prep using `src/eval/neg_sampling.py`.
+How to regenerate current metrics (PowerShell):
+```powershell
+python .\scripts\evaluate_hybrid.py --k 10 --sample-users 1000
+python .\scripts\update_phase3_report.py
+python .\scripts\save_artifacts.py
+```
+
+## 6. Near-Term Tasks (Phase 4 Evaluation & Analysis Kickoff)
+1. Plot curves: NDCG/MAP vs K (baseline vs hybrid vs MF vs popularity).
+2. Coverage & Gini trend plot vs K.
+3. Ablation table (MF vs Hybrid vs Popularity vs Content TF-IDF) with relative lifts.
+4. Temporal split experiment (optional leakage check).
+5. Add lightweight CI (tests + ruff/black) and lint badges.
+6. Integrate explanation examples into report (top 3 items with per-source contributions).
 
 ## 7. Pending / Backlog (Selected)
 - LightFM implicit matrix factorization prototype.
@@ -143,12 +146,23 @@ When a significant event occurs (decision, phase change, major artifact creation
 - 2025-11-10: Full enrichment completed; catalog updated; Phase 1 marked COMPLETE.
 - 2025-11-13: EDA fixed for genres/themes (stored as numpy arrays); saved `anime_metadata_normalized.parquet`.
 - 2025-11-14: Phase 2 pipeline completed; artifacts saved; TF-IDF vectorizer persisted. Wrap-up: user features, indices, scaling stats, quality slices, versions manifest; discovery/fetch enhancements; title variants stored. Tag parsing fix applied for list-like metadata; TF-IDF now 1,170 features on 13,037 items. LightFM baseline trainer added.
+- 2025-11-15: Phase 3 started; kNN improved (centering, shrinkage, popularity prior), MF stable; hybrid evaluator created.
+- 2025-11-17: Initial hybrid tuning produced popularity-heavy blend (low coverage); diversity metrics integrated.
+- 2025-11-21: Diversity-aware Optuna tuning finalized; balanced hybrid weights frozen; artifacts versioned; Phase 3 closed.
 
 (Replace or append daily summaries; keep last 5 only.)
 
 ---
-## 16. Next Trigger
-Begin Phase 3: implement baselines (popularity, TF-IDF/embeddings similarity) and CF models (Surprise KNN/SVD), then hybridization.
+## 16. Phase 4 Tracking & Next Trigger
+Progress checklist (core):
+- [ ] Metric curves (NDCG/MAP vs K)
+- [ ] Coverage & Gini curves vs K
+- [ ] Ablation table (Popularity vs MF vs Hybrid vs Content TF-IDF) with lifts
+- [ ] Explanation examples integrated (top 3 hybrid items per-source shares)
+- [ ] Temporal split validation
+- [ ] CI + lint (tests + ruff/black) green
+
+Next trigger: Once all core items checked, create Phase 4 evaluation report (`reports/phase4_evaluation.md`) and transition to initial Streamlit scaffolding (Phase 5).
 
 ---
 End of running context.

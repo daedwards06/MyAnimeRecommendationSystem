@@ -8,5 +8,12 @@
     "user_index": 73515,
     "item_index": 11200,
     "tfidf_features": 1170
-  }
+  },
+  "models": [
+    {
+      "knn": "models\\item_knn_sklearn_v2025.11.21_202756.joblib",
+      "mf": "models\\mf_sgd_v2025.11.21_202756.joblib",
+      "created_utc": "2025-11-21T20:52:44+00:00"
+    }
+  ]
 }

@@ -1,0 +1,7 @@
+{
+  "model": "hybrid_weighted",
+  "k": 10,
+  "users_evaluated": 300,
+  "ndcg@k_mean": 0.02196334273757603,
+  "map@k_mean": 0.013854497354497355
+}

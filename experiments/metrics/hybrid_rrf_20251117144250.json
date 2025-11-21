@@ -1,0 +1,9 @@
+{
+  "model": "hybrid_rrf",
+  "k": 10,
+  "users_evaluated": 500,
+  "ndcg@k_mean": 0.031100548032474043,
+  "map@k_mean": 0.017253968253968254,
+  "item_coverage@k": 0.059201714438789174,
+  "gini_index@k": 0.7748675716440423
+}

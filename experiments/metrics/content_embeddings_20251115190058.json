@@ -1,0 +1,7 @@
+{
+  "model": "content_embeddings",
+  "k": 10,
+  "users_evaluated": 300,
+  "ndcg@k_mean": 0.01557912184138652,
+  "map@k_mean": 0.013166666666666667
+}

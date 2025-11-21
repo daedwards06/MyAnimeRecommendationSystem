@@ -1,3 +1,48 @@
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+import numpy as np
+import pandas as pd
+from scipy.sparse import coo_matrix
+from lightfm import LightFM
+from joblib import dump
+
+from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, RANDOM_SEED
+
+
+def build_interaction_matrix(df: pd.DataFrame):
+    users = df["user_id"].astype("category")
+    items = df["anime_id"].astype("category")
+    row = users.cat.codes.values
+    col = items.cat.codes.values
+    data = np.ones(len(df), dtype=np.float32)
+    return coo_matrix((data, (row, col))).tocsr(), users, items
+
+
+def train_lightfm(no_components: int = 64, epochs: int = 30, num_threads: int = 4):
+    inter = pd.read_parquet(DATA_PROCESSED_DIR / "interactions.parquet")
+    mat, users, items = build_interaction_matrix(inter)
+    model = LightFM(loss="warp", no_components=no_components, random_state=RANDOM_SEED)
+    model.fit(mat, epochs=epochs, num_threads=num_threads)
+    out = MODELS_DIR / "lightfm_warp_v1.0.joblib"
+    dump(
+        {
+            "model": model,
+            "user_index": dict(enumerate(users.cat.categories.astype(int).tolist())),
+            "item_index": dict(enumerate(items.cat.categories.astype(int).tolist())),
+        },
+        out,
+    )
+    print(f"Saved: {out}")
+    return out
+
+
+if __name__ == "__main__":
+    train_lightfm()
 """Train a LightFM collaborative filtering baseline on Phase 2 splits.
 
 This script:

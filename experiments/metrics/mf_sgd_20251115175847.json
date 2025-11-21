@@ -1,0 +1,7 @@
+{
+  "model": "mf_sgd",
+  "k": 10,
+  "users_evaluated": 300,
+  "ndcg@k_mean": 0.04031096067515299,
+  "map@k_mean": 0.0287526455026455
+}

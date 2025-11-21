@@ -1,0 +1,9 @@
+{
+  "model": "popularity",
+  "k": 10,
+  "users_evaluated": 1000,
+  "ndcg@k_mean": 0.041197797811398956,
+  "map@k_mean": 0.027851190476190474,
+  "item_coverage@k": 0.005804089650861684,
+  "gini_index@k": 0.7257753846153846
+}

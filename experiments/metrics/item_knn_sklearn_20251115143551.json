@@ -1,0 +1,7 @@
+{
+  "model": "item_knn_sklearn",
+  "k": 10,
+  "users_evaluated": 500,
+  "ndcg@k_mean": 0.0033790810408827108,
+  "map@k_mean": 0.002619047619047619
+}

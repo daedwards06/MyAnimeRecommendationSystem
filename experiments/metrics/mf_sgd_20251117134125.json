@@ -1,0 +1,9 @@
+{
+  "model": "mf_sgd",
+  "k": 10,
+  "users_evaluated": 500,
+  "ndcg@k_mean": 0.04281097660577453,
+  "map@k_mean": 0.030656349206349204,
+  "item_coverage@k": 0.05562996696133583,
+  "gini_index@k": 0.7364192616372391
+}

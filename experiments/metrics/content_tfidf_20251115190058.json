@@ -1,0 +1,7 @@
+{
+  "model": "content_tfidf",
+  "k": 10,
+  "users_evaluated": 300,
+  "ndcg@k_mean": 0.025275788507117,
+  "map@k_mean": 0.02073148148148148
+}

@@ -1,0 +1,7 @@
+{
+  "model": "popularity_baseline",
+  "k": 10,
+  "users_evaluated": 500,
+  "ndcg@k_mean": 0.04384926329039148,
+  "map@k_mean": 0.029592857142857143
+}

@@ -5,9 +5,6 @@ pyarrow==16.1.0
 streamlit==1.38.0
 sentence-transformers==2.7.0
 torch>=2.2,<2.5
-surprise==0.1
-lightfm==1.17
-implicit==0.7.2
 optuna==3.6.1
 matplotlib==3.9.2
 seaborn==0.13.2

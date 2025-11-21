@@ -1,0 +1,7 @@
+{
+  "model": "hybrid_rrf",
+  "k": 10,
+  "users_evaluated": 300,
+  "ndcg@k_mean": 0.023454780470436507,
+  "map@k_mean": 0.013572751322751323
+}
