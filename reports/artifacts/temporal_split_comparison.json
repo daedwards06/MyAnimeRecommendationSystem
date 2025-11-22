@@ -1,0 +1,16 @@
+{
+  "train_frac": 0.7,
+  "timestamp_source": "synthetic from row index",
+  "temporal": {
+    "ndcg@5": 0.43994838575175094,
+    "map@5": 0.15341580395554946,
+    "ndcg@10": 0.4383223528191731,
+    "map@10": 0.08967666234617366,
+    "ndcg@20": 0.4452830693944395,
+    "map@20": 0.07386281991487269,
+    "coverage@10": 0.0018003420649923484,
+    "gini@10": 0.4999543941259634
+  },
+  "unified": {},
+  "interpretation": "Review deltas: large drops may indicate time-based drift or leakage. If timestamp_source is synthetic, treat results as heuristic only."
+}

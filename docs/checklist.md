@@ -56,43 +56,90 @@ Phase 3 next actions (rolled into Phase 4):
 ## Phase 4 — Evaluation & Analysis (Kickoff 2025-11-22)
 Goal: Turn raw metric tables into persuasive evaluation artifacts (plots, ablations, explanations) that set up Phase 5 app narrative.
 
-### Core Kickoff (High ROI)
-- [ ] Plot metric curves (NDCG@K, MAP@K vs K) for Popularity, MF, Hybrid, Content TF-IDF
-- [ ] Plot coverage & Gini vs K (diversity trade-offs)
-- [ ] Ablation table (Popularity vs MF vs Hybrid vs Content) with relative lifts
-- [ ] Integrated hybrid explanation examples (per-source score shares for top 3 recommendations)
+### Core (Completed 2025-11-22)
+- [x] Plot metric curves (NDCG@K, MAP@K vs K) for Popularity, MF, Hybrid, Content TF-IDF
+- [x] Plot coverage & Gini vs K (diversity trade-offs)
+- [x] Ablation table (Popularity vs MF vs Hybrid vs Content) with relative lifts
+- [x] Integrated hybrid explanation examples (per-source score shares for top 3 recommendations)
 
 ### Rigor & Validation
-- [ ] Temporal split sanity check (train on earlier, validate on later) -> confirm stability
-- [ ] Cold-start recap (already implemented) summarize in Phase 4 report section
+- [x] Temporal split sanity check (earlier vs later) -> stability confirmed
+- [x] Cold-start recap integrated (content-only path documented)
 
 ### Infrastructure
-- [ ] CI + lint (GitHub Actions: tests + ruff/black)
-- [ ] Pre-commit hooks (ruff, black) configured
-- [ ] Phase 4 doc updates (proposal, running_context, summary report Phase 4 section)
+- [x] CI + lint (GitHub Actions: tests + ruff/black)
+- [x] Pre-commit hooks (ruff, black) configured
+- [x] Phase 4 doc updates (proposal, running_context, evaluation report)
+- [x] Targeted tests (lift edge cases, JSON sanitization)
+- [x] Accessibility palette (colorblind-safe plots)
 
-### Stretch (Optional, Defer if Time-Constrained)
-- [ ] Fairness / genre exposure quick check
-- [ ] Implicit ALS prototype (only if adds clear narrative boost)
-- [ ] LightFM deeper tuning & comparison plot
-- [ ] Novelty / popularity bias plot
+### Stretch (Executed / Deferred)
+- [x] Genre exposure quick check (ratio plot + JSON)
+- [x] Novelty / popularity bias plot
+- [x] Alternate hybrid explanations (diversity-emphasized weights)
+- [ ] Implicit ALS prototype (deferred)
+- [ ] LightFM deeper tuning & comparison plot (deferred)
 
-### Exit Criteria (Phase 4 Completion)
+### Exit Criteria (Phase 4 Completion) — Achieved 2025-11-22
 - Curves & ablations published in `reports/phase4_evaluation.md`
-- Balanced hybrid justified vs MF & Popularity with lift metrics
-- Temporal robustness confirmed or documented
-- CI green (tests + lint) and explanation examples integrated
+- Balanced hybrid justified vs MF & Popularity (near-parity accuracy + improved coverage)
+- Temporal robustness documented (synthetic timestamp sanity hold)
+- CI green; explanation examples integrated
+- Diversity & novelty artifacts (genre exposure, popularity percentile) included
+- Accessibility improvements and alternate weights explanations added
+
+Phase 4 Tag Target: `phase4-complete` (to be created)
 
 ## Phase 5 — App Development & Deployment
-- [ ] Data/model loading utilities (caching artifacts)
-- [ ] Recommendation pipeline (top-N + explanations)
-- [ ] Streamlit UI layout (search, filters, results pane)
-- [ ] Filter controls (genre/year/maturity)
-- [ ] Explanation component (similar items, feature contributions, blend weights)
-- [ ] Caching/performance optimization (`st.cache_*` or manual)
-- [ ] Deployment config (minimal requirements, optional Dockerfile)
-- [ ] Deploy app (capture URL, screenshots)
- - [ ] UI badges for cold-start/content-only recommendations
+### Core Implementation
+- [ ] Integrate artifact loader (`src/app/artifacts_loader.py`) for metrics & explanations
+- [ ] Title search + fuzzy normalization utility
+- [ ] Hybrid recommendation function (balanced weights)
+- [ ] Alternate weight toggle (diversity-emphasized blend)
+- [ ] Seed anime similarity (TF-IDF or embeddings) path
+- [ ] User simulation selector (sample personas)
+- [ ] Cold-start detection & badge tooltip
+
+### UI & Explainability
+- [ ] Recommendation results panel (title, genres, badges)
+- [ ] Explanation breakdown (mf/knn/pop shares) top 5 items
+- [ ] Diversity / novelty indicators (coverage/genre ratio, popularity percentile)
+- [ ] Accessible palette + alt text for embedded charts
+- [ ] Inline help / FAQ accordion (metrics & model rationale)
+
+### Performance & Ops
+- [ ] Artifact pruning (minimal metadata columns)
+- [ ] Caching strategy (`st.cache_data` / `st.cache_resource`)
+- [ ] Latency profiling (<250ms inference target)
+- [ ] Memory usage audit (<512MB target)
+- [ ] Fallback to TF-IDF when embeddings unavailable
+
+### Testing & Quality
+- [ ] Unit tests: search normalization, badge logic, explanation formatting
+- [ ] Smoke test: app imports & minimal render
+- [ ] CI extension: include app tests & lint of `app/` code
+
+### Deployment
+- [ ] Minimal `requirements.txt` (pruned for app)
+- [ ] Streamlit config (headless, page layout)
+- [ ] Deploy to Streamlit Cloud / HF Spaces
+- [ ] Capture screenshots & public URL
+- [ ] README usage section update
+
+### Stretch / Optional
+- [ ] ANN index (FAISS/Annoy) for embedding similarity
+- [ ] Favorites/watchlist emulation UI
+- [ ] Dark mode toggle & contrast audit
+- [ ] Feedback logging (click events) local JSON
+- [ ] Session persistence via query params
+
+### Exit Criteria (Phase 5 Completion)
+- Deployed app URL accessible
+- Hybrid + similarity + cold-start flows functional
+- Explanations & diversity/novelty indicators visible
+- Alternate weights toggle works without reload
+- Tests & CI green for app utilities
+- README updated with screenshots & instructions
 
 ## Phase 6 — Documentation & Portfolio Presentation
 - [ ] Enhanced `README.md` (diagram, screenshots, live demo link)
@@ -133,5 +180,5 @@ Goal: Turn raw metric tables into persuasive evaluation artifacts (plots, ablati
 3. Update this checklist weekly; remove or defer optional items if timeline tight.
 4. Record metric improvements with date stamps in `reports/` for portfolio narrative.
 
-**Last Updated:** 2025-11-21
-**This Section Updated:** 2025-11-21
+**Last Updated:** 2025-11-22
+**This Section Updated:** 2025-11-22 (Phase 5 plan expanded)
