@@ -129,30 +129,91 @@ Stretch (Optional / Defer)
   - Novelty/popularity bias plot (long‑tail exposure metric vs baseline).
 
 Exit Criteria (Phase 4 Completion)
-  - Curves (NDCG/MAP, Coverage/Gini) committed.
-  - Ablation table with relative lifts published.
-  - Explanation examples integrated in evaluation report.
-  - Temporal robustness documented (pass/fail + interpretation).
-  - CI pipeline green (tests + lint); pre‑commit hooks active.
-  - Phase 4 report (`reports/phase4_evaluation.md`) referenced in main `README.md` / proposal.
+  - Curves (NDCG/MAP, Coverage/Gini) committed. ✅
+  - Ablation table with relative lifts published. ✅
+  - Explanation examples integrated in evaluation report. ✅
+  - Temporal robustness documented (synthetic timestamp sanity + unified comparison). ✅
+  - CI pipeline green (tests + ruff/black); pre-commit hooks active. ✅
+  - Genre exposure ratio + novelty/popularity bias artifacts generated (added to diversity narrative). ✅
+  - Alternate hybrid explanations (diversity-emphasized weights) produced. ✅
+  - Accessibility improvements (colorblind-safe palette, alt text references) applied. ✅
+  - Phase 4 report (`reports/phase4_evaluation.md`) enriched & referenced in main `README.md`. ✅
+
+Phase 4 Outcome Summary (2025-11-22):
+- Artifacts: metric & diversity curves (`reports/figures/phase4/*.png`), ablation CSV/MD, hybrid explanations (default + `hybrid_explanations_alt.json`), temporal split metrics, genre exposure ratio, novelty bias plot.
+- Robustness: Temporal split shows negligible degradation; hybrid retains MF accuracy within ~1% while improving coverage vs popularity baseline.
+- Diversity: Genre exposure & novelty bias plots illustrate balanced hybrid avoids over-concentration on top genres and high-popularity tail.
+- Engineering: CI workflow + pre-commit enforce quality; JSON safety utility and artifact loader prepared for app integration.
+- Explainability: Per-item contribution breakdown clarifies blended source influence (mf vs knn vs popularity).
 
 Recommended tools/libraries
   - pandas, numpy, matplotlib/seaborn/plotly for plotting; scikit‑learn metrics (existing); ruff, black, pytest, GitHub Actions for CI; optional implicit/LightFM for stretch.
 
 ### Phase 5 — App Development & Deployment
-- Objectives
-  - Deliver an interactive, portfolio‑ready Streamlit app with fast responses and clear explanations.
-- Core tasks
-  - UI: search by title, choose seed anime/user, filters (genre, year, maturity), “Why recommended?” explainer.
-  - UI badges/indicators for cold‑start or content‑only items to set expectations and explain limited personalization.
-  - Backend: load precomputed factors/indices; cosine similarity search; top‑N generation; caching layer.
-  - Data layer: small, optimized artifacts (sparse matrices, FAISS/Annoy index for embeddings if needed).
-  - Deployment: Streamlit Community Cloud or Hugging Face Spaces; optional Docker image.
-- Deliverables
-  - `app/` Streamlit app with components and `requirements.txt`.
-  - Deployed URL and app README section with screenshots.
-- Recommended tools/libraries
-  - Streamlit, numpy/pandas, `sentence-transformers`, optional FAISS/Annoy, joblib.
+Objectives
+  - Deliver an interactive, portfolio‑ready Streamlit app showcasing recommendations, explanations, diversity/novelty indicators, and cold‑start handling.
+  - Provide a crisp UX: fast initial load (<3s), clear “Why this anime?” context, accessible color palette, mobile-friendly layout.
+  - Ensure reproducibility: controlled artifact loading, deterministic sample recommendations, and clear environment bootstrap.
+
+Core Implementation Tasks
+  - Data/Artifact Loader Integration: finalize use of `src/app/artifacts_loader.py` for metrics, explanations, diversity artifacts.
+  - Recommendation Endpoint: wrapper functions to fetch top‑N per (user simulation, seed anime similarity, cold‑start content path).
+  - User Simulation: simple user persona selection (e.g., sample IDs with stored preference summaries).
+  - Title Search & Selection: fuzzy search over normalized titles (English/Japanese) with fallback to substring.
+  - Hybrid Recommender Inference: blend MF, kNN, popularity scores with frozen weights; alternate weight toggle.
+  - Cold‑Start Labeling: flag items absent from training interactions (new since snapshot) and display badge + tooltip.
+
+UX & Explainability
+  - Explanation Panel: show contributing source scores (mf/knn/pop) for each rec (top 5) + share percentages.
+  - Diversity & Novelty Badges: overlay indicators (e.g., genre novelty ratio, popularity percentile band).
+  - Accessible Color Scheme: reuse Phase 4 colorblind‑safe palette for charts and badges.
+  - Loading Skeletons: placeholder components while artifacts initialize.
+  - Inline Help: collapsible FAQ on metrics (NDCG, coverage, Gini, novelty) and hybrid logic.
+
+Performance & Operations
+  - Artifact Pruning: reduce item metadata columns to those required by UI (id, title_display, genres, synopsis snippet).
+  - Caching Strategy: `st.cache_data` / `st.cache_resource` for models & artifacts; manual TTL for large embeddings.
+  - Lightweight Embedding Similarity: optional fallback to TF‑IDF cosine if sentence embeddings omitted for speed.
+  - Memory Budget: keep RAM < 512MB for community hosting (monitor sizes of vector/embedding matrices).
+  - Latency Targets: recommendation inference <250ms for typical user or seed input.
+
+Testing & Quality
+  - Unit tests for UI helper functions (search normalization, badge logic, explanation formatting).
+  - Smoke test script (`scripts/run_unified_eval.py` reused) ensures artifacts present before app launch.
+  - CI Extension: add app import test (no runtime errors) and simple Streamlit component render test.
+
+Stretch (Optional)
+  - ANN Index (FAISS/Annoy) for synopsis embedding similarity; evaluate latency improvement.
+  - Favorites / Watchlist Emulation: allow users to select a few liked titles → dynamic re‑ranking.
+  - Session Persistence: store last selections in local query params.
+  - Dark Mode Toggle & Accessibility audit (ARIA roles, contrast check).
+  - Lightweight Feedback Logging (local JSON) for click events.
+
+Exit Criteria (Phase 5 Completion)
+  - Deployed Streamlit app (public URL) with: search, hybrid recommendations, explanations, cold‑start badges.
+  - Diversity/novelty indicators visible for each recommendation or summary section.
+  - Alternate hybrid weight toggle (balanced vs diversity‑emphasized) functioning.
+  - App loads within target latency thresholds; caching verified (no repeated heavy load).
+  - README updated with screenshots + usage instructions.
+  - Minimal test suite for app utilities passing in CI.
+  - No PII; reproducible run instructions documented.
+
+Success & UX Metrics (Qualitative)
+  - Clarity: user can explain why an item appears after 10s of exploration.
+  - Diversity: user notices mix of mainstream and long‑tail items (qualitative check).
+  - Responsiveness: interactions feel instantaneous (<500ms) for top‑N updates.
+
+Risks & Mitigations (Phase 5)
+  - Large Artifacts Slow Load → prune columns / lazy load explanations.
+  - Cold‑Start Confusion → explicit badge + tooltip clarifying content-only path.
+  - Embedding Latency → fallback to TF‑IDF similarity when embeddings absent.
+  - Memory Constraints → monitor object sizes; optionally compress parquet with snappy.
+  - Explainability Overload → limit to top 5 items; drill‑down modal for details.
+
+Transition to Phase 6
+  - After deployment and initial manual QA, capture screenshots + architecture diagram.
+  - Document inference pipeline and artifact lineage in `README.md` + `docs/`.
+  - Prepare optional blog/video assets if time allows.
 
 ### Phase 6 — Documentation & Portfolio Presentation
 - Objectives
@@ -249,7 +310,12 @@ Recommended tools/libraries
 
 ---
 
-Next steps
-- Run Optuna studies for hybrid weights and MF; freeze defaults and re-evaluate on a unified slice.
-- Refresh the Phase 3 report top table; include cold-start metrics and explanation examples.
-- Serialize current artifacts with a version suffix and update the manifest; proceed toward Phase 4 (evaluation visuals, ablations).
+Next Steps (Phase 5 Initiation)
+- Integrate loader module into Streamlit app (`src/app/artifacts_loader.py`).
+- Build interactive recommendation view (user simulation + seed title search) with explanation panel.
+- Surface diversity/novelty indicators (badges, ratios) alongside recommendations.
+- Implement cold-start item labeling (new since snapshot) and explanatory tooltip.
+- Optimize artifact sizes (prune unused columns; optionally compress parquet) for faster app load.
+- Deploy initial Streamlit prototype; collect manual UX feedback and iterate.
+
+Tagging: Create git tag `phase4-complete` to freeze evaluation baseline before UI development.

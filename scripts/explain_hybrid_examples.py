@@ -10,7 +10,14 @@ import pandas as pd
 import numpy as np
 from joblib import load
 
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, DEFAULT_HYBRID_WEIGHTS
+from src.models.constants import (
+    DATA_PROCESSED_DIR,
+    MODELS_DIR,
+    METRICS_DIR,
+    TOP_K_DEFAULT,
+    DEFAULT_SAMPLE_USERS,
+    DEFAULT_HYBRID_WEIGHTS,
+)
 from src.eval.splits import build_validation, sample_user_ids
 from src.models.knn_sklearn import ItemKNNRecommender
 from src.models.mf_sgd import FunkSVDRecommender
@@ -19,7 +26,21 @@ from src.models.hybrid import weighted_blend
 from src.eval.explain import blend_explanations
 
 
-def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS, w_mf: float = None, w_knn: float = None, w_pop: float = None, max_users: int = 5):
+def _json_safe(obj):
+    """Recursively convert numpy scalar types to native Python for JSON serialization."""
+    import numpy as _np
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, (_np.integer,)):
+        return int(obj)
+    if isinstance(obj, (_np.floating,)):
+        return float(obj)
+    return obj
+
+
+def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS, w_mf: float = None, w_knn: float = None, w_pop: float = None, max_users: int = 5, out_suffix: str | None = None):
     if w_mf is None:
         w_mf = DEFAULT_HYBRID_WEIGHTS["mf"]
     if w_knn is None:
@@ -48,20 +69,23 @@ def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS, w_mf:
         for it in seen:
             if mf_model.item_to_index and it in mf_model.item_to_index:
                 mf_scores_arr[mf_model.item_to_index[it]] = -np.inf
-        mf_scores = {mf_model.index_to_item[i]: float(s) for i, s in enumerate(mf_scores_arr) if np.isfinite(s)}
-        knn_scores = knn_model.score_all(u, exclude_seen=True)
-        pop_scores = {i: s for i, s in pop_scores_global.items() if i not in seen}
+        mf_scores = {int(mf_model.index_to_item[i]): float(s) for i, s in enumerate(mf_scores_arr) if np.isfinite(s)}
+        knn_raw = knn_model.score_all(u, exclude_seen=True)
+        knn_scores = {int(i): float(s) for i, s in knn_raw.items()}
+        pop_scores = {int(i): float(s) for i, s in pop_scores_global.items() if i not in seen}
         sources = {"mf": mf_scores, "knn": knn_scores, "pop": pop_scores}
-        weights = {"mf": w_mf, "knn": w_knn, "pop": w_pop}
+        weights = {"mf": float(w_mf), "knn": float(w_knn), "pop": float(w_pop)}
         recs = weighted_blend(sources, weights, top_k=k)
         out[str(u)] = {
-            "top": recs,
-            "contributions": blend_explanations(recs[:5], sources, weights),
+            "top": [int(r[0]) if isinstance(r, (list, tuple)) else int(r) for r in recs],
+            "contributions": _json_safe(blend_explanations(recs[:5], sources, weights)),
         }
 
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
-    (METRICS_DIR / "hybrid_explanations.json").write_text(json.dumps(out, indent=2))
-    print(json.dumps(out, indent=2))
+    serialized = _json_safe(out)
+    filename = "hybrid_explanations.json" if out_suffix is None else f"hybrid_explanations_{out_suffix}.json"
+    (METRICS_DIR / filename).write_text(json.dumps(serialized, indent=2))
+    print(json.dumps(serialized, indent=2))
 
 
 if __name__ == "__main__":
@@ -74,5 +98,6 @@ if __name__ == "__main__":
     parser.add_argument("--w-knn", type=float, default=None)
     parser.add_argument("--w-pop", type=float, default=None)
     parser.add_argument("--max-users", type=int, default=5)
+    parser.add_argument("--out-suffix", type=str, default=None, help="Optional suffix for output JSON filename.")
     args = parser.parse_args()
-    main(args.k, args.sample_users, args.w_mf, args.w_knn, args.w_pop, args.max_users)
+    main(args.k, args.sample_users, args.w_mf, args.w_knn, args.w_pop, args.max_users, args.out_suffix)

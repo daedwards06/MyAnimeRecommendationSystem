@@ -1,6 +1,6 @@
 # Running Context (Live Project Snapshot)
 
-Last updated: 2025-11-21
+Last updated: 2025-11-22 (Phase 4 completion)
 
 > Purpose: This document is a concise, living summary of the project state so any new chat/session can quickly regain context without rereading long-form artifacts or scrolling history.
 
@@ -16,7 +16,7 @@ Last updated: 2025-11-21
 | 1 | Data acquisition & enrichment (Kaggle + Jikan) | COMPLETE |
 | 2 | Cleaning & feature engineering | COMPLETE (wrap-up enhancements added) |
 | 3 | Baseline recommenders (CF/content + hybrid tuning) | COMPLETE |
-| 4 | Evaluation & analysis (plots, ablations, explanations, temporal check, CI) | KICKOFF / IN PROGRESS |
+| 4 | Evaluation & analysis (plots, ablations, explanations, temporal check, CI) | COMPLETE (2025-11-22) |
 | 5 | App development (Streamlit UI, inference, explainability surfacing) | Pending |
 | 6 | Documentation & portfolio polish | Pending |
 
@@ -153,16 +153,31 @@ When a significant event occurs (decision, phase change, major artifact creation
 (Replace or append daily summaries; keep last 5 only.)
 
 ---
-## 16. Phase 4 Tracking & Next Trigger
-Progress checklist (core):
-- [ ] Metric curves (NDCG/MAP vs K)
-- [ ] Coverage & Gini curves vs K
-- [ ] Ablation table (Popularity vs MF vs Hybrid vs Content TF-IDF) with lifts
-- [ ] Explanation examples integrated (top 3 hybrid items per-source shares)
-- [ ] Temporal split validation
-- [ ] CI + lint (tests + ruff/black) green
+## 16. Phase 4 Summary & Transition
+Completed artifacts:
+- Metric curves (NDCG@K, MAP@K) + diversity curves (Coverage@K, Gini@K)
+- Ablation table (Popularity vs MF vs Hybrid vs Content TF-IDF) w/ relative lifts
+- Hybrid explanation examples (default + alternate diversity-emphasized weights)
+- Temporal split validation (synthetic ordering; stability confirmed)
+- Genre exposure ratio JSON + bar plot; novelty/popularity bias plot
+- Accessibility upgrades (colorblind-safe palette, alt text references)
+- CI workflow + pre-commit hooks; targeted tests (lift edge case & JSON sanitization)
 
-Next trigger: Once all core items checked, create Phase 4 evaluation report (`reports/phase4_evaluation.md`) and transition to initial Streamlit scaffolding (Phase 5).
+Artifacts locations:
+- `reports/figures/phase4/` (curves, genre_exposure_ratio.png, novelty_bias.png)
+- `reports/artifacts/genre_exposure.json`, `reports/artifacts/novelty_bias.json`
+- `experiments/metrics/hybrid_explanations.json`, `experiments/metrics/hybrid_explanations_alt.json`
+- `reports/phase4_evaluation.md` (central narrative)
+
+Phase 5 Focus (up next): Streamlit UI (recommendations + explanations), diversity/novelty badges, cold-start labeling, artifact loader integration, deployment.
 
 ---
 End of running context.
+---
+### 2025-11-22 Update (Phase 4 Completion)
+- Generated metric & diversity plots, ablation table, explanations (default + alt weights).
+- Added genre exposure & novelty bias artifacts (fairness/diversity narrative).
+- Temporal split robustness confirmed; synthetic timestamp strategy documented.
+- CI + pre-commit operational; tests added for JSON and lift logic.
+- Evaluation report enriched with methodology, accessibility notes, and diversity section.
+- Ready for git tag `phase4-complete` and Phase 5 app scaffolding.
