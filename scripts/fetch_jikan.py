@@ -54,6 +54,7 @@ FIELDS = [
     "mal_rank",
     "mal_popularity",
     "members_count",
+    "streaming",
     "retrieved_at",
 ]
 
@@ -138,6 +139,10 @@ def normalize_record(anime_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
 
+    # Extract streaming platforms with names and URLs
+    streaming_list = data.get("streaming", []) or []
+    streaming_data = [{"name": s.get("name"), "url": s.get("url")} for s in streaming_list if isinstance(s, dict) and s.get("name")]
+    
     return {
         "anime_id": anime_id,
         "title_primary": data.get("title"),
@@ -160,6 +165,7 @@ def normalize_record(anime_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
         "mal_rank": data.get("rank"),
         "mal_popularity": data.get("popularity"),
         "members_count": data.get("members"),
+        "streaming": streaming_data,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
     }
 

@@ -1,3 +1,43 @@
+Last updated: 2025-11-24 (Phase 5 in progress)
+
+## 17. Phase 5 Progress Snapshot (2025-11-24)
+Implemented:
+- Artifact loader integrated with pruned metadata and restored thumbnail column.
+- Query param API migration (deprecated experimental functions removed).
+- Searchable title dropdown (13K+ titles) replacing free text input.
+- Seed selection with green banner indicator + clear button.
+- Sample search suggestions (4 popular titles) in empty state.
+- Visual card redesign: colored borders, inline badge pills with icons, proper spacing.
+- Badge tooltips component explaining cold-start, popularity, novelty.
+- Explanation panel component showing top-5 MF/kNN/Pop breakdowns.
+- Simplified inline explanations (human-friendly summaries) with technical expanders.
+- Progress spinner, result count heading, visual diversity summary bar (Popular/Balanced/Exploratory).
+- Confidence star ratings (1-5 ⭐) per recommendation card.
+- Fixed image rendering (switched to st.image() instead of HTML markdown).
+- Smart synopsis truncation with expandable full text section.
+- Fixed seed similarity indentation bug.
+
+Pending (near-term):
+- Latency/memory profiling display (<250ms / <512MB targets).
+- Unit tests (search, badges, explanations).
+- Deployment to Streamlit Cloud/HF Spaces + screenshots + README update.
+
+Stretch (deferred): ANN index; favorites/watchlist; dark mode; feedback logging.
+
+Risks addressed: Missing titles (multi-field resolver), image codec issues (st.image()), synopsis truncation (expandable section), HTML rendering (component switch), seed logic error (indentation fix).
+
+### Quick Session Summary (Rolling — last 5 entries)
+- 2025-11-17: Diversity metrics integrated; popularity-heavy blend identified as coverage risk.
+- 2025-11-21: Diversity-aware tuning complete; Phase 3 closed; weights frozen.
+- 2025-11-23: Phase 5 scaffold started (query params migration, image diagnostics, onboarding design).
+- 2025-11-24 (morning): Seed similarity refinement, sidebar Quick Steps, title fallback, synopsis truncation, skeleton removal.
+- 2025-11-24 (afternoon): Visual card redesign, searchable dropdown, badge tooltips, explanation panel, progress indicators, diversity bar, confidence stars, image/synopsis fixes.
+Ready for git tag `phase4-complete` (pending); Phase 5 app polish complete; deployment prep next.
+
+### 2025-11-24 Update (Phase 5 Advanced)
+- UX transformation complete: searchable dropdown, seed indicator, visual cards, tooltips, explanation panel, diversity bar, stars.
+- All critical display bugs fixed (images, truncation).
+- Next: performance audit (surface latency/memory) → tests → deploy.
 # Running Context (Live Project Snapshot)
 
 Last updated: 2025-11-22 (Phase 4 completion)

@@ -149,7 +149,7 @@ Phase 4 Outcome Summary (2025-11-22):
 Recommended tools/libraries
   - pandas, numpy, matplotlib/seaborn/plotly for plotting; scikit‑learn metrics (existing); ruff, black, pytest, GitHub Actions for CI; optional implicit/LightFM for stretch.
 
-### Phase 5 — App Development & Deployment
+### Phase 5 — App Development & 
 Objectives
   - Deliver an interactive, portfolio‑ready Streamlit app showcasing recommendations, explanations, diversity/novelty indicators, and cold‑start handling.
   - Provide a crisp UX: fast initial load (<3s), clear “Why this anime?” context, accessible color palette, mobile-friendly layout.
@@ -214,7 +214,49 @@ Transition to Phase 6
   - After deployment and initial manual QA, capture screenshots + architecture diagram.
   - Document inference pipeline and artifact lineage in `README.md` + `docs/`.
   - Prepare optional blog/video assets if time allows.
+  
+#### Phase 5 Progress (2025-11-24)
+Status: IN PROGRESS. Interactive Streamlit prototype with polished UX and explainability features.
+Completed so far:
+  - Integrated artifact loader (`build_artifacts`) with metadata pruning and required columns restoration (including `poster_thumb_url`).
+  - Replaced deprecated Streamlit query param API (migrated to `st.query_params`).
+  - Restored & rendered thumbnails via native `st.image()` component (replaced HTML markdown approach to fix rendering issues).
+  - Added onboarding instructions component (dismissible usage steps) and persistent sidebar quick steps.
+  - Implemented searchable title dropdown (replaced free text) showing all 13K+ sorted titles for improved discoverability.
+  - Seed selection with auto-population on dropdown change; green success banner "🎯 Active Seed" with clear button.
+  - Sample search suggestions (4 popular titles: Steins;Gate, Cowboy Bebop, Death Note, FMA:Brotherhood) in empty state.
+  - Added refined seed similarity path (genre overlap + hybrid score + mild popularity boost) with per-item explanation shares.
+  - Hybrid recommender with weight toggle (Balanced vs Diversity) wired into UI.
+  - Visual card redesign: colored left borders (blue=trained, orange=cold-start), inline badge pills with icons, proper spacing.
+  - Simplified inline explanations (human-friendly summaries like "📊 Collaborative 96%") with technical details in expander.
+  - Badge tooltips component (`src/app/components/tooltips.py`) explaining cold-start, popularity bands, novelty ratios.
+  - Explanation panel component (`src/app/components/explanation_panel.py`) showing top-5 MF/kNN/Pop breakdowns.
+  - Title fallback resolver across multiple metadata fields (title_display → title_english → title → title_japanese → fallback).
+  - Smart synopsis truncation with full text available in expandable "📖 Read full synopsis" section.
+  - Progress indicators: spinner "🔍 Finding recommendations..." during computation.
+  - Result count heading: "Showing X recommendations".
+  - Visual diversity summary bar: horizontal colored bar showing Popular (🔥), Balanced (📊), Exploratory (🌟) counts with proportions.
+  - Confidence star rating (⭐ 1-5 stars) per card based on recommendation score magnitude.
+  - Fixed indentation bug in seed similarity path causing NameError.
 
+Remaining (near-term):
+  - Latency measurement display + caching audit (ensure <250ms inference path).
+  - Memory usage profiling (<512MB target).
+  - Unit tests for search normalization, badge logic, explanation formatting.
+  - README screenshot & usage section draft; deployment to public hosting.
+  - Minimal `requirements.txt` for deployment.
+
+Stretch still open: ANN index, favorites/watchlist, dark mode, feedback logging.
+
+Risks Observed & Mitigated:
+  - Metadata pruning inadvertently dropped critical display columns (resolved with expanded `MIN_METADATA_COLUMNS`).
+  - Image codec issues avoided via native st.image() instead of HTML markdown.
+  - Synopsis truncation cutting mid-sentence (resolved with expandable full text section).
+  - Image HTML tags appearing as text (fixed by switching from markdown to st.image()).
+  - Seed selection logic indentation error (fixed).
+
+Next focus: Performance audit (latency/memory surface) → minimal test suite → deploy & document.
+Deployment
 ### Phase 6 — Documentation & Portfolio Presentation
 - Objectives
   - Communicate impact, rigor, and reproducibility.
