@@ -1,13 +1,27 @@
+############################################################
+# Phase 5 App Runtime Requirements
+# Pruned set for Streamlit deployment (low memory footprint).
+# Training/experimentation libs retained if small; heavy ones optional.
+# (If deploying minimal app only, comment out heavier libs below.)
+############################################################
+
+streamlit==1.38.0
 pandas==2.2.2
 numpy==1.26.4
 scikit-learn==1.5.2
+joblib==1.4.2
 pyarrow==16.1.0
-streamlit==1.38.0
+rapidfuzz==3.9.4
+Pillow==10.4.0  # image thumbnail processing for enrich_images pipeline
+httpx==0.27.2   # HTTP client (already listed below but kept for clarity near image deps)
+
+# Optional (enable embeddings content path). Comment out to slim further.
 sentence-transformers==2.7.0
 torch>=2.2,<2.5
-optuna==3.6.1
+
+# Dev / evaluation (can be excluded in minimal prod):
 matplotlib==3.9.2
 seaborn==0.13.2
 plotly==5.24.1
+optuna==3.6.1
 pytest==8.3.2
-httpx==0.27.2

@@ -1,0 +1,16 @@
+[
+  {
+    "user_id": 101,
+    "label": "Action Adventurer",
+    "favorite_genres": ["action", "adventure", "fantasy"],
+    "preference_summary": "Prefers high-energy shounen with world-building and ensemble casts.",
+    "liked_example_ids": [5114, 9253, 11061]
+  },
+  {
+    "user_id": 202,
+    "label": "Drama Slice-Fan",
+    "favorite_genres": ["drama", "slice of life", "romance"],
+    "preference_summary": "Enjoys character-driven slow-burn dramas and emotional arcs.",
+    "liked_example_ids": [6547, 4181, 32281]
+  }
+]

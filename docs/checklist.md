@@ -92,26 +92,36 @@ Phase 4 Tag Target: `phase4-complete` (to be created)
 
 ## Phase 5 — App Development & Deployment
 ### Core Implementation
-- [ ] Integrate artifact loader (`src/app/artifacts_loader.py`) for metrics & explanations
-- [ ] Title search + fuzzy normalization utility
-- [ ] Hybrid recommendation function (balanced weights)
-- [ ] Alternate weight toggle (diversity-emphasized blend)
-- [ ] Seed anime similarity (TF-IDF or embeddings) path
-- [ ] User simulation selector (sample personas)
-- [ ] Cold-start detection & badge tooltip
+- [x] Integrate artifact loader (`src/app/artifacts_loader.py`) for metrics & explanations
+- [x] Searchable title dropdown (replaced free text input; 13K+ sorted titles)
+- [x] Hybrid recommendation function (balanced weights)
+- [x] Alternate weight toggle (diversity-emphasized blend)
+- [x] Seed anime similarity path (genre overlap + hybrid + popularity prior)
+- [x] Seed selection indicator (green banner "🎯 Active Seed" + clear button)
+- [x] Sample search suggestions (4 popular titles in empty state)
+- [~] User simulation selector (sample personas; basic persona dropdown, profiles TBD)
+- [x] Cold-start detection (flag present) & badge tooltip (tooltip component implemented)
 
 ### UI & Explainability
-- [ ] Recommendation results panel (title, genres, badges)
-- [ ] Explanation breakdown (mf/knn/pop shares) top 5 items
-- [ ] Diversity / novelty indicators (coverage/genre ratio, popularity percentile)
-- [ ] Accessible palette + alt text for embedded charts
-- [ ] Inline help / FAQ accordion (metrics & model rationale)
+- [x] Recommendation results panel (title, genres, badges)
+- [x] Visual card redesign (colored borders: blue=trained, orange=cold-start; inline badge pills with icons; spacing)
+- [x] Badge tooltips component (`src/app/components/tooltips.py`: cold-start, popularity, novelty)
+- [x] Explanation panel component (`src/app/components/explanation_panel.py`: top-5 MF/kNN/Pop breakdown)
+- [x] Simplified inline explanations (human-friendly summaries like "📊 Collaborative 96%")
+- [x] Diversity summary bar (horizontal colored bar: Popular 🔥, Balanced 📊, Exploratory 🌟 with counts/proportions)
+- [x] Confidence star ratings (⭐ 1-5 stars per card based on score magnitude)
+- [x] Progress spinner ("🔍 Finding recommendations..." during computation)
+- [x] Result count heading ("Showing X recommendations")
+- [x] Smart synopsis truncation with expandable full text section ("📖 Read full synopsis")
+- [x] Accessible palette + alt text (leveraging Phase 4 palette + per-poster alt text)
+- [x] Inline help / FAQ accordion (help panel implemented)
 
 ### Performance & Ops
-- [ ] Artifact pruning (minimal metadata columns)
-- [ ] Caching strategy (`st.cache_data` / `st.cache_resource`)
-- [ ] Latency profiling (<250ms inference target)
-- [ ] Memory usage audit (<512MB target)
+- [x] Artifact pruning (minimal metadata columns + restored display fields including poster_thumb_url)
+- [x] Caching strategy (`st.cache_data` / `st.cache_resource` in place)
+- [x] Image rendering optimized (switched to native st.image() for reliability)
+- [~] Latency profiling (<250ms inference target; instrumentation present, surface display pending)
+- [~] Memory usage audit (<512MB target; profiling pending)
 - [ ] Fallback to TF-IDF when embeddings unavailable
 
 ### Testing & Quality
@@ -180,5 +190,21 @@ Phase 4 Tag Target: `phase4-complete` (to be created)
 3. Update this checklist weekly; remove or defer optional items if timeline tight.
 4. Record metric improvements with date stamps in `reports/` for portfolio narrative.
 
-**Last Updated:** 2025-11-22
-**This Section Updated:** 2025-11-22 (Phase 5 plan expanded)
+**Last Updated:** 2025-11-24
+**This Section Updated:** 2025-11-24 (Phase 5 progress logged)
+
+#### Phase 5 Progress Notes (2025-11-24)
+- Onboarding panel + Quick Steps sidebar complete.
+- Searchable title dropdown (13K+ titles) replacing free text input.
+- Seed selection with green banner indicator ("🎯 Active Seed") + clear button.
+- Sample search suggestions (4 popular titles) in empty state.
+- Visual card redesign: colored borders (blue/orange), inline badge pills with icons, proper spacing.
+- Badge tooltips component (`tooltips.py`) implemented for cold-start, popularity, novelty.
+- Explanation panel component (`explanation_panel.py`) showing top-5 MF/kNN/Pop breakdowns.
+- Simplified inline explanations with human-friendly summaries + technical expanders.
+- Progress spinner, result count heading, visual diversity bar (Popular/Balanced/Exploratory).
+- Confidence star ratings (1-5 ⭐) per card based on score magnitude.
+- Image rendering fixed: switched from HTML markdown to native `st.image()` component.
+- Synopsis truncation fixed: added expandable "📖 Read full synopsis" section for full text.
+- Fixed seed similarity indentation bug causing NameError.
+- Remaining near-term: latency/memory profiling display, unit tests, deployment + screenshots.
