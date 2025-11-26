@@ -1,4 +1,47 @@
-Last updated: 2025-11-26 (Phase 5 UX refinement)
+Last updated: 2025-11-26 (Phase 5 UX refinement + type filter debugging)
+
+## 19. Multi-Seed Recommendations Bug Fixes & Type Filter Debugging (2025-11-26)
+**Critical Bug Fixes**:
+- **Genre Parsing Bug**: Multi-seed recommendations returned zero results despite debug script showing they should work
+  - Root cause: Code assumed genres stored as pipe-delimited strings but data stored as numpy arrays
+  - Solution: Added dual format handling for both string and array genres in multi-seed logic
+  - Impact: Tokyo Ghoul + Death Note multi-seed now returns ~50 recommendations
+
+- **Match Percentage Normalization**: Weighted overlap scores >1.0 broke percentage display
+  - Root cause: Raw weighted overlap not normalized to 0-1 range
+  - Solution: `weighted_overlap = raw_overlap / max_possible_overlap`
+  - Impact: Match percentages now display correctly (76% vs incorrect 23%)
+
+- **Quality Filter Issue**: Filter removing all recommendations after genre parsing fix
+  - Solution: Removed quality filter entirely (no longer needed with correct genre parsing)
+  - Impact: Recommendations now appear consistently
+
+**Type Differentiation Feature**:
+- Added `type` field to Jikan fetch script (TV, Movie, OVA, Special, ONA, Music, TV Special, CM, PV)
+- Implemented type filter UI (multi-select in sidebar with 9 type options)
+- Type filter logic with NaN handling: `pd.notna(item_type) and str(item_type).strip() in type_filter`
+- **Type Filter Debugging** (in progress):
+  - User reported filter not working (same results regardless of selection)
+  - Added comprehensive debug logging: active filter list, types distribution, before/after counts
+  - Debug output shows: selected types, types found in recommendations, filtering effectiveness
+  - Awaiting user test with Tokyo Ghoul + "Movie" filter to diagnose root cause
+
+**Image Path Restoration**:
+- All 12,923 thumbnail images disappeared from metadata after fetch_jikan.py run
+- Root cause: fetch_jikan.py rewrites entire parquet file, losing enriched columns not in FIELDS
+- Solution: Ran `enrich_images.py --repair-from-files --repair-only` to restore paths from disk
+- Impact: 12,183 thumbnail paths recovered from filesystem scan
+
+**Data Format Discoveries**:
+- Type data coverage: 12,182/13,037 anime (93.4%)
+- Type distribution: TV (3,752), OVA (3,271), Movie (2,337), Special (1,123), ONA (611), Music (479), TV Special (449), CM (117), PV (43)
+- Genre format: Stored as numpy arrays requiring `hasattr(genres, '__iter__')` checks
+- Type format: Simple string values, requires NaN handling before filtering
+
+**Next Steps**:
+- User needs to reload Streamlit app and test type filter with debug output
+- Analyze debug output to determine if filter logic issue or data coverage issue
+- Potential fixes: session state persistence, type comparison normalization, filter application order
 
 ## 18. Phase 5 UX Refinement Session (2025-11-26)
 Major bug fixes and feature enhancements:

@@ -30,6 +30,7 @@ from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
 from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
+from src.app.quality_filters import apply_quality_filters
 from src.app.components.explanation_panel import render_explanation_panel
 from src.app.theme import get_theme
 from src.app.constants import (
@@ -124,6 +125,26 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     
+    /* Genre pill button styling - make them look like badges */
+    button[kind="secondary"] {
+        background-color: #ECF0F1 !important;
+        color: #34495E !important;
+        border: none !important;
+        padding: 4px 12px !important;
+        font-size: 0.8rem !important;
+        border-radius: 12px !important;
+        font-weight: 500 !important;
+        min-height: 28px !important;
+        height: 28px !important;
+    }
+    
+    button[kind="secondary"]:hover {
+        background-color: #3498DB !important;
+        color: white !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3) !important;
+    }
+    
     /* Remove extra spacing */
     .element-container {
         margin-bottom: 0.5rem;
@@ -182,6 +203,8 @@ for key, default in {
     "year_min": 1960,
     "year_max": 2025,
     "view_mode": "list",
+    "selected_seed_ids": [],
+    "selected_seed_titles": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -206,20 +229,20 @@ for _, row in metadata.iterrows():
     if title:
         title_to_id[title] = int(row["anime_id"])
 
-available_titles = ["(none)"] + sorted(title_to_id.keys())
-current_query = st.session_state.get("query", "")
-if current_query and current_query in available_titles:
-    default_idx = available_titles.index(current_query)
-else:
-    default_idx = 0
+available_titles = sorted(title_to_id.keys())
 
-selected_title = st.sidebar.selectbox(
-    "Search Title",
+# Multi-select for seeds (max 5)
+current_seed_titles = st.session_state.get("selected_seed_titles", [])
+selected_titles = st.sidebar.multiselect(
+    "Search Titles (1-5 seeds)",
     options=available_titles,
-    index=default_idx,
-    help="Browse and select an anime title to use as a seed for recommendations"
+    default=current_seed_titles,
+    max_selections=5,
+    help="Select 1-5 anime to blend their recommendations. More seeds = broader discovery!"
 )
-query = selected_title if selected_title != "(none)" else ""
+
+# Update query for backward compatibility
+query = selected_titles[0] if selected_titles else ""
 
 weight_mode = st.sidebar.radio("Hybrid Weights", ["Balanced", "Diversity"], index=(0 if st.session_state.get("weight_mode") != "Diversity" else 1), horizontal=True)
 top_n = st.sidebar.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N)))
@@ -263,6 +286,20 @@ genre_filter = st.sidebar.multiselect(
     help="Show only anime with these genres"
 )
 
+# Get unique types from metadata for filter
+all_types = set()
+for type_val in metadata["type"].dropna() if "type" in metadata.columns else []:
+    if type_val and isinstance(type_val, str):
+        all_types.add(type_val.strip())
+type_options = sorted(list(all_types)) if all_types else ["TV", "Movie", "OVA", "Special", "ONA", "Music"]
+
+type_filter = st.sidebar.multiselect(
+    "Filter by Type",
+    options=type_options,
+    default=st.session_state.get("type_filter", []),
+    help="Show only TV series, Movies, OVAs, etc."
+)
+
 year_range = st.sidebar.slider(
     "Release Year Range",
     min_value=1960,
@@ -273,6 +310,7 @@ year_range = st.sidebar.slider(
 
 st.session_state["sort_by"] = sort_by
 st.session_state["genre_filter"] = genre_filter
+st.session_state["type_filter"] = type_filter
 st.session_state["year_min"] = year_range[0]
 st.session_state["year_max"] = year_range[1]
 
@@ -357,27 +395,30 @@ if persona_choice != "(none)":
 
 
 # Seed selection indicator & handler --------------------------------------
-selected_seed_id = st.session_state.get("selected_seed_id")
-selected_seed_title = st.session_state.get("selected_seed_title")
-
-# Auto-select seed when title chosen from dropdown
-if query and query != st.session_state.get("last_query"):
-    # Use title_to_id mapping for direct lookup
-    aid = title_to_id.get(query)
+# Convert selected titles to IDs
+selected_seed_ids = []
+selected_seed_titles = []
+for title in selected_titles:
+    aid = title_to_id.get(title)
     if aid:
-        st.session_state["selected_seed_id"] = aid
-        st.session_state["selected_seed_title"] = query
-        st.session_state["last_query"] = query
-        selected_seed_id = aid
-        selected_seed_title = query
+        selected_seed_ids.append(aid)
+        selected_seed_titles.append(title)
+
+# Update session state
+st.session_state["selected_seed_ids"] = selected_seed_ids
+st.session_state["selected_seed_titles"] = selected_seed_titles
 
 # Prominent seed indicator
-if selected_seed_id and selected_seed_title:
-    st.sidebar.success(f"🎯 **Active Seed**: {selected_seed_title}")
-    if st.sidebar.button("✖ Clear Seed", key="clear_seed"):
-        st.session_state.pop("selected_seed_id", None)
-        st.session_state.pop("selected_seed_title", None)
-        st.session_state["last_query"] = ""
+if selected_seed_ids and selected_seed_titles:
+    if len(selected_seed_titles) == 1:
+        st.sidebar.success(f"🎯 **Active Seed**: {selected_seed_titles[0]}")
+    else:
+        st.sidebar.success(f"🎯 **Active Seeds** ({len(selected_seed_titles)}):")
+        for title in selected_seed_titles:
+            st.sidebar.caption(f"• {title}")
+    if st.sidebar.button("✖ Clear All Seeds", key="clear_seed"):
+        st.session_state["selected_seed_ids"] = []
+        st.session_state["selected_seed_titles"] = []
         st.rerun()
 else:
     # Sample search suggestions
@@ -389,13 +430,15 @@ else:
         for i, sample in enumerate(available_samples[:4]):
             with cols[i % 2]:
                 if st.button(sample, key=f"sample_{i}", use_container_width=True):
-                    # Use title_to_id mapping
+                    # Add to existing seeds (up to max 5)
+                    current_ids = st.session_state.get("selected_seed_ids", [])
+                    current_titles = st.session_state.get("selected_seed_titles", [])
                     aid = title_to_id.get(sample)
-                    if aid:
-                        st.session_state["selected_seed_id"] = aid
-                        st.session_state["selected_seed_title"] = sample
-                        st.session_state["query"] = sample
-                        st.session_state["last_query"] = sample
+                    if aid and sample not in current_titles and len(current_ids) < 5:
+                        current_ids.append(aid)
+                        current_titles.append(sample)
+                        st.session_state["selected_seed_ids"] = current_ids
+                        st.session_state["selected_seed_titles"] = current_titles
                         st.rerun()
 
 
@@ -437,7 +480,15 @@ st.markdown("---")
 
 # Browse mode handling
 if browse_mode:
-    st.subheader("📚 Browse Anime by Genre")
+    if genre_filter:
+        # Show which genres are being browsed
+        genre_list_display = ", ".join(genre_filter[:3])
+        if len(genre_filter) > 3:
+            genre_list_display += f" +{len(genre_filter)-3} more"
+        st.subheader(f"📚 Browsing {genre_list_display}")
+        st.markdown(f"<p style='color: #7F8C8D; margin-top: -8px;'>Click any genre badge on cards to explore similar titles</p>", unsafe_allow_html=True)
+    else:
+        st.subheader("📚 Browse Anime by Genre")
     
     if not genre_filter:
         st.info("👈 Select at least one genre from the sidebar to start browsing")
@@ -510,8 +561,14 @@ if browse_mode:
                 st.warning("No anime found matching your filters. Try adjusting your genre or year selections.")
 else:
     # Recommendation mode (existing logic)
-    if selected_seed_id and selected_seed_title:
-        st.subheader(f"Similar to: {selected_seed_title}")
+    if selected_seed_ids and selected_seed_titles:
+        if len(selected_seed_titles) == 1:
+            st.subheader(f"Similar to: {selected_seed_titles[0]}")
+        else:
+            seed_display = ", ".join(selected_seed_titles[:3])
+            if len(selected_seed_titles) > 3:
+                seed_display += f" +{len(selected_seed_titles)-3} more"
+            st.subheader(f"Blended from: {seed_display}")
     else:
         st.subheader("Recommendations")
     user_index = 0  # demo user index (persona mapping to be added)
@@ -524,56 +581,115 @@ else:
         # Compute recommendations with progress indicator
         with st.spinner("🔍 Finding recommendations..."):
             with latency_timer("recommendations"):
-                if selected_seed_id:
-                    # Refined seed similarity path: genre overlap blended with hybrid scores & popularity.
-                    seed_row = metadata.loc[metadata["anime_id"] == selected_seed_id].head(1)
-                    if not seed_row.empty:
-                        seed_genres = set(str(seed_row.iloc[0].get("genres", "")).split("|"))
-                        # Get blended hybrid scores for user to incorporate global preference signal.
-                        try:
-                            blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
-                        except Exception:
-                            blended_scores = None
-                        # Map anime_id -> index for quick lookup.
-                        id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
-                        scored: list[dict] = []
-                        for _, mrow in metadata.iterrows():
-                            aid = int(mrow["anime_id"])
-                            if aid == selected_seed_id:
-                                continue
-                            gset = set(str(mrow.get("genres", "")).split("|"))
-                            overlap = len(seed_genres & gset)
-                            if blended_scores is not None and aid in id_to_index:
-                                hybrid_val = float(blended_scores[id_to_index[aid]])
-                                # Popularity percentile (invert so lower percentile => higher boost)
-                                pop_pct = float(pop_percentiles[id_to_index[aid]]) if id_to_index[aid] < len(pop_percentiles) else 50.0
-                                popularity_boost = max(0.0, (50.0 - pop_pct) / 50.0)  # scale 0..1 favoring more popular mildly
+                if selected_seed_ids:
+                    # Multi-seed weighted average aggregation
+                    # Build seed genre map and aggregate all genres
+                    seed_genre_map = {}  # seed_title -> set of genres
+                    all_seed_genres = set()
+                    genre_weights = {}  # genre -> count of seeds having it
+                    
+                    for seed_id, seed_title in zip(selected_seed_ids, selected_seed_titles):
+                        seed_row = metadata.loc[metadata["anime_id"] == seed_id].head(1)
+                        if not seed_row.empty:
+                            # Parse genres - handle both string and array formats
+                            row_genres = seed_row.iloc[0].get("genres")
+                            if isinstance(row_genres, str):
+                                seed_genres = set([g.strip() for g in row_genres.split("|") if g.strip()])
+                            elif hasattr(row_genres, '__iter__') and not isinstance(row_genres, str):
+                                seed_genres = set([str(g).strip() for g in row_genres if g])
                             else:
-                                hybrid_val = 0.0
-                                popularity_boost = 0.0
-                            # Final score components: emphasize overlap, then hybrid, then mild popularity
-                            score = (0.7 * overlap) + (0.25 * hybrid_val) + (0.05 * popularity_boost)
-                            if score <= 0:
-                                continue
-                            explanation = {
-                                "overlap_genres": list(seed_genres & gset),
-                                "genre_overlap_count": overlap,
-                            }
-                            # Append hybrid contribution shares if available
-                            if aid in id_to_index:
-                                explanation.update(recommender.explain_item(user_index, id_to_index[aid], weights))
-                            scored.append({
-                                "anime_id": aid,
-                                "score": score,
-                                "explanation": explanation,
-                            })
-                        scored.sort(key=lambda x: x["score"], reverse=True)
-                        recs = scored[:n_eff]
+                                seed_genres = set()
+                            
+                            seed_genre_map[seed_title] = seed_genres
+                            all_seed_genres.update(seed_genres)
+                            # Weight genres by how many seeds have them
+                            for genre in seed_genres:
+                                genre_weights[genre] = genre_weights.get(genre, 0) + 1
+                    
+                    num_seeds = len(selected_seed_ids)
+                    
+                    # Get blended hybrid scores for user to incorporate global preference signal.
+                    try:
+                        blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
+                    except Exception:
+                        blended_scores = None
+                    
+                    # Map anime_id -> index for quick lookup.
+                    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
+                    scored: list[dict] = []
+                    
+                    for _, mrow in metadata.iterrows():
+                        aid = int(mrow["anime_id"])
+                        if aid in selected_seed_ids:
+                            continue
+                        
+                        # Parse genres - handle both string and array formats
+                        row_genres = mrow.get("genres")
+                        if isinstance(row_genres, str):
+                            item_genres = set([g.strip() for g in row_genres.split("|") if g.strip()])
+                        elif hasattr(row_genres, '__iter__') and not isinstance(row_genres, str):
+                            item_genres = set([str(g).strip() for g in row_genres if g])
+                        else:
+                            item_genres = set()
+                        
+                        # Weighted overlap: sum of genre weights for matching genres, normalized to 0-1
+                        # Maximum possible overlap would be if item has all seed genres
+                        raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
+                        max_possible_overlap = len(all_seed_genres) * num_seeds  # Each genre could appear in all seeds
+                        weighted_overlap = raw_overlap / max_possible_overlap if max_possible_overlap > 0 else 0.0
+                        
+                        # Track which seeds this item matches
+                        overlap_per_seed = {
+                            seed_title: len(seed_genres & item_genres)
+                            for seed_title, seed_genres in seed_genre_map.items()
+                        }
+                        num_seeds_matched = sum(1 for count in overlap_per_seed.values() if count > 0)
+                        
+                        if blended_scores is not None and aid in id_to_index:
+                            hybrid_val = float(blended_scores[id_to_index[aid]])
+                            # Popularity percentile (invert so lower percentile => higher boost)
+                            pop_pct = float(pop_percentiles[id_to_index[aid]]) if id_to_index[aid] < len(pop_percentiles) else 50.0
+                            popularity_boost = max(0.0, (50.0 - pop_pct) / 50.0)  # scale 0..1 favoring more popular mildly
+                        else:
+                            hybrid_val = 0.0
+                            popularity_boost = 0.0
+                        
+                        # Weighted average scoring: emphasize matches across multiple seeds
+                        # (matches/num_seeds) gives proportion of seeds matched
+                        seed_coverage = num_seeds_matched / num_seeds
+                        
+                        # Final score: weighted overlap + seed coverage bonus + hybrid signal + popularity
+                        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost)
+                        
+                        if score <= 0:
+                            continue
+                        
+                        explanation = {
+                            "seed_titles": selected_seed_titles,
+                            "overlap_per_seed": overlap_per_seed,
+                            "weighted_overlap": weighted_overlap,
+                            "seeds_matched": num_seeds_matched,
+                            "seed_coverage": seed_coverage,
+                            "common_genres": list(all_seed_genres & item_genres),
+                        }
+                        # Append hybrid contribution shares if available
+                        if aid in id_to_index:
+                            explanation.update(recommender.explain_item(user_index, id_to_index[aid], weights))
+                        
+                        scored.append({
+                            "anime_id": aid,
+                            "score": score,
+                            "explanation": explanation,
+                        })
+                    
+                    scored.sort(key=lambda x: x["score"], reverse=True)
+                    recs = scored[:n_eff]
                 else:
                     recs = recommender.get_top_n_for_user(user_index, n=n_eff, weights=weights)
         
-        # Apply filters and sorting
+        # Apply user filters and sorting
         if recs:
+            import pandas as pd
             # Filter by genre
             if genre_filter:
                 filtered_recs = []
@@ -586,6 +702,28 @@ else:
                         # Check if any selected genre is in item genres
                         if any(gf in item_genres for gf in genre_filter):
                             filtered_recs.append(rec)
+                recs = filtered_recs
+            
+            # Filter by type
+            if type_filter and "type" in metadata.columns:
+                before_count = len(recs)
+                print(f"[TYPE FILTER] Active filter: {type_filter}")
+                print(f"[TYPE FILTER] Processing {before_count} recommendations...")
+                filtered_recs = []
+                types_found = {}
+                for rec in recs:
+                    anime_id = rec["anime_id"]
+                    row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
+                    if not row_df.empty:
+                        item_type = row_df.iloc[0].get("type")
+                        type_str = str(item_type).strip() if pd.notna(item_type) else "None"
+                        types_found[type_str] = types_found.get(type_str, 0) + 1
+                        # Handle NaN and convert to string for comparison
+                        if pd.notna(item_type) and str(item_type).strip() in type_filter:
+                            filtered_recs.append(rec)
+                after_count = len(filtered_recs)
+                print(f"[TYPE FILTER] Types in recommendations: {dict(sorted(types_found.items(), key=lambda x: -x[1]))}")
+                print(f"[TYPE FILTER] Result: {before_count} → {after_count} (removed {before_count - after_count})")
                 recs = filtered_recs
             
             # Filter by year range
@@ -680,7 +818,12 @@ def _coerce_genres(value) -> str:
 if recs:
     # Result count with total anime count badge
     total_anime = len(metadata)
+    result_count = len(recs)
     filter_info = []
+    if type_filter:
+        filter_info.append(f"Type: {', '.join(type_filter)}")
+    if genre_filter:
+        filter_info.append(f"Genre: {', '.join(genre_filter[:3])}{'...' if len(genre_filter) > 3 else ''}")
     if genre_filter:
         filter_info.append(f"{len(genre_filter)} genre{'s' if len(genre_filter) > 1 else ''}")
     if year_range[0] > 1960 or year_range[1] < 2025:
@@ -783,7 +926,7 @@ if recs:
             pop_pct = float(pop_percentiles[idx])
             render_card(row, rec, pop_pct)
 else:
-    if selected_seed_id and not recs:
+    if selected_seed_ids and not recs:
         st.markdown("""
         <div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>
             <p style='color: #8A6D3B; font-weight: 500; margin: 0;'>⚠️ No similar titles found – try another seed or adjust filters</p>
