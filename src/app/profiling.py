@@ -10,13 +10,20 @@ from typing import Callable, TypeVar
 T = TypeVar("T")
 
 
+_last_timings = {}
+
 @contextmanager
 def latency_timer(label: str):
     start = time.perf_counter()
     yield
-    elapsed_ms = (time.perf_counter() - start) * 1000
+    elapsed = time.perf_counter() - start
+    elapsed_ms = elapsed * 1000
+    _last_timings[label] = elapsed
     print(f"[LATENCY] {label}: {elapsed_ms:.2f} ms")
 
+def get_last_timing():
+    """Get the last recorded timings dictionary."""
+    return _last_timings.copy()
 
 def profile_memory(func: Callable[..., T]) -> Callable[..., T]:  # type: ignore
     def wrapper(*args, **kwargs):  # type: ignore

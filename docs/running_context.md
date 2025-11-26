@@ -1,19 +1,78 @@
-Last updated: 2025-11-24 (Phase 5 in progress)
+Last updated: 2025-11-26 (Phase 5 UX refinement)
 
-## 17. Phase 5 Progress Snapshot (2025-11-24)
+## 18. Phase 5 UX Refinement Session (2025-11-26)
+Major bug fixes and feature enhancements:
+
+**Card Rendering Architecture Fix**:
+- **Problem**: Empty/partially empty boxes appearing above all recommendations in both list and grid views
+- **Root Cause**: Manual HTML `<div>` tags created via `st.markdown()` incompatible with Streamlit's native `st.image()` component—images rendered outside the div context, leaving empty boxes
+- **Solution**: Replaced all manual `<div>` wrappers with `st.container(border=True)` for proper component wrapping
+- **Impact**: Clean card rendering with proper borders, no visual artifacts
+
+**Genre Filter Implementation**:
+- **Problem**: Genre filter dropdown showing "No options to select" despite 13K+ anime with genre data
+- **Root Cause**: Metadata stores genres as numpy arrays (e.g., `['Action' 'Adventure']`), not pipe-delimited strings; code only checked `isinstance(genres_val, str)`
+- **Solution**: Added array format handling: `elif hasattr(genres_val, '__iter__') and not isinstance(genres_val, str): all_genres.update([str(g).strip() for g in genres_val if g])`
+- **Impact**: Genre filter now shows 40+ unique genres (Action, Adventure, Comedy, Drama, etc.)
+
+**Browse by Genre Mode**:
+- **Feature**: New standalone catalog browsing mode independent of recommendation engine
+- **Implementation**:
+  - Checkbox toggle "📂 Browse by Genre" in sidebar Sort & Filter section
+  - When enabled + genres selected: filters `metadata` DataFrame directly by genre + year range
+  - Bypasses recommendation computation entirely for faster performance
+  - Results sorted by selected criteria (MAL Score, Year, Popularity)
+  - Limited to Top N slider value for UI performance
+- **UI Changes**: Shows "📚 Browsing X anime" vs "✨ Showing X Recommendations"
+- **Use Case**: Explore catalog without needing seed anime; discover titles by genre/year filters
+
+**Synopsis Display Enhancement**:
+- **Problem**: Synopsis not displaying on cards after multiple fix attempts
+- **Investigation**: Created diagnostic script to inspect metadata columns—found only single `synopsis` column (no `synopsis_snippet` or `synopsis_full`)
+- **Solution Chain**:
+  1. Confirmed `synopsis` column contains full text (~700 chars average)
+  2. Added proper pandas NaN handling: `if synopsis_val is not None and pd.notna(synopsis_val)`
+  3. Removed expander complexity—now displays full synopsis directly via `st.caption()`
+- **Impact**: Full anime descriptions visible immediately on all cards
+
+**Data Format Discoveries** (important for future development):
+- **Genres**: Stored as numpy arrays, not strings (requires `hasattr` checks + iteration)
+- **Synopsis**: Single `synopsis` column only (~700 char full text)
+- **Images**: `poster_thumb_url` column, 12,923/13,037 coverage (99.1%)
+- **Aired From**: String format "YYYY-MM-DD", extract year via `[:4]`
+
+**Filter & Sort Infrastructure**:
+- Genre multi-select: 40+ options, properly extracted from array format
+- Year range slider: 1960-2025, filters in both recommendation and browse modes
+- Sort options: Confidence, MAL Score, Year (Newest/Oldest), Popularity
+- Reset filters button: Clears all selections, resets to defaults
+- Filter info display: Shows active filters in results heading (e.g., "3 genres, 2000-2020")
+
+Next priorities: Performance profiling display, unit tests for new features, deployment preparation.
+
+## 17. Phase 5 Progress Snapshot (2025-11-25)
 Implemented:
 - Artifact loader integrated with pruned metadata and restored thumbnail column.
 - Query param API migration (deprecated experimental functions removed).
-- Searchable title dropdown (13K+ titles) replacing free text input.
+- **Image Quality Upgrade**: Large Jikan images (425x600px vs 225x318px) for sharper thumbnails; 12,919 images refreshed.
+- **English Title Priority**: Dropdown and cards now prefer English titles (e.g., "Blood Blockade Battlefront" over "Kekkai Sensen"); shows original/Japanese as subtitle.
+- Searchable title dropdown (13K+ titles) replacing free text input with title-to-ID mapping.
 - Seed selection with green banner indicator + clear button.
 - Sample search suggestions (4 popular titles) in empty state.
+- **Comprehensive Metadata Cards**:
+  - ⭐ Color-coded MAL score (green/blue/gray by rating)
+  - 📺 Episode count for watch planning
+  - 📅 Release year from aired_from
+  - ✅/🟢/🔵 Status indicators (Finished/Airing/Not Yet)
+  - 🎬 Studio names (up to 2, with "+X more")
+  - Source material type
+  - 🎬 **Streaming platform badges** (Crunchyroll, Netflix, etc.) with clickable URLs
 - Visual card redesign: colored borders, inline badge pills with icons, proper spacing.
 - Badge tooltips component explaining cold-start, popularity, novelty.
 - Explanation panel component showing top-5 MF/kNN/Pop breakdowns.
 - Simplified inline explanations (human-friendly summaries) with technical expanders.
 - Progress spinner, result count heading, visual diversity summary bar (Popular/Balanced/Exploratory).
 - Confidence star ratings (1-5 ⭐) per recommendation card.
-- Fixed image rendering (switched to st.image() instead of HTML markdown).
 - Smart synopsis truncation with expandable full text section.
 - Fixed seed similarity indentation bug.
 
@@ -21,22 +80,24 @@ Pending (near-term):
 - Latency/memory profiling display (<250ms / <512MB targets).
 - Unit tests (search, badges, explanations).
 - Deployment to Streamlit Cloud/HF Spaces + screenshots + README update.
+- Optional: Genre filters, sort options (by score/year/popularity), year range slider.
 
-Stretch (deferred): ANN index; favorites/watchlist; dark mode; feedback logging.
+Stretch (deferred): ANN index; favorites/watchlist; dark mode; feedback logging; multi-select seeds.
 
-Risks addressed: Missing titles (multi-field resolver), image codec issues (st.image()), synopsis truncation (expandable section), HTML rendering (component switch), seed logic error (indentation fix).
+Risks addressed: Blurry images (large image URLs), missing English titles (prioritization logic), image codec issues (st.image()), synopsis truncation (expandable section), seed logic error (indentation fix).
 
 ### Quick Session Summary (Rolling — last 5 entries)
-- 2025-11-17: Diversity metrics integrated; popularity-heavy blend identified as coverage risk.
-- 2025-11-21: Diversity-aware tuning complete; Phase 3 closed; weights frozen.
 - 2025-11-23: Phase 5 scaffold started (query params migration, image diagnostics, onboarding design).
-- 2025-11-24 (morning): Seed similarity refinement, sidebar Quick Steps, title fallback, synopsis truncation, skeleton removal.
-- 2025-11-24 (afternoon): Visual card redesign, searchable dropdown, badge tooltips, explanation panel, progress indicators, diversity bar, confidence stars, image/synopsis fixes.
-Ready for git tag `phase4-complete` (pending); Phase 5 app polish complete; deployment prep next.
+- 2025-11-24 (morning): Seed similarity refinement, sidebar Quick Steps, title fallback, synopsis truncation.
+- 2025-11-24 (afternoon): Visual card redesign, searchable dropdown, badge tooltips, explanation panel, progress indicators, diversity bar, confidence stars.
+- 2025-11-25: Image quality upgrade (large URLs), English title priority, comprehensive metadata display (MAL score, episodes, year, status, studios, streaming platforms).
+- 2025-11-26: Card rendering fix (st.container), genre filter fix (array handling), Browse by Genre mode, synopsis display fix, filter/sort infrastructure complete.
+Ready for git tag `phase5-ux-refined`; performance profiling and deployment prep next.
 
-### 2025-11-24 Update (Phase 5 Advanced)
-- UX transformation complete: searchable dropdown, seed indicator, visual cards, tooltips, explanation panel, diversity bar, stars.
-- All critical display bugs fixed (images, truncation).
+### 2025-11-25 Update (Phase 5 Feature-Complete)
+- Metadata richness dramatically improved: score, episodes, year, status, studios, streaming links.
+- Image quality significantly enhanced (2x resolution source).
+- English title discovery vastly improved.
 - Next: performance audit (surface latency/memory) → tests → deploy.
 # Running Context (Live Project Snapshot)
 
