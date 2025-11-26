@@ -216,7 +216,18 @@ Transition to Phase 6
   - Prepare optional blog/video assets if time allows.
   
 #### Phase 5 Progress (2025-11-26)
-Status: IN PROGRESS. Feature-rich interactive Streamlit app with polished UX, comprehensive filtering, and dual browsing modes.
+Status: IN PROGRESS. Feature-rich interactive Streamlit app with polished UX, comprehensive filtering, dual browsing modes, and critical multi-seed recommendation bug fixes.
+
+**Recent Critical Fixes (2025-11-26 PM)**:
+- Fixed multi-seed recommendation zero-results bug (genre parsing: numpy arrays vs pipe-delimited strings)
+- Fixed match percentage display bug (weighted overlap normalization: scores >1.0 broke percentages)
+- Removed quality filter (no longer needed after genre parsing fix)
+- Added type differentiation (TV, Movie, OVA, etc.) with Jikan fetch integration
+- Implemented type filter UI with multi-select (9 type options, 93.4% data coverage)
+- Restored 12,183 thumbnail image paths after fetch_jikan.py rewrite (via repair-from-files)
+- Added comprehensive type filter debug logging (active filter, types distribution, before/after counts)
+- Type filter effectiveness verification in progress (awaiting user test with debug output)
+
 Completed so far:
   - Integrated artifact loader (`build_artifacts`) with metadata pruning and required columns restoration.
   - Replaced deprecated Streamlit query param API (migrated to `st.query_params`).

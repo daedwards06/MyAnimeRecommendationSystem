@@ -3,7 +3,7 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 from src.app.badges import badge_payload
-from src.app.explanations import format_explanation
+from src.app.explanations import format_explanation, format_seed_explanation
 from src.app.components.tooltips import format_badge_tooltip
 
 def coerce_genres(value) -> str:
@@ -76,6 +76,9 @@ def _render_image_streamlit(thumb_rel: str | None, title_display: str):
 
 def render_card_grid(row, rec: dict, pop_pct: float):
     """Render a compact grid card version."""
+    # Extract anime_id early (needed for button keys)
+    anime_id = int(row.get("anime_id"))
+    
     raw_genres = row.get("genres")
     genres = coerce_genres(raw_genres)
     item_genres = [g for g in genres.split("|") if g]
@@ -117,9 +120,25 @@ def render_card_grid(row, rec: dict, pop_pct: float):
         # Image
         _render_image_streamlit(thumb, title_display)
         
-        # Title (truncated for grid)
+        # Title (truncated for grid) with confidence badge
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
+        
+        # Compute confidence percentage
+        score = rec.get("score", 0.0)
+        if score > 1.0:
+            pct = min(score * 10, 100)
+        else:
+            pct = score * 100
+        
+        if pct >= 80:
+            conf_color = "#27AE60"
+        elif pct >= 60:
+            conf_color = "#3498DB"
+        else:
+            conf_color = "#95A5A6"
+        
         st.markdown(f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size: 0.75rem; margin: 2px 0;'><span style='background: {conf_color}20; color: {conf_color}; padding: 2px 6px; border-radius: 8px; font-weight: 600;'>🎯 {pct:.0f}%</span></p>", unsafe_allow_html=True)
         
         # Score and year
         meta_parts = []
@@ -132,20 +151,43 @@ def render_card_grid(row, rec: dict, pop_pct: float):
         if meta_parts:
             st.markdown(f"<p style='font-size: 0.8rem; margin: 4px 0;'>{' • '.join(meta_parts)}</p>", unsafe_allow_html=True)
         
-        # Genres (first 3)
+        # Genres (first 3) - clickable
         if genres:
             genre_list = [g.strip() for g in genres.split('|') if g.strip()][:3]
-            genre_pills = ' '.join([f'<span style="background: #ECF0F1; color: #34495E; padding: 2px 6px; border-radius: 8px; font-size: 0.7rem;">{g}</span>' for g in genre_list])
-            st.markdown(f"<div style='margin: 6px 0;'>{genre_pills}</div>", unsafe_allow_html=True)
+            if genre_list:
+                cols = st.columns(len(genre_list))
+                for idx, genre in enumerate(genre_list):
+                    with cols[idx]:
+                        if st.button(
+                            genre,
+                            key=f"grid_genre_{anime_id}_{genre}",
+                            help=f"Browse {genre}",
+                            type="secondary",
+                            use_container_width=True
+                        ):
+                            # Enable browse mode and set genre filter
+                            st.session_state["browse_mode"] = True
+                            st.session_state["genre_filter"] = [genre]
+                            st.session_state["selected_seed_ids"] = []
+                            st.session_state["selected_seed_titles"] = []
+                            st.rerun()
     
-        # More Like This button
-        anime_id = int(row.get("anime_id"))
-        if st.button("🔄", key=f"grid_more_{anime_id}", help="More Like This", use_container_width=True):
-            st.session_state["selected_seed_id"] = anime_id
-            st.session_state["selected_seed_title"] = title_display
-            st.session_state["query"] = title_display
-            st.session_state["last_query"] = title_display
-            st.rerun()
+        # More Like This button - adds to seed list
+        # anime_id already extracted at top of function
+        current_ids = st.session_state.get("selected_seed_ids", [])
+        current_titles = st.session_state.get("selected_seed_titles", [])
+        
+        if anime_id in current_ids:
+            st.caption("✓ In seeds")
+        elif len(current_ids) >= 5:
+            st.caption("⚠️ Max 5")
+        else:
+            if st.button("🔄", key=f"grid_more_{anime_id}", help="Add to Seeds", use_container_width=True):
+                current_ids.append(anime_id)
+                current_titles.append(title_display)
+                st.session_state["selected_seed_ids"] = current_ids
+                st.session_state["selected_seed_titles"] = current_titles
+                st.rerun()
 
 def render_card(row, rec: dict, pop_pct: float):
     raw_genres = row.get("genres")
@@ -160,6 +202,9 @@ def render_card(row, rec: dict, pop_pct: float):
     rec["badges"] = badges
     exp_str = format_explanation(rec.get("explanation", {}))
     thumb = row.get("poster_thumb_url")
+    
+    # Extract anime_id early (needed for button keys)
+    anime_id = int(row.get("anime_id"))
     
     # Primary title: prefer English, fallback to display/primary/Japanese
     title_candidates = [
@@ -178,10 +223,10 @@ def render_card(row, rec: dict, pop_pct: float):
     elif row.get("title_primary") and row.get("title_primary") != title_display:
         alt_title = row.get("title_primary")
     
-    # Get synopsis - the parquet file only has 'synopsis' column with full text
-    synopsis_val = row.get("synopsis")
+    # Get synopsis - try full synopsis first, then snippet
+    synopsis_val = row.get("synopsis") if "synopsis" in row else row.get("synopsis_snippet")
     # Handle pandas NaN/None values
-    if synopsis_val is not None and pd.notna(synopsis_val):
+    if synopsis_val is not None and pd.notna(synopsis_val) and str(synopsis_val).strip():
         display_synopsis = str(synopsis_val).strip()
     else:
         display_synopsis = ""
@@ -214,31 +259,41 @@ def render_card(row, rec: dict, pop_pct: float):
         # Render image using Streamlit's native image component to avoid HTML rendering issues
         _render_image_streamlit(thumb, title_display)
         
-        # Confidence stars
+        # Confidence as percentage match
         score = rec.get("score", 0.0)
-        def _compute_confidence_stars(s: float) -> str:
+        def _compute_confidence_badge(s: float) -> tuple[str, str]:
+            """Convert score to percentage and color code.
+            Returns (badge_html, color)
+            """
+            # Normalize to 0-100%
             if s > 1.0:
-                normalized = min(s / 2.0, 5.0)
+                pct = min(s * 10, 100)  # If 0-10 scale
             else:
-                normalized = s * 5.0
-            full_stars = int(normalized)
-            half_star = (normalized - full_stars) >= 0.5
-            stars = "⭐" * full_stars
-            if half_star and full_stars < 5:
-                stars += "⭐"
-            empty = max(0, 5 - len(stars))
-            stars += "☆" * empty
-            return stars[:5]
+                pct = s * 100  # If 0-1 scale
+            
+            # Color code based on strength
+            if pct >= 80:
+                color = "#27AE60"  # Green
+                label = "Strong"
+            elif pct >= 60:
+                color = "#3498DB"  # Blue
+                label = "Good"
+            else:
+                color = "#95A5A6"  # Grey
+                label = "Fair"
+            
+            badge = f'<span style="background: {color}20; color: {color}; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">🎯 {pct:.0f}% Match</span>'
+            return badge, color
         
-        confidence = _compute_confidence_stars(score)
-        st.markdown(f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display} <span style='font-size: 0.9rem;'>{confidence}</span></h3>", unsafe_allow_html=True)
+        confidence_badge, conf_color = _compute_confidence_badge(score)
+        st.markdown(f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display} {confidence_badge}</h3>", unsafe_allow_html=True)
         
         # Alternative title (Japanese/original)
         if alt_title:
             st.markdown(f"<p style='color: #95A5A6; font-style: italic; font-size: 0.9rem; margin-top: 2px;'>{alt_title}</p>", unsafe_allow_html=True)
         
         # Metadata row: Score, Episodes, Year, Status
-        meta_parts = []= []
+        meta_parts = []
         if mal_score:
             score_color = "#27AE60" if mal_score >= 8.0 else "#3498DB" if mal_score >= 7.0 else "#95A5A6"
             meta_parts.append(f'<span style="background: {score_color}20; color: {score_color}; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85rem;">⭐ {mal_score:.2f}</span>')
@@ -261,11 +316,27 @@ def render_card(row, rec: dict, pop_pct: float):
         elif source:
             st.markdown(f"<p style='color: #7F8C8D; font-size: 0.85rem; margin: 8px 0;'>{source}</p>", unsafe_allow_html=True)
         
-        # Genre tags with pill styling
+        # Genre tags with clickable pill styling
         if genres:
             genre_list = [g.strip() for g in genres.split('|') if g.strip()]
-            genre_pills = ' '.join([f'<span style="background: #ECF0F1; color: #34495E; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; margin-right: 4px; display: inline-block; margin-bottom: 4px;">{g}</span>' for g in genre_list[:5]])
-            st.markdown(f"<div style='margin: 8px 0;'>{genre_pills}</div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin: 8px 0;'>", unsafe_allow_html=True)
+            cols = st.columns([1] * min(len(genre_list[:5]), 5))
+            for idx, genre in enumerate(genre_list[:5]):
+                with cols[idx]:
+                    if st.button(
+                        genre,
+                        key=f"genre_{anime_id}_{genre}",
+                        help=f"Browse more {genre} anime",
+                        type="secondary",
+                        use_container_width=True
+                    ):
+                        # Enable browse mode and set genre filter
+                        st.session_state["browse_mode"] = True
+                        st.session_state["genre_filter"] = [genre]
+                        st.session_state["selected_seed_ids"] = []
+                        st.session_state["selected_seed_titles"] = []
+                        st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         
         # Inline badge pills
         explanation = rec.get("explanation", {})
@@ -280,6 +351,13 @@ def render_card(row, rec: dict, pop_pct: float):
             simple_exp = f"🔗 Neighborhood {knn_pct:.0f}%, Collab {mf_pct:.0f}%, Pop {pop_pct:.0f}%"
         else:
             simple_exp = f"⭐ Collab {mf_pct:.0f}%, Neighbor {knn_pct:.0f}%, Popular {pop_pct:.0f}%"
+        
+        # Add multi-seed match info
+        if "seeds_matched" in explanation and "seed_titles" in explanation:
+            num_matched = explanation["seeds_matched"]
+            total_seeds = len(explanation["seed_titles"])
+            if total_seeds > 1:
+                simple_exp += f" | 🎯 Matches {num_matched}/{total_seeds} seeds"
         
         st.caption(simple_exp)        # Badge pills inline
         cols = st.columns([1, 1, 1])
@@ -337,12 +415,26 @@ def render_card(row, rec: dict, pop_pct: float):
             st.caption(pop_tooltip)
             st.caption(nov_tooltip)
             st.caption(f"**Full breakdown**: {exp_str}")
+            
+            # Multi-seed match details
+            seed_exp = format_seed_explanation(explanation)
+            if seed_exp:
+                st.markdown("**Seed Matches:**")
+                st.caption(seed_exp)
         
-        # "More Like This" button
-        anime_id = int(row.get("anime_id"))
-        if st.button(f"🔄 More Like This", key=f"more_like_{anime_id}", use_container_width=True):
-            st.session_state["selected_seed_id"] = anime_id
-            st.session_state["selected_seed_title"] = title_display
-            st.session_state["query"] = title_display
-            st.session_state["last_query"] = title_display
-            st.rerun()
+        # "More Like This" button - adds to seed list (up to 5)
+        # anime_id already extracted at top of function
+        current_ids = st.session_state.get("selected_seed_ids", [])
+        current_titles = st.session_state.get("selected_seed_titles", [])
+        
+        if anime_id in current_ids:
+            st.caption("✓ Already in seeds")
+        elif len(current_ids) >= 5:
+            st.caption("⚠️ Max 5 seeds (clear some first)")
+        else:
+            if st.button(f"🔄 Add to Seeds", key=f"more_like_{anime_id}", use_container_width=True):
+                current_ids.append(anime_id)
+                current_titles.append(title_display)
+                st.session_state["selected_seed_ids"] = current_ids
+                st.session_state["selected_seed_titles"] = current_titles
+                st.rerun()
