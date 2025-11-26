@@ -215,29 +215,66 @@ Transition to Phase 6
   - Document inference pipeline and artifact lineage in `README.md` + `docs/`.
   - Prepare optional blog/video assets if time allows.
   
-#### Phase 5 Progress (2025-11-24)
-Status: IN PROGRESS. Interactive Streamlit prototype with polished UX and explainability features.
+#### Phase 5 Progress (2025-11-26)
+Status: IN PROGRESS. Feature-rich interactive Streamlit app with polished UX, comprehensive filtering, and dual browsing modes.
 Completed so far:
-  - Integrated artifact loader (`build_artifacts`) with metadata pruning and required columns restoration (including `poster_thumb_url`).
+  - Integrated artifact loader (`build_artifacts`) with metadata pruning and required columns restoration.
   - Replaced deprecated Streamlit query param API (migrated to `st.query_params`).
-  - Restored & rendered thumbnails via native `st.image()` component (replaced HTML markdown approach to fix rendering issues).
+  - **Image Quality Upgrade**: Switched from small (225x318px) to large (425x600px) Jikan images for sharper, crisper thumbnails; rendered via native `st.image()` component.
   - Added onboarding instructions component (dismissible usage steps) and persistent sidebar quick steps.
-  - Implemented searchable title dropdown (replaced free text) showing all 13K+ sorted titles for improved discoverability.
+  - **English Title Prioritization**: Searchable dropdown (13K+ titles) now shows English titles first (e.g., "Blood Blockade Battlefront" vs "Kekkai Sensen") with original/Japanese subtitle when different.
   - Seed selection with auto-population on dropdown change; green success banner "🎯 Active Seed" with clear button.
   - Sample search suggestions (4 popular titles: Steins;Gate, Cowboy Bebop, Death Note, FMA:Brotherhood) in empty state.
   - Added refined seed similarity path (genre overlap + hybrid score + mild popularity boost) with per-item explanation shares.
   - Hybrid recommender with weight toggle (Balanced vs Diversity) wired into UI.
+  - **Comprehensive Metadata Display**: Each card now shows:
+    - ⭐ MAL score (color-coded: green ≥8.0, blue ≥7.0, gray <7.0)
+    - 📺 Episode count
+    - 📅 Release year (extracted from aired_from)
+    - ✅/🟢/🔵 Airing status (Finished/Currently Airing/Not Yet Aired)
+    - 🎬 Studio information (up to 2 studios with "+X more" for additional)
+    - Source material (manga, light novel, game, etc.)
+    - 🎬 **Streaming platforms** with clickable badges (Crunchyroll, Netflix, Hulu, etc.) linking directly to watch pages
   - Visual card redesign: colored left borders (blue=trained, orange=cold-start), inline badge pills with icons, proper spacing.
   - Simplified inline explanations (human-friendly summaries like "📊 Collaborative 96%") with technical details in expander.
   - Badge tooltips component (`src/app/components/tooltips.py`) explaining cold-start, popularity bands, novelty ratios.
   - Explanation panel component (`src/app/components/explanation_panel.py`) showing top-5 MF/kNN/Pop breakdowns.
-  - Title fallback resolver across multiple metadata fields (title_display → title_english → title → title_japanese → fallback).
   - Smart synopsis truncation with full text available in expandable "📖 Read full synopsis" section.
   - Progress indicators: spinner "🔍 Finding recommendations..." during computation.
   - Result count heading: "Showing X recommendations".
   - Visual diversity summary bar: horizontal colored bar showing Popular (🔥), Balanced (📊), Exploratory (🌟) counts with proportions.
   - Confidence star rating (⭐ 1-5 stars) per card based on recommendation score magnitude.
   - Fixed indentation bug in seed similarity path causing NameError.
+  - **Sort & Filter Infrastructure (2025-11-26)**:
+    - Sort controls: 5 options (Confidence, MAL Score, Year Newest/Oldest, Popularity)
+    - Genre filter: Multi-select dropdown with 40+ genres (Action, Adventure, Comedy, Drama, Fantasy, etc.)
+    - Year range filter: Slider (1960-2025) for temporal filtering
+    - Reset filters button: Clears all selections and returns to defaults
+    - Filter info display: Shows active filters in results heading (e.g., "3 genres, 2000-2020")
+  - **Browse by Genre Mode (2025-11-26)**:
+    - Checkbox toggle "📂 Browse by Genre" enabling catalog exploration without seed requirement
+    - Filters metadata directly by selected genres + year range (bypasses recommendation engine)
+    - Shows "📚 Browsing X anime" vs "✨ Showing X Recommendations" in header
+    - Works with all sort options (MAL Score, Year, Popularity)
+    - Limited to Top N slider for performance
+  - **Card Rendering Fix (2025-11-26)**:
+    - Resolved empty/partially empty boxes above all recommendations
+    - Root cause: Manual HTML `<div>` tags incompatible with native `st.image()` component
+    - Solution: Replaced manual divs with `st.container(border=True)` for proper component wrapping
+  - **Synopsis Display Enhancement (2025-11-26)**:
+    - Confirmed metadata structure: single `synopsis` column with full text (~700 chars average)
+    - Removed expander complexity; now displays full synopsis directly via `st.caption()`
+    - Added proper pandas NaN handling (`pd.notna()` checks)
+  - **Genre Filter Fix (2025-11-26)**:
+    - Fixed "No options to select" issue in genre filter dropdown
+    - Root cause: Genres stored as numpy arrays, not pipe-delimited strings
+    - Solution: Added array format handling to extraction logic
+
+Data Format Discoveries (important for maintenance):
+  - Genres: numpy array format requiring `hasattr(genres_val, '__iter__')` checks
+  - Synopsis: Single `synopsis` column only (no separate snippet/full columns)
+  - Images: `poster_thumb_url` column with 99.1% coverage (12,923/13,037)
+  - Aired From: String format "YYYY-MM-DD" for year extraction
 
 Remaining (near-term):
   - Latency measurement display + caching audit (ensure <250ms inference path).
@@ -254,8 +291,12 @@ Risks Observed & Mitigated:
   - Synopsis truncation cutting mid-sentence (resolved with expandable full text section).
   - Image HTML tags appearing as text (fixed by switching from markdown to st.image()).
   - Seed selection logic indentation error (fixed).
+  - Empty card boxes due to HTML div incompatibility (fixed with st.container).
+  - Genre filter not populating (fixed with numpy array handling).
+  - Synopsis not displaying (fixed with proper NaN handling and metadata column identification).
 
 Next focus: Performance audit (latency/memory surface) → minimal test suite → deploy & document.
+Ready for git tag `phase5-ux-refined` once performance profiling display complete.
 Deployment
 ### Phase 6 — Documentation & Portfolio Presentation
 - Objectives

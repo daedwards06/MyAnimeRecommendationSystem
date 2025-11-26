@@ -112,9 +112,19 @@ Phase 4 Tag Target: `phase4-complete` (to be created)
 - [x] Confidence star ratings (⭐ 1-5 stars per card based on score magnitude)
 - [x] Progress spinner ("🔍 Finding recommendations..." during computation)
 - [x] Result count heading ("Showing X recommendations")
-- [x] Smart synopsis truncation with expandable full text section ("📖 Read full synopsis")
+- [x] Full synopsis display (removed expander, showing complete text directly on cards)
 - [x] Accessible palette + alt text (leveraging Phase 4 palette + per-poster alt text)
 - [x] Inline help / FAQ accordion (help panel implemented)
+- [x] Sort controls (5 options: Confidence, MAL Score, Year Newest/Oldest, Popularity)
+- [x] Genre filter (multi-select from all available genres; fixed array format handling)
+- [x] Year range filter (1960-2025 slider)
+- [x] View mode toggle (List/Grid with native st.container borders)
+- [x] Browse by Genre mode (explore catalog without seed, genre-based filtering)
+- [x] Grid layout cards (3-column responsive design with compact metadata)
+- [x] "More Like This" quick pivot buttons (on both list and grid cards)
+- [x] Total anime count badge (13,037 displayed in header)
+- [x] Filter info display (shows active filters in results heading)
+- [x] Card rendering fixes (removed empty div boxes, proper Streamlit containers)
 
 ### Performance & Ops
 - [x] Artifact pruning (minimal metadata columns + restored display fields including poster_thumb_url)
@@ -193,11 +203,18 @@ Phase 4 Tag Target: `phase4-complete` (to be created)
 **Last Updated:** 2025-11-24
 **This Section Updated:** 2025-11-24 (Phase 5 progress logged)
 
-#### Phase 5 Progress Notes (2025-11-24)
+#### Phase 5 Progress Notes (2025-11-26)
 - Onboarding panel + Quick Steps sidebar complete.
-- Searchable title dropdown (13K+ titles) replacing free text input.
+- **Image Quality**: Upgraded to large Jikan images (425x600px) for 12,919 anime; sharper thumbnails.
+- **English Title Priority**: Dropdown shows English titles first; original/Japanese as subtitle.
+- Searchable title dropdown (13K+ titles) with title-to-ID mapping.
 - Seed selection with green banner indicator ("🎯 Active Seed") + clear button.
 - Sample search suggestions (4 popular titles) in empty state.
+- **Rich Metadata Display**:
+  - ⭐ Color-coded MAL scores (green ≥8.0, blue ≥7.0, gray <7.0)
+  - 📺 Episode count, 📅 year, ✅ status (Finished/Airing)
+  - 🎬 Studios (up to 2) and source material
+  - 🎬 **Streaming platforms** (Crunchyroll, Netflix) as clickable badges
 - Visual card redesign: colored borders (blue/orange), inline badge pills with icons, proper spacing.
 - Badge tooltips component (`tooltips.py`) implemented for cold-start, popularity, novelty.
 - Explanation panel component (`explanation_panel.py`) showing top-5 MF/kNN/Pop breakdowns.
@@ -208,3 +225,31 @@ Phase 4 Tag Target: `phase4-complete` (to be created)
 - Synopsis truncation fixed: added expandable "📖 Read full synopsis" section for full text.
 - Fixed seed similarity indentation bug causing NameError.
 - Remaining near-term: latency/memory profiling display, unit tests, deployment + screenshots.
+
+#### Phase 5 UX Enhancement Session (2025-11-26)
+- **Card Rendering Fix**: Resolved empty/partially empty boxes above recommendations in both list and grid views
+  - Root cause: Manual HTML `<div>` tags via `st.markdown()` incompatible with native `st.image()` component
+  - Solution: Replaced manual divs with `st.container(border=True)` for proper component wrapping
+- **Genre Filter Fix**: Fixed "No options to select" issue in genre filter dropdown
+  - Root cause: Genres stored as numpy arrays, not pipe-delimited strings
+  - Solution: Added array format handling to genre extraction logic (`hasattr(genres_val, '__iter__')`)
+- **Browse by Genre Mode**: Implemented standalone catalog browsing without seed requirement
+  - Checkbox toggle "🗂️ Browse by Genre" in sidebar
+  - Filters metadata directly by selected genres + year range
+  - Shows "📚 Browsing X anime" vs "✨ Showing X Recommendations"
+  - Works with all existing sort options (MAL Score, Year, Popularity)
+  - Limit to Top N for performance
+- **Synopsis Display Enhancement**: Fixed truncated synopsis issue and simplified display
+  - Removed expander complexity, now shows full synopsis directly via `st.caption()`
+  - Added proper pandas NaN handling (`pd.notna()` checks)
+  - Confirmed metadata has single `synopsis` column with full text (~700 chars)
+- **Data Format Discoveries**:
+  - Genres: numpy array format (not pipe-delimited strings)
+  - Synopsis: Single `synopsis` column only (no `synopsis_snippet` or `synopsis_full`)
+  - Images: 12,923/13,037 anime have `poster_thumb_url` (99.1% coverage)
+- **Filter & Sort Enhancements**:
+  - Genre filter now shows 40+ unique genres (Action, Adventure, Comedy, etc.)
+  - Year range slider functional (1960-2025)
+  - Sort by MAL Score, Year, Popularity in both recommendation and browse modes
+  - Reset filters button clears all selections
+- **Next Actions**: Performance profiling display, unit tests for new features, deployment prep
