@@ -20,11 +20,13 @@ Last updated: 2025-11-26 (Phase 5 UX refinement + type filter debugging)
 - Added `type` field to Jikan fetch script (TV, Movie, OVA, Special, ONA, Music, TV Special, CM, PV)
 - Implemented type filter UI (multi-select in sidebar with 9 type options)
 - Type filter logic with NaN handling: `pd.notna(item_type) and str(item_type).strip() in type_filter`
-- **Type Filter Debugging** (in progress):
-  - User reported filter not working (same results regardless of selection)
-  - Added comprehensive debug logging: active filter list, types distribution, before/after counts
-  - Debug output shows: selected types, types found in recommendations, filtering effectiveness
-  - Awaiting user test with Tokyo Ghoul + "Movie" filter to diagnose root cause
+- **Type Filter Bug FIXED** (2025-11-26):
+  - **Root Cause #1**: Browse mode completely omitted type filter logic (only applied genre + year filters) - FIXED
+  - **Root Cause #2**: Recommendation mode genre filter had incorrect numpy array handling (broke filter order) - FIXED
+  - **Root Cause #3 (ACTUAL BUG)**: `type` column was missing from `MIN_METADATA_COLUMNS` in artifact loader, so it was being dropped during metadata pruning
+  - **Solution**: Added `"type"` to `MIN_METADATA_COLUMNS` in `src/app/constants.py`
+  - **Impact**: Type filter now works correctly in both browse and recommendation modes
+  - Debug logging removed after successful fix verification
 
 **Image Path Restoration**:
 - All 12,923 thumbnail images disappeared from metadata after fetch_jikan.py run
@@ -38,10 +40,13 @@ Last updated: 2025-11-26 (Phase 5 UX refinement + type filter debugging)
 - Genre format: Stored as numpy arrays requiring `hasattr(genres, '__iter__')` checks
 - Type format: Simple string values, requires NaN handling before filtering
 
-**Next Steps**:
-- User needs to reload Streamlit app and test type filter with debug output
-- Analyze debug output to determine if filter logic issue or data coverage issue
-- Potential fixes: session state persistence, type comparison normalization, filter application order
+**Verification Complete (2025-11-26)**:
+- ✅ Type filter now working correctly in both browse and recommendation modes
+- ✅ Tested with Sci-Fi + Movie filter - correctly excludes non-movie types
+- ✅ Items with type=None properly excluded when filter active
+- ✅ All debug logging removed after successful fix
+- ✅ Filter quantity fix: Recommendations now request 5x items when filters active, then trim to top N after filtering (ensures full N results)
+- ✅ Type display added to cards: Shows type (TV, Movie, OVA, etc.) in both list and grid views alongside MAL score
 
 ## 18. Phase 5 UX Refinement Session (2025-11-26)
 Major bug fixes and feature enhancements:
