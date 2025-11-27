@@ -365,6 +365,165 @@ with st.sidebar.expander("⚡ Performance", expanded=False):
         </div>
         """, unsafe_allow_html=True)
 
+# User Profile (Watchlist Import) ----------------------------------------
+st.sidebar.markdown("---")
+with st.sidebar.expander("👤 User Profile", expanded=False):
+    from src.data.user_profiles import list_profiles, load_profile, save_profile, get_profile_summary
+    from src.data.mal_parser import parse_mal_export, get_mal_export_summary
+    
+    # Initialize session state for profile
+    if "active_profile" not in st.session_state:
+        st.session_state["active_profile"] = None
+    if "parsed_mal_data" not in st.session_state:
+        st.session_state["parsed_mal_data"] = None
+    
+    # Profile Selector
+    available_profiles = list_profiles()
+    profile_options = ["(none)"] + available_profiles
+    
+    current_selection = "(none)"
+    if st.session_state["active_profile"]:
+        current_selection = st.session_state["active_profile"].get("username", "(none)")
+        if current_selection not in profile_options:
+            current_selection = "(none)"
+    
+    selected_profile = st.selectbox(
+        "Active Profile",
+        options=profile_options,
+        index=profile_options.index(current_selection) if current_selection in profile_options else 0,
+        help="Select a profile to hide already-watched anime from recommendations"
+    )
+    
+    # Load profile when selection changes
+    if selected_profile != "(none)" and (not st.session_state["active_profile"] or st.session_state["active_profile"].get("username") != selected_profile):
+        profile_data = load_profile(selected_profile)
+        if profile_data:
+            st.session_state["active_profile"] = profile_data
+            st.rerun()
+    elif selected_profile == "(none)" and st.session_state["active_profile"]:
+        st.session_state["active_profile"] = None
+        st.rerun()
+    
+    # Show profile stats or info message
+    if st.session_state["active_profile"]:
+        profile = st.session_state["active_profile"]
+        watched_count = len(profile.get("watched_ids", []))
+        avg_rating = profile.get("stats", {}).get("avg_rating", 0)
+        
+        st.success(f"✓ **{profile['username']}** – {watched_count} watched")
+        if avg_rating > 0:
+            st.caption(f"Avg Rating: {avg_rating:.1f}/10")
+    else:
+        st.info("💡 Import your MAL watchlist to hide anime you've already watched")
+    
+    st.markdown("---")
+    st.markdown("**Import from MyAnimeList**")
+    
+    # File uploader
+    uploaded_file = st.file_uploader(
+        "Upload MAL XML Export",
+        type=["xml"],
+        help="Export your list from MyAnimeList.net",
+        label_visibility="collapsed"
+    )
+    
+    if uploaded_file is not None:
+        # Show preview button
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📊 Preview", use_container_width=True):
+                try:
+                    # Save uploaded file temporarily
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
+                        tmp_file.write(uploaded_file.getvalue())
+                        tmp_path = tmp_file.name
+                    
+                    # Get summary
+                    summary = get_mal_export_summary(tmp_path)
+                    st.session_state["mal_summary"] = summary
+                    st.session_state["mal_tmp_path"] = tmp_path
+                    
+                except Exception as e:
+                    st.error(f"Error parsing XML: {e}")
+        
+        with col2:
+            if st.button("🔄 Parse", use_container_width=True):
+                try:
+                    # Use temp path from preview or create new one
+                    if "mal_tmp_path" not in st.session_state:
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
+                            tmp_file.write(uploaded_file.getvalue())
+                            tmp_path = tmp_file.name
+                    else:
+                        tmp_path = st.session_state["mal_tmp_path"]
+                    
+                    # Parse with options
+                    with st.spinner("Parsing MAL export..."):
+                        parsed_data = parse_mal_export(
+                            xml_path=tmp_path,
+                            metadata_df=metadata,
+                            include_statuses={'Completed', 'Watching', 'On-Hold'},
+                            use_default_for_unrated=True,
+                            default_rating=7.0
+                        )
+                        st.session_state["parsed_mal_data"] = parsed_data
+                    
+                    st.success(f"✓ Parsed {len(parsed_data['watched_ids'])} anime")
+                    
+                except Exception as e:
+                    st.error(f"Error parsing: {e}")
+    
+    # Show preview summary
+    if "mal_summary" in st.session_state:
+        summary = st.session_state["mal_summary"]
+        st.markdown("**Preview:**")
+        st.caption(f"Username: {summary['username']}")
+        st.caption(f"Total: {summary['total_anime']} anime ({summary['rated_count']} rated)")
+    
+    # Show parsed data and save option
+    if st.session_state["parsed_mal_data"]:
+        parsed = st.session_state["parsed_mal_data"]
+        
+        st.markdown("**Import Summary:**")
+        st.caption(f"✓ {parsed['stats']['total_watched']} anime matched")
+        st.caption(f"✓ {parsed['stats']['rated_count']} with ratings")
+        
+        if parsed['unmatched']:
+            # Use warning instead of nested expander (Streamlit doesn't allow nested expanders)
+            unmatched_titles = ", ".join([entry['title'] for entry in parsed['unmatched'][:3]])
+            if len(parsed['unmatched']) > 3:
+                unmatched_titles += f" +{len(parsed['unmatched']) - 3} more"
+            st.warning(f"⚠️ {len(parsed['unmatched'])} unmatched: {unmatched_titles}")
+        
+        # Username input and save
+        username_input = st.text_input(
+            "Profile Name",
+            value=parsed.get('username', 'my_profile'),
+            help="Choose a name for this profile"
+        )
+        
+        if st.button("💾 Save Profile", type="primary", use_container_width=True):
+            try:
+                save_profile(username_input, parsed)
+                st.session_state["active_profile"] = load_profile(username_input)
+                st.session_state["parsed_mal_data"] = None  # Clear parsed data
+                if "mal_summary" in st.session_state:
+                    del st.session_state["mal_summary"]
+                if "mal_tmp_path" in st.session_state:
+                    import os
+                    try:
+                        os.unlink(st.session_state["mal_tmp_path"])
+                    except:
+                        pass
+                    del st.session_state["mal_tmp_path"]
+                st.success(f"✓ Saved as '{username_input}'")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save: {e}")
+
 # Quick Usage Hints ------------------------------------------------------
 with st.sidebar.expander("💡 Quick Guide", expanded=False):
     st.markdown("""
@@ -510,6 +669,12 @@ if browse_mode:
                 
                 # Check if any selected genre matches
                 if any(gf in item_genres for gf in genre_filter):
+                    # Exclude watched anime (profile filter)
+                    if st.session_state["active_profile"]:
+                        watched_ids = st.session_state["active_profile"].get("watched_ids", [])
+                        if anime_id in watched_ids:
+                            continue  # Skip already-watched anime
+                    
                     # Apply type filter
                     include = True
                     if type_filter and "type" in metadata.columns:
@@ -584,8 +749,9 @@ else:
     user_index = 0  # demo user index (persona mapping to be added)
     
     # Request extra recommendations to account for filtering
-    # If filters are active, request 5x to ensure we have enough after filtering
-    filter_multiplier = 5 if (genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025) else 1
+    # If filters are active (including profile exclusion), request more to ensure we have enough after filtering
+    has_profile = st.session_state["active_profile"] is not None
+    filter_multiplier = 10 if (has_profile or genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025) else 1
     n_requested = min(top_n * filter_multiplier, components.num_items if hasattr(components, "num_items") else len(metadata))
     
     recs: list[dict] = []
@@ -634,6 +800,12 @@ else:
                         aid = int(mrow["anime_id"])
                         if aid in selected_seed_ids:
                             continue
+                        
+                        # Exclude watched anime (profile filter)
+                        if st.session_state["active_profile"]:
+                            watched_ids = st.session_state["active_profile"].get("watched_ids", [])
+                            if aid in watched_ids:
+                                continue
                         
                         # Parse genres - handle both string and array formats
                         row_genres = mrow.get("genres")
@@ -861,6 +1033,15 @@ if recs:
         <span style='background: #3498DB; color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.8rem; font-weight: 600;'>{total_anime:,} total anime</span>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Show exclusion count if profile active
+    if st.session_state["active_profile"]:
+        watched_count = len(st.session_state["active_profile"].get("watched_ids", []))
+        st.markdown(f"""
+        <p style='color: #27AE60; font-size: 0.9rem; margin-top: -8px; margin-bottom: 8px;'>
+            ✓ Excluded {watched_count} already-watched anime
+        </p>
+        """, unsafe_allow_html=True)
     
     if sort_by != "Confidence":
         st.markdown(f"<p style='color: #7F8C8D; font-size: 0.9rem; margin-top: -8px; margin-bottom: 20px;'>Sorted by: {sort_by}</p>", unsafe_allow_html=True)

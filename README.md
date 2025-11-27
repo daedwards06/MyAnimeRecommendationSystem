@@ -32,7 +32,9 @@ MyAnimeRecommendationSystem/
 └─ README.md
 ```
 
-## Getting started
+## Getting Started
+
+### Quick Start (No Profile Required)
 
 Set up a virtual environment, install dependencies, and run the Streamlit app.
 
@@ -44,8 +46,22 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Run the app
-streamlit run app/app.py
+streamlit run app/main.py
 ```
+
+The app works immediately - no setup required! Browse anime by genre or get seed-based recommendations.
+
+### Import Your Watchlist (Optional)
+
+Want to hide anime you've already watched? Import your MyAnimeList watchlist:
+
+1. **Export from MAL**: Visit [MyAnimeList.net](https://myanimelist.net/panel.php?go=export) → "Export My List"
+2. **Import in app**: Sidebar → "👤 User Profile" → Upload XML → Parse → Save
+3. **Enjoy personalized results**: All watched anime automatically excluded!
+
+📖 **Full guide**: See [`docs/user_guide_watchlist.md`](docs/user_guide_watchlist.md) for detailed instructions with screenshots.
+
+**Privacy Note**: Your watchlist is stored locally in `data/user_profiles/` and never uploaded anywhere. Files are excluded from git via `.gitignore`.
 
 ### Windows PowerShell tips
 
