@@ -510,9 +510,19 @@ if browse_mode:
                 
                 # Check if any selected genre matches
                 if any(gf in item_genres for gf in genre_filter):
-                    # Apply year filter
+                    # Apply type filter
                     include = True
-                    if year_range[0] > 1960 or year_range[1] < 2025:
+                    if type_filter and "type" in metadata.columns:
+                        item_type = row.get("type")
+                        if pd.notna(item_type):
+                            type_str = str(item_type).strip()
+                            if type_str not in type_filter:
+                                include = False
+                        else:
+                            include = False  # Exclude items with no type when filter is active
+                    
+                    # Apply year filter
+                    if include and (year_range[0] > 1960 or year_range[1] < 2025):
                         aired_from = row.get("aired_from")
                         if aired_from and isinstance(aired_from, str):
                             try:
@@ -573,11 +583,13 @@ else:
         st.subheader("Recommendations")
     user_index = 0  # demo user index (persona mapping to be added)
     
-    # Ensure we do not request more items than available (important for APP_IMPORT_LIGHT mode).
-    n_eff = min(top_n, components.num_items if hasattr(components, "num_items") else len(metadata))
+    # Request extra recommendations to account for filtering
+    # If filters are active, request 5x to ensure we have enough after filtering
+    filter_multiplier = 5 if (genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025) else 1
+    n_requested = min(top_n * filter_multiplier, components.num_items if hasattr(components, "num_items") else len(metadata))
     
     recs: list[dict] = []
-    if n_eff > 0:
+    if n_requested > 0:
         # Compute recommendations with progress indicator
         with st.spinner("🔍 Finding recommendations..."):
             with latency_timer("recommendations"):
@@ -683,9 +695,9 @@ else:
                         })
                     
                     scored.sort(key=lambda x: x["score"], reverse=True)
-                    recs = scored[:n_eff]
+                    recs = scored[:n_requested]
                 else:
-                    recs = recommender.get_top_n_for_user(user_index, n=n_eff, weights=weights)
+                    recs = recommender.get_top_n_for_user(user_index, n=n_requested, weights=weights)
         
         # Apply user filters and sorting
         if recs:
@@ -697,8 +709,13 @@ else:
                     anime_id = rec["anime_id"]
                     row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
                     if not row_df.empty:
-                        row_genres = str(row_df.iloc[0].get("genres", ""))
-                        item_genres = set([g.strip() for g in row_genres.split("|") if g.strip()])
+                        row_genres_val = row_df.iloc[0].get("genres", "")
+                        # Handle both string and array formats
+                        item_genres = set()
+                        if isinstance(row_genres_val, str):
+                            item_genres = set([g.strip() for g in row_genres_val.split("|") if g.strip()])
+                        elif hasattr(row_genres_val, '__iter__') and not isinstance(row_genres_val, str):
+                            item_genres = set([str(g).strip() for g in row_genres_val if g])
                         # Check if any selected genre is in item genres
                         if any(gf in item_genres for gf in genre_filter):
                             filtered_recs.append(rec)
@@ -776,6 +793,9 @@ else:
                     enriched_recs.sort(key=lambda x: x["_popularity"], reverse=False)  # Lower percentile = more popular
                 
                 recs = enriched_recs
+            
+            # After all filtering and sorting, trim to requested top_n
+            recs = recs[:top_n]
 
 def _compute_confidence_stars(score: float) -> str:
     """Convert recommendation score to visual star rating (1-5 stars)."""

@@ -40,6 +40,7 @@ MIN_METADATA_COLUMNS = [
     "aired_from",
     "studios",
     "source_material",
+    "type",  # Added for type filter functionality
 ]
 
 # Filenames / paths (central references)

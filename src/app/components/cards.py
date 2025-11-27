@@ -140,11 +140,17 @@ def render_card_grid(row, rec: dict, pop_pct: float):
         st.markdown(f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>", unsafe_allow_html=True)
         st.markdown(f"<p style='font-size: 0.75rem; margin: 2px 0;'><span style='background: {conf_color}20; color: {conf_color}; padding: 2px 6px; border-radius: 8px; font-weight: 600;'>🎯 {pct:.0f}%</span></p>", unsafe_allow_html=True)
         
-        # Score and year
+        # Score, type, and year
         meta_parts = []
         if mal_score:
             score_color = "#27AE60" if mal_score >= 8.0 else "#3498DB" if mal_score >= 7.0 else "#95A5A6"
             meta_parts.append(f'<span style="color: {score_color}; font-weight: 600;">⭐ {mal_score:.1f}</span>')
+        
+        # Type (TV, Movie, OVA, etc.)
+        anime_type = row.get("type")
+        if anime_type and pd.notna(anime_type):
+            meta_parts.append(f'<span style="color: #9B59B6; font-weight: 600;">🎬 {anime_type}</span>')
+        
         if year:
             meta_parts.append(f'<span style="color: #7F8C8D;">📅 {year}</span>')
         
@@ -292,11 +298,17 @@ def render_card(row, rec: dict, pop_pct: float):
         if alt_title:
             st.markdown(f"<p style='color: #95A5A6; font-style: italic; font-size: 0.9rem; margin-top: 2px;'>{alt_title}</p>", unsafe_allow_html=True)
         
-        # Metadata row: Score, Episodes, Year, Status
+        # Metadata row: Score, Type, Episodes, Year, Status
         meta_parts = []
         if mal_score:
             score_color = "#27AE60" if mal_score >= 8.0 else "#3498DB" if mal_score >= 7.0 else "#95A5A6"
             meta_parts.append(f'<span style="background: {score_color}20; color: {score_color}; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85rem;">⭐ {mal_score:.2f}</span>')
+        
+        # Type (TV, Movie, OVA, etc.)
+        anime_type = row.get("type")
+        if anime_type and pd.notna(anime_type):
+            meta_parts.append(f'<span style="color: #9B59B6; font-size: 0.9rem; font-weight: 600;">🎬 {anime_type}</span>')
+        
         if episodes:
             meta_parts.append(f'<span style="color: #7F8C8D; font-size: 0.9rem;">📺 {episodes} eps</span>')
         if year:
