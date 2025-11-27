@@ -1,0 +1,52 @@
+{
+  "username": "example_user",
+  "mal_username": "example_user",
+  "watched_ids": [
+    1,
+    5,
+    6,
+    7,
+    8,
+    16,
+    20,
+    30,
+    199,
+    205
+  ],
+  "ratings": {
+    "1": 8.5,
+    "5": 9.0,
+    "6": 7.5,
+    "7": 8.0,
+    "16": 9.5,
+    "20": 7.0,
+    "30": 8.5,
+    "199": 7.0,
+    "205": 8.0
+  },
+  "status_map": {
+    "1": "Completed",
+    "5": "Completed",
+    "6": "Completed",
+    "7": "Completed",
+    "8": "Completed",
+    "16": "Completed",
+    "20": "Completed",
+    "30": "Watching",
+    "199": "Completed",
+    "205": "On-Hold"
+  },
+  "import_date": "2025-11-27T00:00:00.000000",
+  "stats": {
+    "total_watched": 10,
+    "rated_count": 9,
+    "unrated_count": 1,
+    "avg_rating": 8.11,
+    "unmatched_count": 0,
+    "status_breakdown": {
+      "Completed": 8,
+      "Watching": 1,
+      "On-Hold": 1
+    }
+  }
+}

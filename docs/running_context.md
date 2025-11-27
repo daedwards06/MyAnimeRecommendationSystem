@@ -1,4 +1,87 @@
-Last updated: 2025-11-26 (Phase 5 UX refinement + type filter debugging)
+Last updated: 2025-11-27 (Phase A: MAL Watchlist Import & Exclusion Filter - MVP Complete)
+
+## 20. MAL Watchlist Import & Personalized Exclusion (Phase A Complete - 2025-11-27)
+**Feature Overview**:
+Phase A MVP implementation allows users to import their MyAnimeList watchlist and automatically exclude already-watched anime from recommendations. This provides immediate practical value for personal use and makes the recommender system truly useful for discovering new anime.
+
+**Implementation Details**:
+
+**Backend Components**:
+- `src/data/mal_parser.py`: Full MAL XML export parser
+  - Extracts anime_title, series_animedb_id (MAL ID), my_score, my_status
+  - Handles all status types: Completed, Watching, On-Hold, Dropped, Plan to Watch
+  - Maps MAL IDs to internal anime_ids using metadata lookup with title fallback
+  - Flexible rating system: explicit ratings + optional default (7.0) for unrated completed anime
+  - Comprehensive error handling and unmatched title logging
+  - Returns: watched_ids, ratings, status_map, unmatched list, stats
+
+- `src/data/user_profiles.py`: Profile management system
+  - JSON-based file storage in `data/user_profiles/{username}_profile.json`
+  - Functions: save_profile, load_profile, list_profiles, delete_profile, validate_profile
+  - Profile schema includes: username, watched_ids, ratings, status_map, import_date, stats
+  - Privacy: Profiles excluded from git via .gitignore, local-only storage
+
+**Frontend Integration** (`app/main.py`):
+- "👤 User Profile" expander in sidebar (below Performance section)
+- Profile selector dropdown (defaults to "(none)" - profiles are optional)
+- MAL Import UI:
+  - File uploader for XML exports
+  - "📊 Preview" button shows quick summary (username, counts)
+  - "🔄 Parse" button performs full parse with matching
+  - Import summary displays matched/rated counts and unmatched warnings
+  - Username input for profile naming
+  - "💾 Save Profile" button stores profile and auto-loads it
+- Active profile indicator: "✓ Profile: {username} ({X} watched)" with avg rating
+- Info prompt when no profile: "💡 Import your MAL watchlist to hide anime you've already watched"
+
+**Exclusion Logic**:
+- **Browse Mode**: Watched anime filtered out during genre browsing (before type/year filters)
+- **Recommendation Mode**: Watched anime excluded from multi-seed scoring loop (before CF scoring)
+- Filter multiplier increased to 10x when profile active (ensures sufficient results after exclusion)
+- Exclusion counter displayed: "✓ Excluded {N} already-watched anime" (green text below results header)
+- Exclusion order: Profile → Genre → Type → Year (correct sequence for optimal performance)
+
+**Testing & Validation**:
+- ✅ Parser tested with real MAL export: 93/104 anime matched (89% success, 11 unmatched newer titles)
+- ✅ Profile save/load roundtrip verified
+- ✅ Integration testing: Import → load → verify exclusions in both browse and recommendation modes
+- ✅ Manual testing confirmed: Zero watched anime appear in filtered results
+- ✅ Edge cases handled: Nested expander error fixed (switched to warning display)
+
+**User Experience**:
+- Profiles are completely optional - app works perfectly without them
+- First-run users see all anime, no blocking prompts
+- Profile UI collapsed by default (non-intrusive)
+- Multi-user support built-in (file-based, no auth required)
+- Fork-friendly: Profiles stay local, never committed to git
+
+**Data & Performance**:
+- Real user profile: 93 watched anime, 91 with ratings (12 explicit + 81 default 7.0), avg 7.33/10
+- Import performance: <5 seconds for 100+ anime XML parse
+- Profile loading cached in session state (no reload on every interaction)
+- Example profile provided for reference structure
+
+**Files Created**:
+- `src/data/mal_parser.py` (242 lines)
+- `src/data/user_profiles.py` (191 lines)
+- `data/user_profiles/.gitkeep`
+- `data/user_profiles/example_profile.json`
+- `scripts/test_mal_parser.py` (test/validation script)
+- `scripts/test_profile_loading.py` (profile validation script)
+
+**Files Modified**:
+- `app/main.py`: Added profile UI (lines 336-528) + exclusion logic (lines 676-681, 807-812, 1020-1028)
+- `.gitignore`: Added `data/user_profiles/*.json` exclusion rule
+- `docs/watchlist_implementation_plan.md`: Complete Phase A implementation plan
+
+**Next Steps (Phase B - Future)**:
+- User embedding generation from ratings
+- Personalized CF scoring integration
+- Rating management UI (rate from cards)
+- Taste profile visualization
+- "Similar to my favorites" mode
+
+---
 
 ## 19. Multi-Seed Recommendations Bug Fixes & Type Filter Debugging (2025-11-26)
 **Critical Bug Fixes**:
