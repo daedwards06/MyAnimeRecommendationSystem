@@ -3,8 +3,8 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 from src.app.badges import badge_payload
-from src.app.explanations import format_explanation, format_seed_explanation
 from src.app.components.tooltips import format_badge_tooltip
+from src.app.components.rating import render_quick_rating_buttons
 
 def coerce_genres(value) -> str:
     if value is None:
@@ -140,6 +140,11 @@ def render_card_grid(row, rec: dict, pop_pct: float):
         st.markdown(f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>", unsafe_allow_html=True)
         st.markdown(f"<p style='font-size: 0.75rem; margin: 2px 0;'><span style='background: {conf_color}20; color: {conf_color}; padding: 2px 6px; border-radius: 8px; font-weight: 600;'>🎯 {pct:.0f}%</span></p>", unsafe_allow_html=True)
         
+        # Personalized explanation (if available)
+        explanation = rec.get("explanation")
+        if explanation:
+            st.markdown(f"<p style='font-size: 0.7rem; color: #7F8C8D; margin: 4px 0; font-style: italic;'>{explanation}</p>", unsafe_allow_html=True)
+        
         # Score, type, and year
         meta_parts = []
         if mal_score:
@@ -194,6 +199,13 @@ def render_card_grid(row, rec: dict, pop_pct: float):
                 st.session_state["selected_seed_ids"] = current_ids
                 st.session_state["selected_seed_titles"] = current_titles
                 st.rerun()
+        
+        # Rating buttons (if profile loaded)
+        profile = st.session_state.get("active_profile")
+        if profile:
+            current_rating = profile.get("ratings", {}).get(str(anime_id))
+            st.markdown("---")
+            render_quick_rating_buttons(anime_id, title_display, current_rating)
 
 def render_card(row, rec: dict, pop_pct: float):
     raw_genres = row.get("genres")
@@ -206,7 +218,6 @@ def render_card(row, rec: dict, pop_pct: float):
         item_genres=item_genres,
     )
     rec["badges"] = badges
-    exp_str = format_explanation(rec.get("explanation", {}))
     thumb = row.get("poster_thumb_url")
     
     # Extract anime_id early (needed for button keys)
@@ -298,6 +309,11 @@ def render_card(row, rec: dict, pop_pct: float):
         if alt_title:
             st.markdown(f"<p style='color: #95A5A6; font-style: italic; font-size: 0.9rem; margin-top: 2px;'>{alt_title}</p>", unsafe_allow_html=True)
         
+        # Personalized explanation (if available)
+        explanation = rec.get("explanation")
+        if explanation:
+            st.markdown(f"<div style='background: #ECF0F1; padding: 8px 12px; border-radius: 6px; margin: 8px 0; border-left: 3px solid {conf_color};'><p style='font-size: 0.85rem; color: #34495E; margin: 0;'>{explanation}</p></div>", unsafe_allow_html=True)
+        
         # Metadata row: Score, Type, Episodes, Year, Status
         meta_parts = []
         if mal_score:
@@ -350,28 +366,7 @@ def render_card(row, rec: dict, pop_pct: float):
                         st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         
-        # Inline badge pills
-        explanation = rec.get("explanation", {})
-        mf_pct = explanation.get("mf", 0.0) * 100
-        knn_pct = explanation.get("knn", 0.0) * 100
-        pop_pct = explanation.get("pop", 0.0) * 100
-        
-        # Simplified inline explanation
-        if mf_pct > 50:
-            simple_exp = f"📊 Collaborative {mf_pct:.0f}%, Others {100-mf_pct:.0f}%"
-        elif knn_pct > 30:
-            simple_exp = f"🔗 Neighborhood {knn_pct:.0f}%, Collab {mf_pct:.0f}%, Pop {pop_pct:.0f}%"
-        else:
-            simple_exp = f"⭐ Collab {mf_pct:.0f}%, Neighbor {knn_pct:.0f}%, Popular {pop_pct:.0f}%"
-        
-        # Add multi-seed match info
-        if "seeds_matched" in explanation and "seed_titles" in explanation:
-            num_matched = explanation["seeds_matched"]
-            total_seeds = len(explanation["seed_titles"])
-            if total_seeds > 1:
-                simple_exp += f" | 🎯 Matches {num_matched}/{total_seeds} seeds"
-        
-        st.caption(simple_exp)        # Badge pills inline
+        # Badge pills inline
         cols = st.columns([1, 1, 1])
         with cols[0]:
             cs_icon = "🆕" if badges['cold_start'] else "✓"
@@ -426,13 +421,6 @@ def render_card(row, rec: dict, pop_pct: float):
             st.caption(cs_tooltip)
             st.caption(pop_tooltip)
             st.caption(nov_tooltip)
-            st.caption(f"**Full breakdown**: {exp_str}")
-            
-            # Multi-seed match details
-            seed_exp = format_seed_explanation(explanation)
-            if seed_exp:
-                st.markdown("**Seed Matches:**")
-                st.caption(seed_exp)
         
         # "More Like This" button - adds to seed list (up to 5)
         # anime_id already extracted at top of function
@@ -450,3 +438,14 @@ def render_card(row, rec: dict, pop_pct: float):
                 st.session_state["selected_seed_ids"] = current_ids
                 st.session_state["selected_seed_titles"] = current_titles
                 st.rerun()
+        
+        st.markdown("---")
+        
+        # Rating section (if profile loaded)
+        profile = st.session_state.get("active_profile")
+        if profile:
+            current_rating = profile.get("ratings", {}).get(str(anime_id))
+            st.markdown("**Rate This Anime**")
+            render_quick_rating_buttons(anime_id, title_display, current_rating)
+        else:
+            st.caption("💡 Load a profile to rate anime")

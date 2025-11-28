@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from .constants import BALANCED_WEIGHTS, DIVERSITY_EMPHASIZED_WEIGHTS
+from src.models.user_embedding import compute_personalized_scores
 
 
 @dataclass
@@ -128,6 +129,82 @@ class HybridRecommender:
                     "anime_id": int(self.c.item_ids[i]),
                     "score": float(scores[i]),
                     "explanation": self.explain_item(user_index, i, w),
+                }
+            )
+        return result
+
+    def get_personalized_recommendations(
+        self,
+        user_embedding: np.ndarray,
+        mf_model,
+        n: int = 10,
+        weights: Optional[Dict[str, float]] = None,
+        exclude_item_ids: Optional[Sequence[int]] = None,
+    ) -> List[Dict[str, float]]:
+        """Compute top-N personalized recommendations using user embedding.
+
+        Parameters
+        ----------
+        user_embedding : np.ndarray
+            User embedding vector (shape: [n_factors]) generated from ratings.
+        mf_model
+            Matrix factorization model with Q (item factors) and item_to_index mapping.
+        n : int
+            Number of items to return.
+        weights : Optional[Dict[str, float]]
+            Blending weights; defaults to BALANCED_WEIGHTS.
+        exclude_item_ids : Optional[Sequence[int]]
+            External item IDs to exclude from ranking.
+        
+        Returns
+        -------
+        List[Dict[str, float]]
+            Top-N recommendations with anime_id, score, and explanation.
+        """
+        w = weights or BALANCED_WEIGHTS
+        
+        # Compute personalized MF scores using user embedding
+        personalized_mf_scores = compute_personalized_scores(
+            user_embedding, mf_model, exclude_anime_ids=None
+        )
+        
+        # Build personalized MF score array aligned with item_ids
+        # Initialize with zeros
+        mf_scores_array = np.zeros(len(self.c.item_ids), dtype=np.float32)
+        for idx, item_id in enumerate(self.c.item_ids):
+            if item_id in personalized_mf_scores:
+                mf_scores_array[idx] = personalized_mf_scores[item_id]
+        
+        # Blend personalized MF with kNN and popularity
+        scores = w.get("mf", 0.0) * mf_scores_array
+        if self.c.knn is not None and "knn" in w:
+            # For kNN, use seed-based scoring (no user-specific kNN yet)
+            # Could be extended later with seed blending
+            pass
+        if self.c.pop is not None:
+            scores += w.get("pop", 0.0) * self.c.pop
+        
+        # Apply exclusion filter
+        if exclude_item_ids:
+            mask = np.isin(self.c.item_ids, np.asarray(exclude_item_ids))
+            scores = scores.copy()
+            scores[mask] = -np.inf
+        
+        # Efficient partial selection
+        top_idx = np.argpartition(scores, -n)[-n:]
+        ordered = top_idx[np.argsort(scores[top_idx])[::-1]]
+        
+        result: List[Dict[str, float]] = []
+        for i in ordered:
+            result.append(
+                {
+                    "anime_id": int(self.c.item_ids[i]),
+                    "score": float(scores[i]),
+                    "explanation": {
+                        "mf": w.get("mf", 0.0),
+                        "knn": 0.0,
+                        "pop": w.get("pop", 0.0),
+                    },
                 }
             )
         return result
