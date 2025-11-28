@@ -51,7 +51,7 @@ streamlit run app/main.py
 
 The app works immediately - no setup required! Browse anime by genre or get seed-based recommendations.
 
-### Import Your Watchlist (Optional)
+### Import Your Watchlist & Enable Personalization (Optional)
 
 Want to hide anime you've already watched? Import your MyAnimeList watchlist:
 
@@ -61,7 +61,24 @@ Want to hide anime you've already watched? Import your MyAnimeList watchlist:
 
 📖 **Full guide**: See [`docs/user_guide_watchlist.md`](docs/user_guide_watchlist.md) for detailed instructions with screenshots.
 
-**Privacy Note**: Your watchlist is stored locally in `data/user_profiles/` and never uploaded anywhere. Files are excluded from git via `.gitignore`.
+**NEW: Personalized Recommendations** 🎯
+
+If your profile includes ratings (parsed from MAL export), you can enable **personalized collaborative filtering**:
+
+1. **Load profile with ratings**: Import MAL watchlist (includes your 1-10 ratings)
+2. **Enable personalization**: Sidebar → "👤 User Profile" → Toggle "🎯 Personalized Recommendations"
+3. **Adjust strength**: Use slider (0-100%) to blend seed-based and personalized recommendations
+   - **0%** = Pure seed-based (original behavior)
+   - **50%** = Balanced blend of both approaches
+   - **100%** = Fully personalized from your rating history
+4. **Get tailored recs**: System generates a taste profile from your ratings and recommends anime aligned with your preferences
+
+**How it works**: Your ratings are used to generate a personalized "user embedding" in the same latent space as our matrix factorization model. This embedding captures your unique taste profile (e.g., preference for action, rating patterns). Recommendations are then computed using collaborative filtering on your embedding, not just seed similarity.
+
+📖 **User Guide**: See [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) for detailed instructions and tips.  
+📖 **Technical details**: See [`docs/phase_b_implementation.md`](docs/phase_b_implementation.md) for architecture and implementation details.
+
+**Privacy Note**: Your watchlist and ratings are stored locally in `data/user_profiles/` and never uploaded anywhere. Files are excluded from git via `.gitignore`.
 
 ### Windows PowerShell tips
 

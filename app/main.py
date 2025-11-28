@@ -31,7 +31,6 @@ from src.app.components.help import render_help_panel
 from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
 from src.app.quality_filters import apply_quality_filters
-from src.app.components.explanation_panel import render_explanation_panel
 from src.app.theme import get_theme
 from src.app.constants import (
     DEFAULT_TOP_N,
@@ -181,9 +180,6 @@ if st.sidebar.button("Reload artifacts"):
     st.rerun()
 persona_labels = [p["label"] for p in personas] if personas else []
 params = st.query_params
-# Persisting image debug toggle across reruns
-img_debug = st.sidebar.checkbox("Debug images", value=bool(st.session_state.get("__IMG_DEBUG__", False)))
-st.session_state["__IMG_DEBUG__"] = img_debug
 
 def _qp_get(key: str, default):
     val = params.get(key, default)
@@ -194,7 +190,6 @@ def _qp_get(key: str, default):
 
 # Initialize session state defaults
 for key, default in {
-    "persona_choice": _qp_get("persona", None) or (persona_labels[0] if persona_labels else "(none)"),
     "query": _qp_get("q", ""),
     "weight_mode": _qp_get("wm", "Balanced"),
     "top_n": int(_qp_get("n", DEFAULT_TOP_N)),
@@ -209,7 +204,315 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-persona_choice = st.sidebar.selectbox("Persona", options=persona_labels or ["(none)"], index=(persona_labels.index(st.session_state["persona_choice"]) if persona_labels and st.session_state.get("persona_choice") in persona_labels else 0))
+# ============================================================================
+# SIDEBAR: USER PROFILE (Section 1 - Top Priority)
+# ============================================================================
+st.sidebar.markdown("### 👤 User Profile")
+
+from src.data.user_profiles import list_profiles, load_profile, save_profile, get_profile_summary
+from src.data.mal_parser import parse_mal_export, get_mal_export_summary
+
+# Initialize session state for profile
+if "active_profile" not in st.session_state:
+    st.session_state["active_profile"] = None
+if "parsed_mal_data" not in st.session_state:
+    st.session_state["parsed_mal_data"] = None
+
+# Profile Selector
+available_profiles = list_profiles()
+profile_options = ["(none)"] + available_profiles
+
+current_selection = "(none)"
+if st.session_state["active_profile"]:
+    current_selection = st.session_state["active_profile"].get("username", "(none)")
+    if current_selection not in profile_options:
+        current_selection = "(none)"
+
+selected_profile = st.sidebar.selectbox(
+    "Active Profile",
+    options=profile_options,
+    index=profile_options.index(current_selection) if current_selection in profile_options else 0,
+    help="Select a profile to hide already-watched anime from recommendations",
+    label_visibility="collapsed"
+)
+
+# Load profile when selection changes
+if selected_profile != "(none)" and (not st.session_state["active_profile"] or st.session_state["active_profile"].get("username") != selected_profile):
+    profile_data = load_profile(selected_profile)
+    if profile_data:
+        st.session_state["active_profile"] = profile_data
+        st.rerun()
+elif selected_profile == "(none)" and st.session_state["active_profile"]:
+    st.session_state["active_profile"] = None
+    st.rerun()
+
+# Show profile stats or info message
+if st.session_state["active_profile"]:
+    profile = st.session_state["active_profile"]
+    watched_count = len(profile.get("watched_ids", []))
+    avg_rating = profile.get("stats", {}).get("avg_rating", 0)
+    
+    st.sidebar.success(f"✓ **{profile['username']}** – {watched_count} watched")
+    
+    # Show rating stats
+    ratings_count = len(profile.get("ratings", {}))
+    if ratings_count > 0:
+        st.sidebar.caption(f"⭐ {ratings_count} ratings • Avg: {avg_rating:.1f}/10")
+        
+        # Show rating distribution (simple display)
+        if st.sidebar.checkbox("📊 Rating distribution", key="show_rating_dist", value=False):
+            ratings = profile.get("ratings", {})
+            
+            # Count by rating bucket
+            distribution = {"10": 0, "9": 0, "8": 0, "7": 0, "6": 0, "5": 0, "4": 0, "3": 0, "2": 0, "1": 0}
+            for rating in ratings.values():
+                distribution[str(rating)] = distribution.get(str(rating), 0) + 1
+            
+            # Display as simple bars
+            for rating in ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]:
+                count = distribution[rating]
+                if count > 0:
+                    bar = "█" * min(count, 20)
+                    st.sidebar.caption(f"{rating}/10: {bar} ({count})")
+    elif avg_rating > 0:
+        st.sidebar.caption(f"Avg Rating: {avg_rating:.1f}/10")
+    
+    # Import MAL (collapsed by default)
+    with st.sidebar.expander("📥 Import from MAL", expanded=False):
+        st.caption("Update your watchlist & ratings")
+        
+        # File uploader
+        uploaded_file = st.file_uploader(
+            "Upload MAL XML Export",
+            type=["xml"],
+            help="Export your list from MyAnimeList.net",
+            label_visibility="collapsed"
+        )
+        
+        if uploaded_file is not None:
+            # Show preview button
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("📊 Preview", use_container_width=True):
+                    try:
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
+                            tmp_file.write(uploaded_file.getvalue())
+                            tmp_path = tmp_file.name
+                        
+                        summary = get_mal_export_summary(tmp_path)
+                        st.session_state["mal_summary"] = summary
+                        st.session_state["mal_tmp_path"] = tmp_path
+                        
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+            
+            with col2:
+                if st.button("🔄 Parse", use_container_width=True):
+                    try:
+                        if "mal_tmp_path" not in st.session_state:
+                            import tempfile
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
+                                tmp_file.write(uploaded_file.getvalue())
+                                tmp_path = tmp_file.name
+                        else:
+                            tmp_path = st.session_state["mal_tmp_path"]
+                        
+                        with st.spinner("Parsing..."):
+                            parsed_data = parse_mal_export(
+                                xml_path=tmp_path,
+                                metadata_df=metadata,
+                                include_statuses={'Completed', 'Watching', 'On-Hold'},
+                                use_default_for_unrated=True,
+                                default_rating=7.0
+                            )
+                            st.session_state["parsed_mal_data"] = parsed_data
+                        
+                        st.success(f"✓ Parsed {len(parsed_data['watched_ids'])} anime")
+                        
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+        
+        # Show parsed data and save option
+        if st.session_state["parsed_mal_data"]:
+            parsed = st.session_state["parsed_mal_data"]
+            
+            st.caption(f"✓ {parsed['stats']['total_watched']} matched • {parsed['stats']['rated_count']} rated")
+            
+            if parsed['unmatched']:
+                st.warning(f"⚠️ {len(parsed['unmatched'])} unmatched")
+            
+            username_input = st.text_input(
+                "Profile Name",
+                value=parsed.get('username', 'my_profile'),
+                help="Choose a name for this profile"
+            )
+            
+            if st.button("💾 Save Profile", type="primary", use_container_width=True):
+                try:
+                    save_profile(username_input, parsed)
+                    st.session_state["active_profile"] = load_profile(username_input)
+                    st.session_state["parsed_mal_data"] = None
+                    if "mal_summary" in st.session_state:
+                        del st.session_state["mal_summary"]
+                    if "mal_tmp_path" in st.session_state:
+                        import os
+                        try:
+                            os.unlink(st.session_state["mal_tmp_path"])
+                        except:
+                            pass
+                        del st.session_state["mal_tmp_path"]
+                    st.success(f"✓ Saved as '{username_input}'")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed: {e}")
+else:
+    st.sidebar.info("💡 Import your MAL watchlist to hide watched anime")
+    
+    # Import MAL (expanded when no profile)
+    with st.sidebar.expander("📥 Import from MAL", expanded=True):
+        st.caption("Get started by importing your watchlist")
+        
+        uploaded_file = st.file_uploader(
+            "Upload MAL XML Export",
+            type=["xml"],
+            help="Export from MyAnimeList.net",
+            label_visibility="collapsed"
+        )
+        
+        if uploaded_file is not None:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("📊 Preview", use_container_width=True, key="preview_no_profile"):
+                    try:
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
+                            tmp_file.write(uploaded_file.getvalue())
+                            tmp_path = tmp_file.name
+                        
+                        summary = get_mal_export_summary(tmp_path)
+                        st.session_state["mal_summary"] = summary
+                        st.session_state["mal_tmp_path"] = tmp_path
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+            
+            with col2:
+                if st.button("🔄 Parse", use_container_width=True, key="parse_no_profile"):
+                    try:
+                        if "mal_tmp_path" not in st.session_state:
+                            import tempfile
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
+                                tmp_file.write(uploaded_file.getvalue())
+                                tmp_path = tmp_file.name
+                        else:
+                            tmp_path = st.session_state["mal_tmp_path"]
+                        
+                        with st.spinner("Parsing..."):
+                            parsed_data = parse_mal_export(
+                                xml_path=tmp_path,
+                                metadata_df=metadata,
+                                include_statuses={'Completed', 'Watching', 'On-Hold'},
+                                use_default_for_unrated=True,
+                                default_rating=7.0
+                            )
+                            st.session_state["parsed_mal_data"] = parsed_data
+                        
+                        st.success(f"✓ Parsed {len(parsed_data['watched_ids'])} anime")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+        
+        if st.session_state["parsed_mal_data"]:
+            parsed = st.session_state["parsed_mal_data"]
+            st.caption(f"✓ {parsed['stats']['total_watched']} matched • {parsed['stats']['rated_count']} rated")
+            
+            username_input = st.text_input(
+                "Profile Name",
+                value=parsed.get('username', 'my_profile'),
+                key="username_no_profile"
+            )
+            
+            if st.button("💾 Save Profile", type="primary", use_container_width=True, key="save_no_profile"):
+                try:
+                    save_profile(username_input, parsed)
+                    st.session_state["active_profile"] = load_profile(username_input)
+                    st.session_state["parsed_mal_data"] = None
+                    st.success(f"✓ Saved as '{username_input}'")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed: {e}")
+
+# ============================================================================
+# SIDEBAR: PERSONALIZATION (Section 2 - Separate from Profile)
+# ============================================================================
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🎯 Personalization")
+
+# Initialize personalization state
+if "personalization_enabled" not in st.session_state:
+    st.session_state["personalization_enabled"] = False
+if "personalization_strength" not in st.session_state:
+    st.session_state["personalization_strength"] = 100
+if "user_embedding" not in st.session_state:
+    st.session_state["user_embedding"] = None
+
+# Check if profile has ratings
+profile_has_ratings = False
+if st.session_state["active_profile"]:
+    ratings = st.session_state["active_profile"].get("ratings", {})
+    profile_has_ratings = len(ratings) > 0
+
+# Personalization toggle
+if profile_has_ratings:
+    personalization_enabled = st.sidebar.checkbox(
+        "Enable Personalized Recommendations",
+        value=st.session_state["personalization_enabled"],
+        help=f"Use your {len(ratings)} ratings to personalize recommendations"
+    )
+    st.session_state["personalization_enabled"] = personalization_enabled
+    
+    if personalization_enabled:
+        # Personalization strength slider
+        personalization_strength = st.sidebar.slider(
+            "Strength",
+            min_value=0,
+            max_value=100,
+            value=st.session_state["personalization_strength"],
+            help="0% = seed-based only, 100% = fully personalized",
+            format="%d%%"
+        )
+        st.session_state["personalization_strength"] = personalization_strength
+        
+        # Generate user embedding if not already cached
+        if st.session_state["user_embedding"] is None:
+            with st.spinner("Generating taste profile..."):
+                from src.models.user_embedding import generate_user_embedding
+                mf_model = bundle["models"].get("mf")
+                if mf_model:
+                    user_embedding = generate_user_embedding(
+                        ratings_dict=ratings,
+                        mf_model=mf_model,
+                        method="weighted_average",
+                        normalize=True
+                    )
+                    st.session_state["user_embedding"] = user_embedding
+                    st.sidebar.success(f"✓ Profile ready ({len(ratings)} ratings)")
+        else:
+            st.sidebar.caption(f"✓ Using {len(ratings)} ratings")
+        
+        # Taste profile visualization
+        if st.sidebar.checkbox("🎨 View Taste Profile", key="show_taste_profile", value=False):
+            from src.app.components.taste_profile import render_taste_profile_panel
+            render_taste_profile_panel(st.session_state["active_profile"], metadata)
+else:
+    st.sidebar.caption("💡 Rate anime to enable personalization")
+
+# ============================================================================
+# SIDEBAR: SEARCH & SEEDS (Section 3 - Discovery Tools)
+# ============================================================================
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔍 Search & Seeds")
 
 # Searchable title dropdown - prefer English titles
 def get_display_title(row):
@@ -247,9 +550,11 @@ query = selected_titles[0] if selected_titles else ""
 weight_mode = st.sidebar.radio("Hybrid Weights", ["Balanced", "Diversity"], index=(0 if st.session_state.get("weight_mode") != "Diversity" else 1), horizontal=True)
 top_n = st.sidebar.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N)))
 
-# Sort and Filter Controls
+# ============================================================================
+# SIDEBAR: FILTERS & DISPLAY (Section 4)
+# ============================================================================
 st.sidebar.markdown("---")
-st.sidebar.subheader("🎛️ Sort & Filter")
+st.sidebar.markdown("### 🎛️ Filters & Display")
 
 # Browse mode toggle
 browse_mode = st.sidebar.checkbox(
@@ -325,18 +630,17 @@ view_mode = st.sidebar.radio(
 st.session_state["view_mode"] = "list" if view_mode == "List" else "grid"
 
 # Clear filters button
-if genre_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != "Confidence":
+if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != "Confidence":
     if st.sidebar.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
         st.session_state["sort_by"] = "Confidence"
         st.session_state["genre_filter"] = []
+        st.session_state["type_filter"] = []
         st.session_state["year_min"] = 1960
         st.session_state["year_max"] = 2025
         st.rerun()
 
-# Performance Metrics Display
-st.sidebar.markdown("---")
+# Performance Metrics
 with st.sidebar.expander("⚡ Performance", expanded=False):
-    # Get latest timing from profiling context if available
     from src.app.profiling import get_last_timing
     try:
         last_timing = get_last_timing()
@@ -354,7 +658,6 @@ with st.sidebar.expander("⚡ Performance", expanded=False):
     except Exception:
         st.caption("Run recommendations to see metrics")
     
-    # Memory estimate
     import sys
     if hasattr(bundle, '__sizeof__'):
         mem_mb = sys.getsizeof(bundle) / (1024 * 1024)
@@ -365,193 +668,28 @@ with st.sidebar.expander("⚡ Performance", expanded=False):
         </div>
         """, unsafe_allow_html=True)
 
-# User Profile (Watchlist Import) ----------------------------------------
+# ============================================================================
+# SIDEBAR: HELP & FAQ (Section 5 - Bottom)
+# ============================================================================
 st.sidebar.markdown("---")
-with st.sidebar.expander("👤 User Profile", expanded=False):
-    from src.data.user_profiles import list_profiles, load_profile, save_profile, get_profile_summary
-    from src.data.mal_parser import parse_mal_export, get_mal_export_summary
-    
-    # Initialize session state for profile
-    if "active_profile" not in st.session_state:
-        st.session_state["active_profile"] = None
-    if "parsed_mal_data" not in st.session_state:
-        st.session_state["parsed_mal_data"] = None
-    
-    # Profile Selector
-    available_profiles = list_profiles()
-    profile_options = ["(none)"] + available_profiles
-    
-    current_selection = "(none)"
-    if st.session_state["active_profile"]:
-        current_selection = st.session_state["active_profile"].get("username", "(none)")
-        if current_selection not in profile_options:
-            current_selection = "(none)"
-    
-    selected_profile = st.selectbox(
-        "Active Profile",
-        options=profile_options,
-        index=profile_options.index(current_selection) if current_selection in profile_options else 0,
-        help="Select a profile to hide already-watched anime from recommendations"
-    )
-    
-    # Load profile when selection changes
-    if selected_profile != "(none)" and (not st.session_state["active_profile"] or st.session_state["active_profile"].get("username") != selected_profile):
-        profile_data = load_profile(selected_profile)
-        if profile_data:
-            st.session_state["active_profile"] = profile_data
-            st.rerun()
-    elif selected_profile == "(none)" and st.session_state["active_profile"]:
-        st.session_state["active_profile"] = None
-        st.rerun()
-    
-    # Show profile stats or info message
-    if st.session_state["active_profile"]:
-        profile = st.session_state["active_profile"]
-        watched_count = len(profile.get("watched_ids", []))
-        avg_rating = profile.get("stats", {}).get("avg_rating", 0)
-        
-        st.success(f"✓ **{profile['username']}** – {watched_count} watched")
-        if avg_rating > 0:
-            st.caption(f"Avg Rating: {avg_rating:.1f}/10")
-    else:
-        st.info("💡 Import your MAL watchlist to hide anime you've already watched")
-    
-    st.markdown("---")
-    st.markdown("**Import from MyAnimeList**")
-    
-    # File uploader
-    uploaded_file = st.file_uploader(
-        "Upload MAL XML Export",
-        type=["xml"],
-        help="Export your list from MyAnimeList.net",
-        label_visibility="collapsed"
-    )
-    
-    if uploaded_file is not None:
-        # Show preview button
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("📊 Preview", use_container_width=True):
-                try:
-                    # Save uploaded file temporarily
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
-                        tmp_file.write(uploaded_file.getvalue())
-                        tmp_path = tmp_file.name
-                    
-                    # Get summary
-                    summary = get_mal_export_summary(tmp_path)
-                    st.session_state["mal_summary"] = summary
-                    st.session_state["mal_tmp_path"] = tmp_path
-                    
-                except Exception as e:
-                    st.error(f"Error parsing XML: {e}")
-        
-        with col2:
-            if st.button("🔄 Parse", use_container_width=True):
-                try:
-                    # Use temp path from preview or create new one
-                    if "mal_tmp_path" not in st.session_state:
-                        import tempfile
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as tmp_file:
-                            tmp_file.write(uploaded_file.getvalue())
-                            tmp_path = tmp_file.name
-                    else:
-                        tmp_path = st.session_state["mal_tmp_path"]
-                    
-                    # Parse with options
-                    with st.spinner("Parsing MAL export..."):
-                        parsed_data = parse_mal_export(
-                            xml_path=tmp_path,
-                            metadata_df=metadata,
-                            include_statuses={'Completed', 'Watching', 'On-Hold'},
-                            use_default_for_unrated=True,
-                            default_rating=7.0
-                        )
-                        st.session_state["parsed_mal_data"] = parsed_data
-                    
-                    st.success(f"✓ Parsed {len(parsed_data['watched_ids'])} anime")
-                    
-                except Exception as e:
-                    st.error(f"Error parsing: {e}")
-    
-    # Show preview summary
-    if "mal_summary" in st.session_state:
-        summary = st.session_state["mal_summary"]
-        st.markdown("**Preview:**")
-        st.caption(f"Username: {summary['username']}")
-        st.caption(f"Total: {summary['total_anime']} anime ({summary['rated_count']} rated)")
-    
-    # Show parsed data and save option
-    if st.session_state["parsed_mal_data"]:
-        parsed = st.session_state["parsed_mal_data"]
-        
-        st.markdown("**Import Summary:**")
-        st.caption(f"✓ {parsed['stats']['total_watched']} anime matched")
-        st.caption(f"✓ {parsed['stats']['rated_count']} with ratings")
-        
-        if parsed['unmatched']:
-            # Use warning instead of nested expander (Streamlit doesn't allow nested expanders)
-            unmatched_titles = ", ".join([entry['title'] for entry in parsed['unmatched'][:3]])
-            if len(parsed['unmatched']) > 3:
-                unmatched_titles += f" +{len(parsed['unmatched']) - 3} more"
-            st.warning(f"⚠️ {len(parsed['unmatched'])} unmatched: {unmatched_titles}")
-        
-        # Username input and save
-        username_input = st.text_input(
-            "Profile Name",
-            value=parsed.get('username', 'my_profile'),
-            help="Choose a name for this profile"
-        )
-        
-        if st.button("💾 Save Profile", type="primary", use_container_width=True):
-            try:
-                save_profile(username_input, parsed)
-                st.session_state["active_profile"] = load_profile(username_input)
-                st.session_state["parsed_mal_data"] = None  # Clear parsed data
-                if "mal_summary" in st.session_state:
-                    del st.session_state["mal_summary"]
-                if "mal_tmp_path" in st.session_state:
-                    import os
-                    try:
-                        os.unlink(st.session_state["mal_tmp_path"])
-                    except:
-                        pass
-                    del st.session_state["mal_tmp_path"]
-                st.success(f"✓ Saved as '{username_input}'")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to save: {e}")
-
-# Quick Usage Hints ------------------------------------------------------
 with st.sidebar.expander("💡 Quick Guide", expanded=False):
     st.markdown("""
     <div style='font-size: 0.9rem; line-height: 1.8;'>
-    1️⃣ Search a title OR pick a persona<br>
-    2️⃣ Select from dropdown to set seed<br>
-    3️⃣ Adjust hybrid weights as desired<br>
-    4️⃣ Use sort/filter to refine results<br>
-    5️⃣ Explore badges & explanations
+    1️⃣ <b>Load Profile</b> – Import MAL or create new<br>
+    2️⃣ <b>Personalize</b> – Enable & adjust strength<br>
+    3️⃣ <b>Find Seeds</b> – Search titles to blend<br>
+    4️⃣ <b>Adjust Filters</b> – Sort, genre, year, type<br>
+    5️⃣ <b>Explore</b> – Check badges & explanations
     </div>
     """, unsafe_allow_html=True)
 
 # Persist updates
-st.session_state["persona_choice"] = persona_choice
 st.session_state["query"] = query
 st.session_state["weight_mode"] = weight_mode
 st.session_state["top_n"] = top_n
-st.query_params.update({"persona": persona_choice, "q": query, "wm": weight_mode, "n": str(top_n)})
+st.query_params.update({"q": query, "wm": weight_mode, "n": str(top_n)})
 
 weights = choose_weights(weight_mode)
-
-# Persona summary ----------------------------------------------------------
-if persona_choice != "(none)":
-    persona_obj = next((p for p in personas if p["label"] == persona_choice), None)
-    if persona_obj:
-        st.sidebar.markdown(f"**Genres:** {', '.join(persona_obj['favorite_genres'])}")
-        st.sidebar.caption(persona_obj["preference_summary"])
-
 
 # Seed selection indicator & handler --------------------------------------
 # Convert selected titles to IDs
@@ -704,7 +842,7 @@ if browse_mode:
                         browse_results.append({
                             "anime_id": anime_id,
                             "score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
-                            "explanation": {"browse": "catalog"},
+                            "explanation": None,  # No explanation in browse mode
                             "_mal_score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
                             "_year": 0,
                             "_popularity": float(pop_percentiles[idx]) if idx < len(pop_percentiles) else 50.0
@@ -869,7 +1007,76 @@ else:
                     scored.sort(key=lambda x: x["score"], reverse=True)
                     recs = scored[:n_requested]
                 else:
+                    # Default: seed-based recommendations
                     recs = recommender.get_top_n_for_user(user_index, n=n_requested, weights=weights)
+        
+        # Check if personalization is enabled (after recs are generated)
+        personalization_enabled = st.session_state.get("personalization_enabled", False)
+        user_embedding = st.session_state.get("user_embedding")
+        personalization_strength = st.session_state.get("personalization_strength", 100) / 100.0  # Convert to 0-1
+        
+        # Apply personalization if enabled and user has embedding
+        if recs and personalization_enabled and user_embedding is not None:
+            mf_model = bundle["models"].get("mf")
+            
+            # Get watched anime IDs for exclusion
+            watched_ids = []
+            if st.session_state["active_profile"]:
+                watched_ids = st.session_state["active_profile"].get("watched_ids", [])
+            
+            if personalization_strength >= 0.99:
+                # Pure personalized recommendations (100% strength)
+                recs = recommender.get_personalized_recommendations(
+                    user_embedding=user_embedding,
+                    mf_model=mf_model,
+                    n=n_requested,
+                    weights=weights,
+                    exclude_item_ids=watched_ids
+                )
+            elif personalization_strength > 0.01:
+                # Blend personalized and seed-based
+                personalized_recs = recommender.get_personalized_recommendations(
+                    user_embedding=user_embedding,
+                    mf_model=mf_model,
+                    n=n_requested,
+                    weights=weights,
+                    exclude_item_ids=watched_ids
+                )
+                
+                # Create score dictionaries
+                personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
+                seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
+                
+                # Collect all unique anime IDs
+                all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
+                
+                # Blend scores
+                blended = []
+                for aid in all_anime_ids:
+                    p_score = personalized_scores.get(aid, 0.0)
+                    s_score = seed_scores.get(aid, 0.0)
+                    
+                    # Weighted blend based on personalization strength
+                    final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
+                    
+                    blended.append({
+                        "anime_id": aid,
+                        "score": final_score,
+                    })
+                
+                # Sort and take top N
+                blended.sort(key=lambda x: x["score"], reverse=True)
+                recs = blended[:n_requested]
+            # else: personalization_strength <= 0.01, keep seed-based recs as-is
+        
+        # Generate explanations for personalized recommendations
+        if recs and personalization_enabled and st.session_state.get("active_profile"):
+            from src.app.components.explanations import generate_batch_explanations
+            recs = generate_batch_explanations(
+                recommendations=recs,
+                user_profile=st.session_state["active_profile"],
+                metadata_df=metadata
+            )
         
         # Apply user filters and sorting
         if recs:
@@ -1156,9 +1363,7 @@ else:
 
 
 st.markdown("---")
-if recs:
-    render_explanation_panel(recs, top_k=min(5, len(recs)))
-    st.markdown("---")
+# Note: Old explanation panel removed - explanations now shown inline on cards
 render_diversity_panel(recs, metadata)
 
 
