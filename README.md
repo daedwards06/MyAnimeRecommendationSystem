@@ -1,5 +1,39 @@
-# MyAnimeRecommendationSystem
-Anime Recommender 
+# MyAnimeRecommendationSystem (MARS)
+
+**Portfolio-grade hybrid anime recommender system** with personalized collaborative filtering, explainability, and rich metadata integration.
+
+## ✨ Key Features
+
+### 🎯 Personalized Recommendations (Phase B - Complete)
+- **Collaborative Filtering**: Generate personalized taste profile from your MAL ratings
+- **Smart Blending**: 0-100% slider to blend personalized and seed-based recommendations
+- **Taste Profile Visualization**: Radar charts, rating distributions, and preference statistics
+- **Personalized Explanations**: "You rate Action (8.3★), Drama (7.9★) • Similar to: Death Note"
+- **In-App Rating**: Rate anime directly with quick buttons, auto-updates profile
+
+### 🎬 Rich Recommendation Engine
+- **Hybrid Model**: Balanced blend of Matrix Factorization (93%), Item kNN (7%), and Popularity
+- **Seed-Based Similarity**: Find anime similar to your favorites via genre overlap + CF
+- **Browse by Genre**: Explore 13,000+ anime by genre, year, and type filters
+- **Multi-Seed Support**: Combine multiple anime as seeds for nuanced recommendations
+
+### 📊 Advanced Metadata & Discovery
+- **Comprehensive Cards**: MAL scores, episodes, studios, streaming platforms, synopsis
+- **Smart Filters**: Genre (40+ options), Type (TV/Movie/OVA), Year range (1960-2025)
+- **Sort Options**: By confidence, MAL score, release year, or popularity
+- **View Modes**: List or grid layout with rich metadata display
+
+### 🔒 Privacy & Multi-User
+- **Local Storage**: Profiles stored on your machine (`data/user_profiles/`), never uploaded
+- **Multi-User**: Multiple people can use the same installation with separate profiles
+- **No Auth Required**: File-based separation, fork-friendly design
+- **Profiles Optional**: App works perfectly without any profile
+
+### 🎨 User Experience
+- **Searchable Dropdown**: 13,000+ anime titles with fuzzy matching
+- **Active Seed Indicator**: Green banner shows current seed with clear button
+- **Confidence Ratings**: Visual match indicators on all recommendations
+- **Responsive Design**: Clean cards with colored borders and inline badges
 
 ## Project structure
 
@@ -61,22 +95,33 @@ Want to hide anime you've already watched? Import your MyAnimeList watchlist:
 
 📖 **Full guide**: See [`docs/user_guide_watchlist.md`](docs/user_guide_watchlist.md) for detailed instructions with screenshots.
 
-**NEW: Personalized Recommendations** 🎯
+### Personalized Recommendations 🎯 (Phase B - Complete)
 
-If your profile includes ratings (parsed from MAL export), you can enable **personalized collaborative filtering**:
+If your profile includes ratings, unlock **personalized collaborative filtering** based on your unique taste profile:
 
+#### Quick Setup
 1. **Load profile with ratings**: Import MAL watchlist (includes your 1-10 ratings)
 2. **Enable personalization**: Sidebar → "👤 User Profile" → Toggle "🎯 Personalized Recommendations"
 3. **Adjust strength**: Use slider (0-100%) to blend seed-based and personalized recommendations
    - **0%** = Pure seed-based (original behavior)
    - **50%** = Balanced blend of both approaches
-   - **100%** = Fully personalized from your rating history
-4. **Get tailored recs**: System generates a taste profile from your ratings and recommends anime aligned with your preferences
+   - **100%** = Fully personalized from your rating history (default)
 
-**How it works**: Your ratings are used to generate a personalized "user embedding" in the same latent space as our matrix factorization model. This embedding captures your unique taste profile (e.g., preference for action, rating patterns). Recommendations are then computed using collaborative filtering on your embedding, not just seed similarity.
+#### Features
+- **📊 Taste Profile Visualization**: View your genre preferences (radar chart), rating distribution, and statistics
+- **💬 Personalized Explanations**: See why each anime is recommended based on your genre preferences and similar titles you've rated highly
+- **⭐ In-App Rating**: Rate anime directly from cards with quick buttons (👍 8, ❤️ 10, 👎 4)
+- **🎯 Smart Blending**: Seamlessly blend personalized CF with seed-based similarity at any ratio
+- **📈 Real-time Updates**: Ratings instantly update your profile and refresh recommendations
 
-📖 **User Guide**: See [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) for detailed instructions and tips.  
-📖 **Technical details**: See [`docs/phase_b_implementation.md`](docs/phase_b_implementation.md) for architecture and implementation details.
+#### How It Works
+Your ratings generate a personalized "user embedding" (64-dimensional vector) in the same latent space as our matrix factorization model. This embedding captures your unique taste profile through weighted averaging—anime you rated higher contribute more to your profile. Recommendations are computed via collaborative filtering (dot product with all anime embeddings), predicting what you'll enjoy based on patterns learned from 73,515 users.
+
+**Example**: If you rated *Attack on Titan* (10/10), *Death Note* (9/10), and *Steins;Gate* (9/10) highly, the system learns you prefer dark themes, psychological elements, and complex plots—then recommends similar anime even if they don't share explicit genres.
+
+#### Documentation
+- 📖 **User Guide**: [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) - Detailed walkthrough with tips
+- 📖 **Implementation**: [`docs/watchlist_implementation_plan.md`](docs/watchlist_implementation_plan.md#phase-b-personalized-collaborative-filtering-advanced-enhancement) - Technical architecture
 
 **Privacy Note**: Your watchlist and ratings are stored locally in `data/user_profiles/` and never uploaded anywhere. Files are excluded from git via `.gitignore`.
 
@@ -124,9 +169,28 @@ python scripts/train_lightfm_baseline.py `
 
 This reports Precision@K and Recall@K on validation and test.
 
-## Proposal
+## 📋 Project Status
 
-See `PROJECT_PROPOSAL.md` for the full professional plan, roadmap, timeline, and deliverables.
+| Phase | Status | Completion Date |
+|-------|--------|-----------------|
+| **Phase 1** - Data Acquisition & Enrichment | ✅ Complete | 2025-11-10 |
+| **Phase 2** - Feature Engineering | ✅ Complete | 2025-11-14 |
+| **Phase 3** - Model Development | ✅ Complete | 2025-11-21 |
+| **Phase 4** - Evaluation & Analysis | ✅ Complete | 2025-11-22 |
+| **Phase 5A** - MAL Watchlist Import | ✅ Complete | 2025-11-27 |
+| **Phase 5B** - Personalized CF | ✅ Complete | 2025-11-28 |
+| **Phase 5C** - App Polish & Deployment | 🔄 In Progress | - |
+| **Phase 6** - Documentation & Portfolio | 🔄 In Progress | - |
+
+### Recent Milestones
+- ✅ **2025-11-28**: Personalized explanations with genre matching and similar anime
+- ✅ **2025-11-28**: Taste profile visualization (radar charts, histograms, stats)
+- ✅ **2025-11-28**: In-app rating system with auto-save and watched list integration
+- ✅ **2025-11-27**: MAL watchlist import with 89% match rate on real user data
+- ✅ **2025-11-26**: Browse by genre mode and comprehensive filter system
+- ✅ **2025-11-22**: Phase 4 evaluation with diversity & novelty metrics
+
+See [`docs/running_context.md`](docs/running_context.md) for detailed phase summaries and [`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md) for the full roadmap.
 
 ## Phase 4 Evaluation Report
 
