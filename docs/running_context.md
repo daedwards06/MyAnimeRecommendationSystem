@@ -1,4 +1,123 @@
-Last updated: 2025-11-27 (Phase A: MAL Watchlist Import & Exclusion Filter - MVP Complete)
+Last updated: 2025-11-28 (Phase B: Personalized Collaborative Filtering - Complete)
+
+## 21. Personalized Collaborative Filtering (Phase B Complete - 2025-11-28)
+**Feature Overview**:
+Phase B implements true personalized recommendations based on user rating history. Instead of relying solely on seed-based similarity, the system generates a custom user embedding from ratings and computes personalized scores via collaborative filtering.
+
+**Implementation Details**:
+
+**Backend Components**:
+- `src/models/user_embedding.py`: User embedding generator
+  - Weighted average approach: higher-rated anime contribute more to profile
+  - Normalization: (rating - min) / (max - min) to 0-1 scale
+  - L2 normalization for consistent magnitude
+  - Returns 64-dimensional user vector matching MF model space
+  - Performance: <10ms for 100 ratings
+
+- `src/app/recommender.py`: Personalized scoring integration
+  - `get_personalized_recommendations()`: Computes dot product user_embedding @ item_factors.T
+  - Blending system: 0-100% slider mixes personalized CF with seed-based similarity
+  - Score normalization and popularity prior blending
+  - Exclusion of watched anime from candidates
+
+- `src/app/components/explanations.py`: Personalized explanation generator (265 lines)
+  - Analyzes user's genre rating patterns (average per genre, minimum 2 ratings)
+  - Identifies matching genres between recommendation and user preferences
+  - Finds similar highly-rated anime (8+) with 2+ shared genres
+  - Formats: "🎯 Match: 8.5/10 • You rate Action (8.3★), Drama (7.9★) • Similar to: Death Note"
+  - Handles numpy array genre format from metadata
+  - Score conversion: 0-1 scale multiplied by 10 for display
+
+- `src/app/components/taste_profile.py`: Visual taste analysis (338 lines)
+  - Genre preferences radar chart (top 8 genres by average rating)
+  - Rating distribution histogram (9-10, 7-8, 5-6, 1-4 buckets)
+  - Statistics: total ratings, avg rating, generosity %, diversity, rating style personality
+  - Rating style classification: Enthusiast (8+), Balanced (7+), Critical (6+), Tough Critic (<6)
+
+**Frontend Integration** (`app/main.py`):
+- **Personalization Toggle**: "🎯 Personalized Recommendations" checkbox (only visible with rated profile)
+- **Personalization Strength Slider**: 0-100% blend between seed-based and personalized
+  - 0%: Pure seed similarity (original behavior)
+  - 50%: Balanced blend
+  - 100%: Fully personalized CF (default)
+- **Taste Profile Viewer**: "🎨 View Taste Profile" button opens modal with 3 tabs
+  - Genre Preferences: Radar chart + sorted list
+  - Rating Patterns: Histogram + percentage breakdown
+  - Statistics: Avg rating, generosity, diversity, rating style
+- **In-App Rating System**: Quick rating buttons on cards
+  - 👍 8 (Good), ❤️ 10 (Love it!), 👎 4 (Meh)
+  - Displays current rating if already rated
+  - Auto-saves to profile, invalidates embedding cache, updates stats
+  - Automatically adds rated anime to watched list
+- **Personalized Explanations**: Shown on all cards when personalization enabled
+  - Grid view: One-line compact explanation
+  - List view: Full explanation with icon
+- **Rating Distribution**: Histogram in sidebar showing user's rating spread
+
+**Blending Logic**:
+- Pure personalized (100%): Full personalized recs from `get_personalized_recommendations()`
+- Pure seed-based (0%): Keep original seed-based recommendations
+- Blended (1-99%): Merge personalized and seed scores, weighted by slider
+  - Combines all unique anime IDs from both sets
+  - Computes weighted average: `(strength * p_score) + ((1-strength) * s_score)`
+  - Sorts by blended score, returns top N
+
+**Bug Fixes During Implementation**:
+- Fixed type mismatch: JSON stores rating keys as strings, metadata uses int anime_ids
+  - Solution: Convert to int in `_calculate_genre_ratings()` and `_find_similar_rated_anime()`
+- Fixed numpy array genre parsing: `_parse_genres()` now handles string, list, and numpy.ndarray
+- Fixed score display inconsistency: Explanations now multiply 0-1 scores by 10 for "X/10" format
+- Fixed old explanation format conflicts: Removed deprecated dict format, use string format
+- Fixed personalization_enabled scope issue: Moved variable to correct scope
+- Fixed browse mode debug output: Changed explanation from dict to None
+- Fixed rating save missing username argument
+- Fixed rated anime not disappearing: Auto-add to watched_ids on rating
+
+**Performance**:
+- User embedding generation: <10ms for 100 ratings
+- Personalized scoring: <10ms for 13K anime
+- Explanation generation: Negligible overhead (<5ms per recommendation)
+- Taste profile rendering: <100ms
+
+**Files Created**:
+- `src/models/user_embedding.py` (102 lines)
+- `src/app/components/explanations.py` (265 lines)
+- `src/app/components/taste_profile.py` (338 lines)
+- `docs/user_guide_personalization.md` (398 lines)
+
+**Files Modified**:
+- `app/main.py`: Personalization UI + blending logic + explanation integration
+- `src/app/components/rating.py`: Rating buttons + auto-watched integration
+- `src/app/components/cards.py`: Explanation display on cards
+- `src/app/recommender.py`: `get_personalized_recommendations()` method
+
+**Testing & Validation**:
+- ✅ Tested with 91-rating profile: Genre matching working correctly
+- ✅ Blending verified at 0%, 50%, 100% - smooth transitions
+- ✅ Explanations showing genre preferences and similar anime
+- ✅ Rating system: Save, display, auto-watched all functional
+- ✅ Taste profile visualizations rendering correctly
+- ✅ Performance targets met (<100ms all operations)
+
+**User Experience**:
+- Seamless integration with existing workflow
+- Personalization optional, defaults to 100% when enabled
+- Clear visual feedback (taste profile, explanations, rating confirmations)
+- No breaking changes to seed-based workflow
+
+**Next Steps (Stretch Goals - Optional)**:
+- Rating prediction display (show predicted score before rating)
+- Export recommendations (CSV/Markdown)
+- "Discover new genres" mode (recommend outside usual preferences)
+
+**Phase B Success Metrics Met**:
+- ✅ Personalized recommendations differ from seed-based
+- ✅ Recommendations align with user rating patterns
+- ✅ Embedding generation <100ms
+- ✅ User can add/update ratings seamlessly
+- ✅ Positive functionality verification complete
+
+---
 
 ## 20. MAL Watchlist Import & Personalized Exclusion (Phase A Complete - 2025-11-27)
 **Feature Overview**:

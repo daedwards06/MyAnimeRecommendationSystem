@@ -6,6 +6,7 @@ based on user's taste profile and rating history.
 """
 
 import pandas as pd
+import numpy as np
 from typing import Dict, List, Optional, Tuple
 import logging
 
@@ -64,8 +65,9 @@ def generate_explanation(
         # Build explanation
         parts = []
         
-        # Part 1: Predicted rating
-        parts.append(f"🎯 **Match: {personalized_score:.1f}/10**")
+        # Part 1: Predicted rating (convert 0-1 scale to 0-10)
+        score_out_of_10 = personalized_score * 10
+        parts.append(f"🎯 **Match: {score_out_of_10:.1f}/10**")
         
         # Part 2: Genre match (if any)
         if matching_genres:
@@ -109,11 +111,12 @@ def generate_explanation(
 
 
 def _parse_genres(genres_str) -> List[str]:
-    """Parse genres from string or list format."""
+    """Parse genres from string, list, or numpy array format."""
     if isinstance(genres_str, str):
         # Handle pipe-delimited format
         return [g.strip() for g in genres_str.split('|') if g.strip()]
-    elif isinstance(genres_str, list):
+    elif isinstance(genres_str, (list, np.ndarray)):
+        # Handle list or numpy array
         return [str(g).strip() for g in genres_str if g]
     return []
 
@@ -130,7 +133,13 @@ def _calculate_genre_ratings(
     """
     genre_stats = {}
     
-    for anime_id, rating in ratings.items():
+    for anime_id_str, rating in ratings.items():
+        # Convert to int (ratings dict has string keys from JSON)
+        try:
+            anime_id = int(anime_id_str)
+        except (ValueError, TypeError):
+            continue
+        
         # Find anime in metadata
         anime_row = metadata_df[metadata_df['anime_id'] == anime_id]
         if anime_row.empty:
@@ -180,7 +189,13 @@ def _find_similar_rated_anime(
     """
     similar = []
     
-    for anime_id, rating in ratings.items():
+    for anime_id_str, rating in ratings.items():
+        # Convert to int (ratings dict has string keys from JSON)
+        try:
+            anime_id = int(anime_id_str)
+        except (ValueError, TypeError):
+            continue
+        
         if anime_id == target_anime_id:
             continue
         

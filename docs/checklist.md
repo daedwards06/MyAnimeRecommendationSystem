@@ -91,6 +91,42 @@ Goal: Turn raw metric tables into persuasive evaluation artifacts (plots, ablati
 Phase 4 Tag Target: `phase4-complete` (to be created)
 
 ## Phase 5 — App Development & Deployment
+
+### Phase 5A: MAL Watchlist Import & Exclusion (Complete - 2025-11-27)
+- [x] MAL XML parser with metadata matching
+- [x] User profile storage system (JSON-based)
+- [x] Profile selector UI with stats display
+- [x] MAL import UI (upload, parse, preview, save)
+- [x] Exclusion filter integration (browse & recommendation modes)
+- [x] Multi-user support (file-based, privacy-first)
+- [x] Documentation (user guide, implementation plan)
+- [x] Testing (unit tests, integration tests, manual validation)
+
+### Phase 5B: Personalized Collaborative Filtering (Complete - 2025-11-28)
+- [x] User embedding generation (`src/models/user_embedding.py`)
+- [x] Personalized scoring integration (`get_personalized_recommendations()`)
+- [x] Blending system (0-100% personalization strength slider)
+- [x] Personalization toggle UI (only visible with rated profile)
+- [x] Personalized explanations (`src/app/components/explanations.py`)
+  - [x] Genre preference matching
+  - [x] Similar anime identification
+  - [x] Score display formatting (0-10 scale)
+  - [x] Numpy array genre handling fix
+- [x] Taste profile visualization (`src/app/components/taste_profile.py`)
+  - [x] Genre preferences radar chart
+  - [x] Rating distribution histogram
+  - [x] Statistics dashboard (avg, diversity, rating style)
+- [x] In-app rating system
+  - [x] Quick rating buttons (👍 8, ❤️ 10, 👎 4)
+  - [x] Current rating display
+  - [x] Auto-save to profile
+  - [x] Auto-add to watched list
+  - [x] Stats update on rating
+- [x] Rating distribution histogram in sidebar
+- [x] Documentation (`docs/user_guide_personalization.md`)
+- [x] Bug fixes (type mismatches, scope issues, format conflicts)
+- [x] Testing & validation (91-rating profile, blending, explanations)
+
 ### Core Implementation
 - [x] Integrate artifact loader (`src/app/artifacts_loader.py`) for metrics & explanations
 - [x] Searchable title dropdown (replaced free text input; 13K+ sorted titles)

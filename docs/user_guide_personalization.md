@@ -384,7 +384,7 @@ A: That's fine! Rate based on episodes you've seen. You can update later.
 A: Yes! When personalization is enabled, each recommendation shows an explanation including your genre preferences and similar anime you've rated highly. Look for the explanation text below the match score.
 
 **Q: Does rating an anime automatically mark it as watched?**  
-A: No. Ratings and watched status are separate. Add to watched list during import or manually.
+A: Yes! When you rate an anime in the app, it's automatically added to your watched list and removed from future recommendations. This ensures you can't rate something you haven't watched.
 
 ---
 

@@ -141,16 +141,24 @@ def _save_rating(anime_id: int, rating: int, title: str) -> None:
     old_rating = fresh_profile["ratings"].get(str(anime_id))
     fresh_profile["ratings"][str(anime_id)] = rating
     
+    # Add to watched list (you can't rate something you haven't watched)
+    if "watched_ids" not in fresh_profile:
+        fresh_profile["watched_ids"] = []
+    if anime_id not in fresh_profile["watched_ids"]:
+        fresh_profile["watched_ids"].append(anime_id)
+    
     # Update stats
     if "stats" not in fresh_profile:
         fresh_profile["stats"] = {}
     
+    fresh_profile["stats"]["total_watched"] = len(fresh_profile["watched_ids"])
     ratings_list = list(fresh_profile["ratings"].values())
     fresh_profile["stats"]["total_ratings"] = len(ratings_list)
     fresh_profile["stats"]["avg_rating"] = sum(ratings_list) / len(ratings_list) if ratings_list else 0.0
     
     # Save profile
-    save_profile(fresh_profile)
+    username = fresh_profile.get("username", "unknown")
+    save_profile(username, fresh_profile)
     
     # Update session state
     st.session_state["active_profile"] = fresh_profile
