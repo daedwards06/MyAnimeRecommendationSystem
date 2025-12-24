@@ -5,6 +5,7 @@ import pandas as pd
 from src.app.badges import badge_payload
 from src.app.components.tooltips import format_badge_tooltip
 from src.app.components.rating import render_quick_rating_buttons
+from src.app.score_semantics import SCORE_LABEL_SHORT, format_match_score, has_match_score
 
 def coerce_genres(value) -> str:
     if value is None:
@@ -120,25 +121,24 @@ def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         # Image
         _render_image_streamlit(thumb, title_display)
         
-        # Title (truncated for grid) with confidence badge
+        # Title (truncated for grid) with match score badge (relative)
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
-        
-        # Compute confidence percentage
-        score = rec.get("score", 0.0)
-        if score > 1.0:
-            pct = min(score * 10, 100)
-        else:
-            pct = score * 100
-        
-        if pct >= 80:
-            conf_color = "#27AE60"
-        elif pct >= 60:
-            conf_color = "#3498DB"
-        else:
-            conf_color = "#95A5A6"
-        
-        st.markdown(f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size: 0.75rem; margin: 2px 0;'><span style='background: {conf_color}20; color: {conf_color}; padding: 2px 6px; border-radius: 8px; font-weight: 600;'>🎯 {pct:.0f}%</span></p>", unsafe_allow_html=True)
+
+        score = rec.get("score")
+        score_badge = ""
+        if has_match_score(score):
+            score_str = format_match_score(float(score))
+            score_badge = (
+                f"<span style='background: #3498DB20; color: #3498DB; padding: 2px 6px; "
+                f"border-radius: 8px; font-weight: 600;'>{SCORE_LABEL_SHORT}: {score_str}</span>"
+            )
+
+        st.markdown(
+            f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>",
+            unsafe_allow_html=True,
+        )
+        if score_badge:
+            st.markdown(f"<p style='font-size: 0.75rem; margin: 2px 0;'>{score_badge}</p>", unsafe_allow_html=True)
         
         # Personalized explanation (if available)
         explanation = rec.get("explanation")
@@ -276,34 +276,27 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         # Render image using Streamlit's native image component to avoid HTML rendering issues
         _render_image_streamlit(thumb, title_display)
         
-        # Confidence as percentage match
-        score = rec.get("score", 0.0)
-        def _compute_confidence_badge(s: float) -> tuple[str, str]:
-            """Convert score to percentage and color code.
-            Returns (badge_html, color)
-            """
-            # Normalize to 0-100%
-            if s > 1.0:
-                pct = min(s * 10, 100)  # If 0-10 scale
-            else:
-                pct = s * 100  # If 0-1 scale
-            
-            # Color code based on strength
-            if pct >= 80:
-                color = "#27AE60"  # Green
-                label = "Strong"
-            elif pct >= 60:
-                color = "#3498DB"  # Blue
-                label = "Good"
-            else:
-                color = "#95A5A6"  # Grey
-                label = "Fair"
-            
-            badge = f'<span style="background: {color}20; color: {color}; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">🎯 {pct:.0f}% Match</span>'
-            return badge, color
-        
-        confidence_badge, conf_color = _compute_confidence_badge(score)
-        st.markdown(f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display} {confidence_badge}</h3>", unsafe_allow_html=True)
+        # Recommendation score display (single semantic: Match score (relative))
+        score = rec.get("score")
+        score_badge = ""
+        badge_color = "#3498DB"
+        if has_match_score(score):
+            score_str = format_match_score(float(score))
+            score_badge = (
+                f"<span style=\"background: {badge_color}20; color: {badge_color}; padding: 2px 8px; "
+                f"border-radius: 12px; font-size: 0.85rem; font-weight: 600;\">{SCORE_LABEL_SHORT}: {score_str}</span>"
+            )
+
+        if score_badge:
+            st.markdown(
+                f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display} {score_badge}</h3>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display}</h3>",
+                unsafe_allow_html=True,
+            )
         
         # Alternative title (Japanese/original)
         if alt_title:
@@ -312,7 +305,7 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         # Personalized explanation (if available)
         explanation = rec.get("explanation")
         if explanation:
-            st.markdown(f"<div style='background: #ECF0F1; padding: 8px 12px; border-radius: 6px; margin: 8px 0; border-left: 3px solid {conf_color};'><p style='font-size: 0.85rem; color: #34495E; margin: 0;'>{explanation}</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='background: #ECF0F1; padding: 8px 12px; border-radius: 6px; margin: 8px 0; border-left: 3px solid {badge_color};'><p style='font-size: 0.85rem; color: #34495E; margin: 0;'>{explanation}</p></div>", unsafe_allow_html=True)
         
         # Metadata row: Score, Type, Episodes, Year, Status
         meta_parts = []

@@ -238,7 +238,7 @@ for key, default in {
     "query": _qp_get("q", ""),
     "weight_mode": _qp_get("wm", "Balanced"),
     "top_n": int(_qp_get("n", DEFAULT_TOP_N)),
-    "sort_by": _qp_get("sort", "Confidence"),
+    "sort_by": _qp_get("sort", "Match score"),
     "genre_filter": [],
     "year_min": 1960,
     "year_max": 2025,
@@ -678,10 +678,21 @@ st.session_state["browse_mode"] = browse_mode
 if browse_mode:
     st.sidebar.info("💡 Select at least one genre to browse")
 
+default_sort_for_mode = "MAL Score" if browse_mode else "Match score"
+sort_options = ["MAL Score", "Year (Newest)", "Year (Oldest)", "Popularity"] if browse_mode else [
+    "Match score",
+    "MAL Score",
+    "Year (Newest)",
+    "Year (Oldest)",
+    "Popularity",
+]
+current_sort = st.session_state.get("sort_by", default_sort_for_mode)
+if current_sort not in sort_options:
+    current_sort = default_sort_for_mode
 sort_by = st.sidebar.selectbox(
     "Sort by",
-    ["Confidence", "MAL Score", "Year (Newest)", "Year (Oldest)", "Popularity"],
-    index=["Confidence", "MAL Score", "Year (Newest)", "Year (Oldest)", "Popularity"].index(st.session_state.get("sort_by", "Confidence"))
+    sort_options,
+    index=sort_options.index(current_sort),
 )
 
 # Get unique genres from metadata for filter
@@ -741,9 +752,9 @@ view_mode = st.sidebar.radio(
 st.session_state["view_mode"] = "list" if view_mode == "List" else "grid"
 
 # Clear filters button
-if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != "Confidence":
+if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != default_sort_for_mode:
     if st.sidebar.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
-        st.session_state["sort_by"] = "Confidence"
+        st.session_state["sort_by"] = default_sort_for_mode
         st.session_state["genre_filter"] = []
         st.session_state["type_filter"] = []
         st.session_state["year_min"] = 1960
@@ -1051,7 +1062,8 @@ if browse_mode:
                         # Create a rec-like dict for compatibility with existing card rendering
                         browse_results.append({
                             "anime_id": anime_id,
-                            "score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
+                            # Browse mode has no recommender score; keep this absent to avoid mixed semantics.
+                            "score": None,
                             "explanation": None,  # No explanation in browse mode
                             "_mal_score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
                             "_year": 0,
@@ -1074,7 +1086,7 @@ if browse_mode:
                 browse_results.sort(key=lambda x: x["_year"], reverse=False)
             elif sort_by == "Popularity":
                 browse_results.sort(key=lambda x: x["_popularity"], reverse=False)
-            else:  # Confidence / MAL Score as default
+            else:  # Default
                 browse_results.sort(key=lambda x: x["_mal_score"], reverse=True)
             
             # Limit to top N for performance
@@ -1401,7 +1413,7 @@ else:
                 recs = filtered_recs
             
             # Sort recommendations
-            if sort_by != "Confidence":
+            if sort_by != default_sort_for_mode:
                 # Enrich recs with metadata for sorting
                 enriched_recs = []
                 for rec in recs:
@@ -1455,25 +1467,6 @@ personalization_requested = st.session_state.get("personalization_enabled", Fals
 blocked_reason = st.session_state.get("personalization_blocked_reason")
 if personalization_requested and not locals().get("personalization_applied", False) and blocked_reason:
     active_scoring_path = f"{active_scoring_path} (Personalization unavailable)"
-
-def _compute_confidence_stars(score: float) -> str:
-    """Convert recommendation score to visual star rating (1-5 stars)."""
-    # Normalize score to 0-5 range (assuming scores typically 0-1 or 0-10)
-    if score > 1.0:
-        normalized = min(score / 2.0, 5.0)  # If score is 0-10 range
-    else:
-        normalized = score * 5.0  # If score is 0-1 range
-    
-    full_stars = int(normalized)
-    half_star = (normalized - full_stars) >= 0.5
-    
-    stars = "⭐" * full_stars
-    if half_star and full_stars < 5:
-        stars += "⭐"
-    empty = max(0, 5 - len(stars))
-    stars += "☆" * empty
-    
-    return stars[:5]  # Ensure exactly 5 characters
 
 def _coerce_genres(value) -> str:
     """Normalize genre field into pipe-delimited string."""
@@ -1539,7 +1532,7 @@ if recs:
         </p>
         """, unsafe_allow_html=True)
     
-    if sort_by != "Confidence":
+    if sort_by != default_sort_for_mode:
         st.markdown(f"<p style='color: #7F8C8D; font-size: 0.9rem; margin-top: -8px; margin-bottom: 20px;'>Sorted by: {sort_by}</p>", unsafe_allow_html=True)
     
     # Calculate diversity mix
