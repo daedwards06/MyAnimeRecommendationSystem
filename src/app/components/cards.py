@@ -74,7 +74,7 @@ def _render_image_streamlit(thumb_rel: str | None, title_display: str):
     if debug:
         st.caption(f"[img missing] {img_path}")
 
-def render_card_grid(row, rec: dict, pop_pct: float):
+def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
     """Render a compact grid card version."""
     # Extract anime_id early (needed for button keys)
     anime_id = int(row.get("anime_id"))
@@ -83,7 +83,7 @@ def render_card_grid(row, rec: dict, pop_pct: float):
     genres = coerce_genres(raw_genres)
     item_genres = [g for g in genres.split("|") if g]
     badges = badge_payload(
-        is_in_training=True,
+        is_in_training=is_in_training,
         pop_percentile=pop_pct,
         user_genre_hist={g: 1 for g in item_genres},
         item_genres=item_genres,
@@ -207,12 +207,12 @@ def render_card_grid(row, rec: dict, pop_pct: float):
             st.markdown("---")
             render_quick_rating_buttons(anime_id, title_display, current_rating)
 
-def render_card(row, rec: dict, pop_pct: float):
+def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
     raw_genres = row.get("genres")
     genres = coerce_genres(raw_genres)
     item_genres = [g for g in genres.split("|") if g]
     badges = badge_payload(
-        is_in_training=True,
+        is_in_training=is_in_training,
         pop_percentile=pop_pct,
         user_genre_hist={g: 1 for g in item_genres},
         item_genres=item_genres,

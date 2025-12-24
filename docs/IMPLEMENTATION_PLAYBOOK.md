@@ -13,24 +13,21 @@ How to use:
 
 **Project:** Anime Recommendation System (Streamlit portfolio app)
 
-**Primary goal right now:** Phase 1
+**Primary goal right now:** Phase 2
 
-**Current phase:** Phase 1 
+**Current phase:** Phase 2
 
-**Last updated:** 2025-12-23
+**Last updated:** 2025-12-24
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Removed dummy/placeholder scoring paths in the Streamlit app.
-- Enforced MF artifact contracts at load-time and fail-loud UI errors at startup.
-- Validated Phase 1 / Chunk 1 via pytest + a manual UI “bad stem” failure test.
-- Added pytest collection config so `scripts/test_*.py` scripts are not collected as tests.
-- Implemented a single “Active scoring path” indicator that reflects the executed browse/recommend/personalization/seed path.
+- Confirmed cold-start badges are provably truthful: for `anime_id=34096` ("Gintama Season 5"), `in_training=False` under the loaded MF model (`item_to_index`).
+- Added a tiny helper script to validate MF membership + title lookup from artifacts.
 
 **Next action (single sentence):**
-- Phase 1 / Chunk 4: make cold-start detection real (derive is_in_training from MF factor availability and verify badges).
+- Phase 2 / Chunk 1: standardize score semantics (single source of truth) across UI + explanations.
 
 ---
 
@@ -39,7 +36,8 @@ How to use:
 Set one phase to **IN PROGRESS**. Keep the rest **NOT STARTED** or **DONE**.
 
 - Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): IN PROGRESS
-- Phase 2 — Score Semantics + Explanations (Credibility): NOT STARTED 
+- Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): DONE
+- Phase 2 — Score Semantics + Explanations (Credibility): IN PROGRESS
 - Phase 3 — UX Flow + Progressive Disclosure (Clarity): NOT STARTED
 - Phase 4 — Refactor + Tests + Performance (Maintainability): NOT STARTED 
 - Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal): NOT STARTED 
@@ -158,7 +156,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 4 — Make cold-start detection real
 
-- [ ] Make cold-start detection real by deriving `is_in_training` from training interactions / MF factor availability, and verify cold-start badges appear for truly unseen items only (High)
+- [x] Make cold-start detection real by deriving `is_in_training` from training interactions / MF factor availability, and verify cold-start badges appear for truly unseen items only (High)
 
 **Done when:**
 - For any recommended item `anime_id`:
@@ -434,11 +432,31 @@ Record decisions that future sessions must not re-litigate.
 - What I changed (additional):
   - Wired personalization to the bundle-selected MF artifact and added cache invalidation on ratings/profile/MF stem changes in [app/main.py](app/main.py).
   - Added a small integration test proving rating changes change personalized top-1 in [tests/test_personalization.py](tests/test_personalization.py).
+- What I did (additional):
+  - Implemented real cold-start detection: `is_in_training = (anime_id in mf_model.item_to_index)` and removed hard-coded `is_in_training=True`.
+- What I changed (additional):
+  - Wired badge inputs through the UI card renderers in [src/app/components/cards.py](src/app/components/cards.py).
+  - Added MF-backed `_is_in_training(...)` helper and used it for displayed items in [app/main.py](app/main.py).
+- Validation run (additional):
+  - `python -m pytest -q` (41 passed)
+  - Spot-check (artifact-backed): 3 trained IDs `[1, 5, 6]`, 2 cold-start IDs `[34591, 34599]` (trained_count=11200, cold_count=1837)
 - Next session start here:
   - Manual: toggled Browse / seeds / personalization and verified the “Active scoring path” label changes as expected.
   - (Optional) Verified Browse mode shows Browse and does not claim recommendation scoring.
 - Next session start here:
-  - Phase 1 / Chunk 4: cold-start detection (start in [app/main.py](app/main.py) where `badge_payload(... is_in_training=True ...)` is currently hard-coded).
+  - Phase 2 / Chunk 1: standardize score semantics (single source of truth) across UI + explanations.
+
+### Session 2025-12-24
+
+- What I did:
+  - Proved cold-start badges are correct using the same loaded artifacts the app uses.
+- Validation proof:
+  - `anime_id=34096` ("Gintama Season 5") => `in_training=False` (not in `mf_model.item_to_index`), so it must display as Cold-start.
+  - Observed MF mapping size: 11200 items.
+- What I changed:
+  - Added [check_in_training_membership.py](check_in_training_membership.py) to quickly validate `anime_id` membership + title lookup.
+- Next session start here:
+  - Phase 2 / Chunk 1: pick and standardize one score semantic across the app.
 
 ---
 

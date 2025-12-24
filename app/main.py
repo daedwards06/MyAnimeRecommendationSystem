@@ -871,6 +871,42 @@ def _pop_pct_for_anime_id(anime_id: int) -> float:
     except Exception:
         return 50.0
 
+
+def _is_in_training(anime_id: int) -> bool:
+    """Cold-start detection based on MF factor availability.
+
+    Rule: an item is in training iff anime_id is present in mf_model.item_to_index.
+    """
+    if IMPORT_LIGHT:
+        return False
+
+    local_mf_model = globals().get("mf_model")
+    if local_mf_model is None:
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "MF model is not loaded; cannot determine cold-start status.",
+                details=["Expected bundle['models']['mf'] to be present."],
+            )
+        )
+    if not hasattr(local_mf_model, "item_to_index"):
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "MF model missing item_to_index; cannot determine cold-start status.",
+                details=["Required attributes: Q, item_to_index, index_to_item"],
+            )
+        )
+
+    try:
+        return int(anime_id) in local_mf_model.item_to_index
+    except Exception as e:  # noqa: BLE001
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "Failed checking MF training membership for anime_id.",
+                details=[f"anime_id={anime_id}", f"Error: {e}"],
+            )
+        )
+    return False
+
 if not IMPORT_LIGHT:
     mf_model = bundle.get("models", {}).get("mf")
     if mf_model is None:
@@ -1513,7 +1549,7 @@ if recs:
         if "Top 25%"
         in str(
             badge_payload(
-                is_in_training=True,
+                is_in_training=_is_in_training(int(r["anime_id"])),
                 pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
                 user_genre_hist={},
                 item_genres=[],
@@ -1526,7 +1562,7 @@ if recs:
         if "Long-tail"
         in str(
             badge_payload(
-                is_in_training=True,
+                is_in_training=_is_in_training(int(r["anime_id"])),
                 pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
                 user_genre_hist={},
                 item_genres=[],
@@ -1587,7 +1623,7 @@ if recs:
                         row = row_df.iloc[0]
                         pop_pct = _pop_pct_for_anime_id(int(anime_id))
                         with col:
-                            render_card_grid(row, rec, pop_pct)
+                            render_card_grid(row, rec, pop_pct, is_in_training=_is_in_training(int(anime_id)))
     else:
         # List layout: standard cards
         for rec in recs:
@@ -1597,7 +1633,7 @@ if recs:
                 continue
             row = row_df.iloc[0]
             pop_pct = _pop_pct_for_anime_id(int(anime_id))
-            render_card(row, rec, pop_pct)
+            render_card(row, rec, pop_pct, is_in_training=_is_in_training(int(anime_id)))
 else:
     if (browse_mode or active_scoring_path == "Recommendations disabled"):
         st.markdown(f"**Active scoring path:** {active_scoring_path}")
