@@ -3,10 +3,9 @@
 This module provides a lightweight inference layer that blends
 MF, kNN, and popularity signals and exposes explanation shares.
 
-It is intentionally model-agnostic: the loaded artifacts should provide
-precomputed score matrices/vectors (e.g., user-item MF scores, kNN scores,
-and item popularity scores). If an expected artifact is missing, the
-module falls back to safe defaults (zeros) while emitting warnings.
+Artifact contract enforcement (fail-loud) is expected to happen at
+app startup (see `src.app.artifacts_loader`). This module avoids
+constructing placeholder score arrays for missing artifacts.
 """
 
 from __future__ import annotations
@@ -162,11 +161,31 @@ class HybridRecommender:
             Top-N recommendations with anime_id, score, and explanation.
         """
         w = weights or BALANCED_WEIGHTS
+
+        # Enforce MF artifact contract for personalization.
+        missing: list[str] = []
+        if mf_model is None:
+            missing = ["mf_model"]
+        else:
+            for attr in ("Q", "item_to_index", "index_to_item"):
+                if not hasattr(mf_model, attr):
+                    missing.append(attr)
+        if missing:
+            raise ValueError(
+                "MF artifact contract violation: missing "
+                + ", ".join(missing)
+                + ". Required: Q, item_to_index, index_to_item."
+            )
         
         # Compute personalized MF scores using user embedding
         personalized_mf_scores = compute_personalized_scores(
             user_embedding, mf_model, exclude_anime_ids=None
         )
+
+        # If we cannot score anything (e.g., no overlap with training items),
+        # return no results rather than ranking arbitrary items.
+        if not personalized_mf_scores:
+            return []
         
         # Build personalized MF score array aligned with item_ids
         # Initialize with zeros

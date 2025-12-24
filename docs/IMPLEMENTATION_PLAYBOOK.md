@@ -1,0 +1,539 @@
+# Implementation Playbook (Multi-Session)
+
+This file is designed to make work resumable across multiple chat sessions.
+
+How to use:
+- Keep this file updated after every work session (2–5 minutes).
+- Treat the top sections as the source of truth (assumptions, contracts, decisions).
+- Use the “Resume Checklist” to restart quickly without re-reading the repo.
+
+---
+
+## 0) Context Capsule (Update Each Session)
+
+**Project:** Anime Recommendation System (Streamlit portfolio app)
+
+**Primary goal right now:** Phase 1
+
+**Current phase:** Phase 1 
+
+**Last updated:** 2025-12-23
+
+**Current blockers (if any):**
+- None (app now fails loudly if artifacts are missing/invalid).
+
+**What changed last session (short):**
+- Removed dummy/placeholder scoring paths in the Streamlit app.
+- Enforced MF artifact contracts at load-time and fail-loud UI errors at startup.
+- Validated Phase 1 / Chunk 1 via pytest + a manual UI “bad stem” failure test.
+- Added pytest collection config so `scripts/test_*.py` scripts are not collected as tests.
+
+**Next action (single sentence):**
+- Phase 1 / Chunk 2: implement an explicit “Active scoring path” indicator that reflects the real code path used.
+
+---
+
+## 0.1) Phase Dashboard (Update Each Session)
+
+Set one phase to **IN PROGRESS**. Keep the rest **NOT STARTED** or **DONE**.
+
+- Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): IN PROGRESS
+- Phase 2 — Score Semantics + Explanations (Credibility): NOT STARTED 
+- Phase 3 — UX Flow + Progressive Disclosure (Clarity): NOT STARTED
+- Phase 4 — Refactor + Tests + Performance (Maintainability): NOT STARTED 
+- Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal): NOT STARTED 
+
+---
+
+## 1) Resume Checklist (5–10 minutes)
+
+- [ ] Open docs/Audit_Improvement_Plan.md and identify the current phase’s items (High)
+- [ ] Confirm which Streamlit entrypoint is used: `streamlit run app/main.py` (not app/app.py) (High)
+- [ ] Inspect available model artifacts in `models/` and identify the MF artifact used for inference (High)
+- [ ] Confirm metadata parquet exists at `data/processed/anime_metadata.parquet` and includes required UI columns (High)
+- [ ] Run the app once and record which scoring path is currently active (before changes) (Medium)
+- [ ] Update “Context Capsule”, “Phase Dashboard”, and “Next action” before coding (Low)
+
+---
+
+## 2) Artifact Inventory (Source of Truth)
+
+### 2.1 Expected files/dirs
+
+- `data/processed/anime_metadata.parquet`
+- `models/*.joblib`
+- `reports/**/*explanations*.json` (optional)
+- `reports/**/*diversity*.json` (optional)
+
+### 2.2 Loaded bundle contract (from src/app/artifacts_loader.py)
+
+Bundle keys:
+- `metadata`: pandas DataFrame
+- `models`: dict of loaded joblib objects (key = filename stem)
+- `explanations`: dict of JSON artifacts (optional)
+- `diversity`: dict of JSON artifacts (optional)
+
+Minimum required metadata columns (see src/app/constants.py -> MIN_METADATA_COLUMNS):
+- `anime_id`, title fields, `genres`, `synopsis` / `synopsis_snippet`, `poster_thumb_url`, `mal_score`, `aired_from`, `type`, etc.
+
+### 2.3 MF model contract (for inference + personalization)
+
+The MF model object must provide:
+- `Q`: item factors (shape: num_items x n_factors)
+- `item_to_index`: mapping anime_id -> item index
+- `index_to_item`: mapping item index -> anime_id
+
+If these are not available, the app must fail loudly with an actionable message (no dummy scoring).
+
+**Selected MF artifact for inference (set once, update if changed):**
+- Name: `mf_sgd_v2025.11.21_202756`
+- Rationale: Latest timestamped MF artifact in repo; selected deterministically by default and overrideable via `APP_MF_MODEL_STEM`.
+
+---
+
+## 3) Scoring Path Definitions (Source of Truth)
+
+### 3.1 Modes
+
+- **Browse mode:** filter and sort metadata only; no recommender scoring.
+- **Seed-based:** generate recommendations from hybrid scoring using seed(s) and/or default user index.
+- **Personalized:** generate recommendations from user embedding computed from profile ratings + MF item factors.
+- **Cold-start content-only:** if an item is not in MF training (see below), use content similarity artifacts (if available).
+
+### 3.2 Cold-start definition
+
+Default (recommended for portfolio + robustness):
+- An item is **in training** iff `anime_id in mf_model.item_to_index`.
+- An item is **cold-start** otherwise.
+
+This is inference-safe and does not require shipping the interactions dataset to the app.
+
+---
+
+## 4) Phased Implementation Plan (1–5)
+
+Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chunk per session.
+
+### Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start)
+
+**Goal:** No placeholder/dummy scoring; app uses real artifacts or fails loudly with actionable errors; scoring path is visible; cold-start is real.
+
+**Dependencies:** None.
+
+**Phase 1 done when:**
+- The app cannot generate recommendations from any dummy/placeholder score arrays.
+- Missing/invalid artifacts produce a clear, actionable error message in the UI (not silent fallback).
+- The UI shows the correct active scoring path for: Browse, Seed-based, Personalized.
+- Cold-start badges reflect real “in training” status (based on MF factor availability).
+
+#### Chunk 1 — Remove placeholder scoring + enforce contracts
+
+- [x] Remove all placeholder/dummy scoring paths so recommendations are always generated from real loaded artifacts; app must raise a clear error if required artifacts are missing (High)
+- [x] Add strict artifact contract checks in the artifact loader (required columns, MF factor matrix, mappings) with actionable error messages; verify failures are informative and non-silent (Medium)
+
+**Done when:**
+- Running `streamlit run app/main.py` produces recommendations only if real artifacts load successfully.
+- If the MF artifact is missing or lacks required attributes (`Q`, `item_to_index`, `index_to_item`), the UI shows an error stating exactly what is missing and where it was expected.
+- There is no code path that constructs dummy `mf_scores`, `knn_scores`, or `pop_scores` arrays to power recommendation results.
+
+#### Chunk 2 — Add “active scoring path” indicator
+
+- [ ] Implement an explicit “active scoring path” status indicator (e.g., MF-only, Hybrid, Personalized, Cold-start content) that reflects the actual code path used for the current results (High)
+
+**Done when:**
+- The UI displays a single “Active scoring path” label for every run.
+- Toggling Browse mode switches the label to Browse.
+- Enabling personalization (with a rated profile) switches the label to Personalized when active.
+- Seed selection (1+ seeds) switches the label to Seed-based / Multi-seed (as appropriate).
+
+#### Chunk 3 — Wire personalization end-to-end
+
+- [ ] Ensure personalization works end-to-end by wiring the correct MF model key from the loaded `bundle["models"]` and verifying the personalized ranking changes when user ratings change (High)
+
+**Done when:**
+- With a loaded profile that has ratings, enabling personalization produces a different top-N list than seed-only at the same filters.
+- Changing at least one rating (via in-app rating or profile edit) changes the personalized ranking on the next run.
+- The personalization path uses the selected MF artifact from the bundle (no hard-coded model key assumptions).
+
+#### Chunk 4 — Make cold-start detection real
+
+- [ ] Make cold-start detection real by deriving `is_in_training` from training interactions / MF factor availability, and verify cold-start badges appear for truly unseen items only (High)
+
+**Done when:**
+- For any recommended item `anime_id`:
+  - If `anime_id` is in `mf_model.item_to_index`, it is labeled Trained.
+  - If not, it is labeled Cold-start.
+- Spot-check at least 5 items: 3 trained + 2 cold-start, and the badge matches MF factor availability.
+
+---
+
+### Phase 2 — Score Semantics + Explanations (Credibility)
+
+**Goal:** Every displayed score/explanation/badge is numerically defensible and consistent with the underlying scoring path.
+
+**Dependencies:** Phase 1 (must be running real inference paths).
+
+**Phase 2 done when:**
+- One score meaning is documented and consistently displayed across UI + explanations.
+- Personalized explanations never show impossible bounds (e.g., >10/10) and match score semantics.
+- Hybrid contribution shares are truthful and sum to ~100% when shown.
+- Diversity/novelty metrics are computed from correct inputs (user history, catalog genres) and pass sanity checks.
+
+#### Chunk 1 — Standardize score semantics (single source of truth)
+
+- [ ] Standardize score semantics across the app (e.g., “relative score”, “predicted rating”, or “match percentile”) and verify that the displayed explanation matches the chosen semantics everywhere (High)
+
+**Done when:**
+- The app uses one named score semantic everywhere (e.g., “Match score (relative)”, “Predicted rating”, or “Percentile”).
+- The Help/FAQ and any inline labels match the chosen semantics.
+- There is no mix of “/10” and raw dot-product scores in the same mode.
+
+#### Chunk 2 — Fix personalization score bounds
+
+- [ ] Calibrate or reframe personalized scores so the explanation cannot exceed valid bounds (e.g., if showing “/10”, enforce 0–10); verify with unit tests and a manual profile run (High)
+
+**Done when:**
+- Manual run: at least 10 personalized recommendations show scores within the defined bounds.
+- Unit test (or deterministic check) prevents regressions for out-of-range formatting.
+
+#### Chunk 3 — Truthful hybrid explanation shares
+
+- [ ] Make hybrid explanations truthful by showing per-item source contributions computed from the actual score components used for that item; verify contributions sum to ~100% and reflect the active model path (High)
+
+**Done when:**
+- For at least 5 items, the displayed MF/kNN/Pop shares sum to ~100%.
+- Switching weight preset changes at least one item’s shares in a visible way.
+
+#### Chunk 4 — Diversity metrics computed from correct inputs
+
+- [ ] Validate that diversity metrics shown in-app (coverage, genre exposure ratio, novelty) are computed from correct inputs (user history + catalog genres); verify with a controlled test set and sanity checks (Medium)
+
+**Done when:**
+- With a rated profile, novelty uses the user’s genre history (not item genres as a proxy).
+- With no profile, novelty is either hidden/NA or clearly labeled as non-personalized.
+
+---
+
+### Phase 3 — UX Flow + Progressive Disclosure (Clarity)
+
+**Goal:** Reduce cognitive load; make first-time usage obvious; ensure copy matches the real UI and scoring paths.
+
+**Dependencies:** Phase 1–2 (needs truthful behavior + stable semantics).
+
+**Phase 3 done when:**
+- First-time user can get results in ≤2 actions in each mode (Personalized / Seed / Browse).
+- Onboarding/help text matches the implemented controls and scoring paths.
+- Empty states provide actionable recovery steps and users can recover without leaving the app.
+
+#### Chunk 1 — Align onboarding and remove persona mismatch
+
+- [ ] Align onboarding copy to the implemented UX (profiles + seeds + browse mode); remove persona language unless personas are fully implemented and visible in the UI (High)
+
+**Done when:**
+- On first load, onboarding references only controls that actually exist.
+- Any mention of personas is removed unless persona selection is present and functional.
+
+#### Chunk 2 — Choose-a-mode gating (progressive disclosure)
+
+- [ ] Add a single “Choose your mode” decision at the top (Personalized / Seed-based / Browse) with only relevant controls shown per mode; verify a first-time user can get results in ≤2 actions (High)
+
+**Done when:**
+- Only relevant controls are shown for the selected mode.
+- Each mode produces visible results within ≤2 user actions from a cold start.
+
+#### Chunk 3 — First-load clarity and empty-state recovery
+
+- [ ] Ensure the app clearly answers “What is this / Why care / What next” on first load (1–2 sentences + primary CTA); verify via a cold-start screenshot (Medium)
+- [ ] In recommendation mode, show an explicit empty-state checklist when results are empty (e.g., “remove filters”, “try fewer seeds”, “disable browse mode”); verify each suggestion is actionable in-app (Medium)
+
+**Done when:**
+- A cold-start screenshot includes: what this is, why it matters, and what to do next.
+- Empty-state checklist contains only actions available in-app and leads to recovery.
+
+#### Chunk 4 — Consistent mode-specific copy + tooltips
+
+- [ ] Ensure “Browse by Genre” mode disables or visually de-emphasizes seed-specific copy; verify headings and help text match mode consistently (Medium)
+- [ ] Add consistent tooltips/help text for key controls (Hybrid Weights, personalization strength, filters); verify every control has either help text or is self-explanatory (Low)
+
+**Done when:**
+- Mode headings match the mode (Browse vs Recommendations) at all times.
+- Every non-obvious control has help text (hover) or an adjacent hint.
+
+---
+
+### Phase 4 — Refactor + Tests + Performance (Maintainability)
+
+**Goal:** Reduce `app/main.py` complexity, remove duplicated logic, improve responsiveness, and add basic test coverage.
+
+**Dependencies:** Phase 1–3 (avoid refactoring unstable behavior).
+
+**Phase 4 done when:**
+- App behavior is unchanged from the user perspective, but the code is modular and readable.
+- Duplicated parsing/filtering logic is removed (single implementation per concern).
+- Basic smoke + unit tests run cleanly.
+- Performance improves measurably or remains stable while complexity drops.
+
+#### Chunk 1 — Modularize the app entrypoint
+
+- [ ] Refactor main.py into smaller modules (sidebar/state, scoring, filtering, rendering) while preserving identical UX; verify by running the app and confirming all features still work (High)
+
+**Done when:**
+- `app/main.py` primarily composes UI and calls functions from `src/app/` modules.
+- No single file contains the full browse + recommend + personalization + filtering logic end-to-end.
+
+#### Chunk 2 — Centralize parsing/filtering + cache indexes
+
+- [ ] Centralize genre/type/year parsing and filtering into reusable functions to eliminate duplicated logic; verify only one implementation exists for each filter type (High)
+- [ ] Replace repeated `metadata.iterrows()` loops and repeated `metadata.loc[...]` lookups with cached indexes (e.g., `anime_id -> row`, `anime_id -> genre set`); verify a measurable latency improvement in the performance panel (Medium)
+
+**Done when:**
+- Genre/type/year parsing exists in one shared utility location.
+- Recommendation-mode and browse-mode reuse the same filter functions.
+- Performance panel shows reduced or stable latency with fewer repeated DataFrame scans.
+
+#### Chunk 3 — Tests + logging hygiene
+
+- [ ] Remove `print()` debug logging from the recommendation path and replace with structured logging (or Streamlit-friendly debug toggle); verify no console noise in normal runs (Low)
+- [ ] Add a lightweight smoke test that imports the app in “light mode” and confirms key modules load without heavy artifacts; verify it runs in CI (Medium)
+- [ ] Add unit tests for: genre coercion, badge payload correctness, explanation formatting, and personalized embedding generation; verify tests pass locally and in CI (Medium)
+
+**Done when:**
+- Default runs produce no noisy debug `print()` output.
+- Smoke test validates imports with `APP_IMPORT_LIGHT=1`.
+- Unit tests cover: genre coercion, badge payload, explanation formatting, user embedding.
+
+---
+
+### Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal)
+
+**Goal:** Surface evaluation rigor, tradeoffs, lineage, and a coherent demo narrative; finalize stability and presentation.
+
+**Dependencies:** Phase 1–4.
+
+**Phase 5 done when:**
+- In-app evaluation transparency exists (metrics + split + robustness) and matches reports.
+- Differentiators are tied to offline evidence (accuracy vs diversity tradeoff).
+- README/docs support a clean 5–10 minute interview demo.
+- Final QA checklist passes; app is stable and coherent.
+
+#### Chunk 1 — In-app evaluation transparency
+
+- [ ] Add an in-app “Model Card / Evaluation” expander that reports dataset snapshot date, split strategy (user-aware + temporal check), and 3–5 headline metrics (NDCG@K, MAP@K, coverage, Gini); verify it matches the Phase 4 artifacts (High)
+- [ ] Add a visible “Robustness” note showing temporal validation outcome and leakage safeguards; verify it is consistent with Phase 4 writeups (Medium)
+
+**Done when:**
+- In-app metrics match Phase 4 artifacts (numbers, labels, and dataset snapshot).
+- A reviewer can understand evaluation setup without opening notebooks.
+
+#### Chunk 2 — Differentiators and decision tradeoffs
+
+- [ ] Add an interactive “Accuracy vs Diversity” explanation tied to offline metrics (e.g., show metric deltas when toggling weights); verify numbers match Phase 4 evaluation artifacts (High)
+- [ ] Add per-recommendation drill-down for “Why this anime?” that shows: matched genres, similar rated titles (if personalized), and source contributions; verify drill-down is consistent with active mode (Medium)
+- [ ] Add a visible “Reproducibility & Lineage” section that lists artifact versions/timestamps and whether data is stale; verify it reads from real artifact metadata (Medium)
+- [ ] Add a small “Tradeoffs & Decisions” panel describing why MF+hybrid was chosen and what was deferred (ALS/LightFM) with justification; verify it references concrete results (Low)
+
+**Done when:**
+- Accuracy vs Diversity explanation shows numbers consistent with offline evaluation.
+- Drill-down explanations reflect the actual active scoring path.
+
+#### Chunk 3 — Docs + interview-ready demo
+
+- [ ] Update README with: live demo instructions, screenshots (browse, seed, personalized), and a 60-second “how to use” flow; verify links and images render on GitHub (High)
+- [ ] Add a short architecture diagram (data → features → models → artifacts → Streamlit) and confirm it matches repo structure; verify it is included in README or docs index (Medium)
+- [ ] Add a “Model & Data Cards” doc page summarizing dataset provenance/licensing, preprocessing, evaluation protocol, and limitations; verify it references actual files/artifacts (Medium)
+- [ ] Add a “Demo Script” doc for interviews (3 scenarios: cold start, seed-based, personalized) with expected outcomes; verify it can be followed step-by-step (Low)
+
+**Done when:**
+- README renders correctly with screenshots and a 60-second usage flow.
+- Architecture diagram matches repo structure and terminology.
+- Demo script can be followed verbatim by someone unfamiliar with the repo.
+
+#### Chunk 4 — Final QA + correctness checks
+
+- [ ] Ensure the app demonstrates real ML inference (not a UI demo) by proving recommendations change when: seed changes, weights toggle changes, and user ratings change; verify with a scripted “demo checklist” run (High)
+- [ ] Ensure codebase clearly separates concerns (data loading, scoring, UI rendering) and is easy to navigate; verify by file structure and module boundaries (Medium)
+- [ ] Run and document a full “portfolio QA” pass: cold start, seed recommendations, browse mode, MAL import, exclusions, ratings updates, personalization strength slider, and filters; verify no crashes and clear UX throughout (High)
+- [ ] Validate that badges/metrics displayed never contradict the underlying data (e.g., cold-start badge correctness, novelty not computed from item genres alone); verify with spot checks and tests (High)
+- [ ] Confirm performance targets are met on a typical machine (e.g., <500ms interactive updates, reasonable memory footprint) and reflect real measurements in the performance panel (Medium)
+- [ ] Remove or gate any experimental UI remnants (e.g., persona references, unused imports/components) so reviewers see a coherent product; verify no dead UI paths remain (Low)
+- [ ] Ensure all dependencies required to run the app are pinned and minimal for deployment; verify `pip install -r requirements.txt` followed by app launch works cleanly (Medium)
+
+**Done when:**
+- Scripted demo checklist proves recommendations change with seeds, weights, and ratings.
+- Badges/metrics never contradict the underlying data.
+- App meets stated performance targets (or documents observed values and constraints).
+
+---
+
+## 5) Validation Checklist (What to Run After Changes)
+
+### 5.1 Manual checks (fast)
+
+- [ ] Browse mode still works with genre/type/year filters (Medium)
+- [ ] Seed-based recommendations generate without placeholder scoring (High)
+- [ ] “Active scoring path” indicator matches observed behavior (High)
+- [ ] Personalization changes ranking when ratings change (High)
+
+### 5.2 Developer checks
+
+- [ ] `APP_IMPORT_LIGHT=1` import path still works for tests (Medium)
+- [ ] No silent fallback to dummy arrays remains (High)
+- [ ] `python -m pytest -q` passes (pytest should only collect `tests/` via `pytest.ini`) (High)
+- [ ] Manual negative test: set `APP_MF_MODEL_STEM=__bad__` and confirm UI fails loudly + disables recommendations (High)
+
+---
+
+## 6) Decision Log (Keep This Short)
+
+Record decisions that future sessions must not re-litigate.
+
+- **2025-12-20:** Created this playbook to persist Phase 1 assumptions + contracts.
+- **2025-12-22:** Enforced MF artifact contract (must have `Q`, `item_to_index`, `index_to_item`) and removed all placeholder scoring. Default MF selection is `mf_sgd_v2025.11.21_202756` unless overridden by `APP_MF_MODEL_STEM`.
+- **2025-12-22:** Popularity percentiles are treated as neutral (50.0) unless a real popularity signal is loaded (Phase 1 / Chunk 2).
+- **2025-12-23:** Pytest collection is restricted to `tests/` via `pytest.ini` to avoid collecting runnable scripts under `scripts/test_*.py`.
+
+---
+
+## 7) Session Log (Tiny, but consistent)
+
+### Session 2025-12-22
+
+- What I did:
+  - Removed all placeholder/dummy scoring so the app never recommends from fabricated arrays.
+  - Added runtime artifact contract validation (MF + metadata) and made failures show clearly in Streamlit.
+- What I changed:
+  - Enforced MF selection + contract validation in [src/app/artifacts_loader.py](src/app/artifacts_loader.py)
+  - Removed dummy scoring init and guarded recommendation paths in [app/main.py](app/main.py)
+  - Tightened personalization behavior to avoid all-zero rankings in [src/app/recommender.py](src/app/recommender.py)
+  - Added default artifact stems in [src/app/constants.py](src/app/constants.py)
+- What I learned:
+  - The previous app path depended on dummy mf/knn/pop arrays; real MF artifacts exist but were not wired as `models['mf']`.
+- Next session start here:
+  - Implement real popularity + (optional) kNN/seed scoring inputs and compute `pop_percentiles` from real data (see [app/main.py](app/main.py)).
+
+### Session 2025-12-23
+
+- What I did:
+  - Validated Phase 1 / Chunk 1 end-to-end (tests + UI failure mode).
+  - Confirmed the app fails loudly when an invalid MF artifact stem is requested.
+- What I changed:
+  - Added [pytest.ini](pytest.ini) so `python -m pytest -q` only collects `tests/` (not runnable scripts under `scripts/`).
+- Validation run:
+  - `python -m pytest -q` (40 passed)
+  - Manual: set `APP_MF_MODEL_STEM=__bad__` and verified the app shows an actionable error + disables recommendations.
+- Next session start here:
+  - Implement Phase 1 / Chunk 2 “Active scoring path” indicator in [app/main.py](app/main.py).
+
+---
+
+## 8) 60-Second End-of-Session Update Template
+
+Copy/paste this block at the top of the file (or fill it in-place) at the end of each work session:
+
+**Last updated:** YYYY-MM-DD
+
+**Current phase:** Phase X
+
+**Current blockers (if any):**
+- 
+
+**What changed last session (short):**
+- 
+
+**Decisions made (only if needed):**
+- 
+
+**Next action (single sentence):**
+- 
+
+**Next session start here (exact file/function):**
+- 
+
+---
+
+## 9) Session Starter Prompt Template (Copy/Paste)
+
+Use this at the start of a new chat to implement exactly one chunk without losing context.
+
+### Template
+
+I’m continuing work on this repo. I want you to implement **Phase {PHASE#} / Chunk {CHUNK#}: {CHUNK_TITLE}**.
+
+Context + source of truth:
+- Use the playbook as authoritative context: [docs/IMPLEMENTATION_PLAYBOOK.md](docs/IMPLEMENTATION_PLAYBOOK.md)
+- Current date: {YYYY-MM-DD}
+- OS: Windows
+
+Scope for this session:
+- **Goal:** {1–2 sentences}
+- **In-scope tasks:**
+  - {Task 1}
+  - {Task 2}
+  - {Task 3 (optional)}
+- **Out of scope:**
+  - {Explicit non-goals (e.g., “no refactors”, “no semantics changes”, “no new UI”) }
+
+Constraints (must follow):
+- Implement exactly what’s needed for this chunk; avoid “nice-to-haves”.
+- Preserve existing design system and UX unless the chunk explicitly requires UX changes.
+- Prefer failing loudly with actionable UI errors over silent fallback behavior.
+- Keep changes minimal and consistent with the existing style.
+
+Relevant files to inspect first:
+- {file 1 path}
+- {file 2 path}
+- {file 3 path (optional)}
+
+Definition of Done (must satisfy all):
+- {DoD 1 — observable/testable}
+- {DoD 2 — observable/testable}
+- {DoD 3 — observable/testable}
+- {DoD 4 (optional)}
+
+What I want you (the assistant) to do:
+1) Identify exactly where in the codebase this chunk should be implemented.
+2) Implement the smallest set of code changes that meet the Definition of Done.
+3) Validate the result (run the narrowest checks available: lint/compile/smoke/tests).
+4) Update the playbook Session Log with: decisions made, files changed, validation run, and what’s next.
+
+When you reply, include:
+- A short summary of changes (what/where).
+- Any remaining risks or follow-ups for the next chunk.
+
+### Optional: “Fast Fill” Checklist (for you, the repo owner)
+
+Fill these before pasting the template:
+- {PHASE#}/{CHUNK#}/{CHUNK_TITLE}
+- One clear goal sentence
+- 2–6 in-scope tasks (verbs)
+- 2–6 explicit non-goals
+- 3–6 “Done when” bullets that are verifiable
+- 2–4 file paths you expect to touch
+
+### Example (Phase 1 / Chunk 1)
+
+I’m continuing work on this repo. I want you to implement **Phase 1 / Chunk 1: Remove placeholder scoring + enforce contracts**.
+
+Context + source of truth:
+- Use the playbook as authoritative context: [docs/IMPLEMENTATION_PLAYBOOK.md](docs/IMPLEMENTATION_PLAYBOOK.md)
+- Current date: 2025-12-21
+- OS: Windows
+
+Scope for this session:
+- **Goal:** Prevent any recommendations from being generated using dummy scores; enforce artifact contracts.
+- **In-scope tasks:**
+  - Remove placeholder MF/kNN/Pop score generation.
+  - Add explicit runtime checks for required artifact attributes.
+- **Out of scope:**
+  - No scoring semantics changes (Phase 2).
+  - No large refactors (Phase 4).
+
+Relevant files to inspect first:
+- app/main.py
+- src/app/artifacts_loader.py
+- src/app/recommender.py
+
+Definition of Done (must satisfy all):
+- The app never shows recommendations based on placeholder scores.
+- Missing MF artifacts/attributes produce a clear UI error and stop execution.
+- Real artifacts produce real recommendations.

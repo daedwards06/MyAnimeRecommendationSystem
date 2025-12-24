@@ -1,1 +1,12 @@
-"""Placeholder script for downloading or syncing anime datasets.\nFill in logic for API calls or Kaggle downloads as needed."""\n\ndef main():\n    print("Data download placeholder.")\n\nif __name__ == "__main__":\n    main()
+"""Placeholder script for downloading or syncing anime datasets.
+
+Fill in logic for API calls or Kaggle downloads as needed.
+"""
+
+
+def main() -> None:
+	print("Data download placeholder.")
+
+
+if __name__ == "__main__":
+	main()
