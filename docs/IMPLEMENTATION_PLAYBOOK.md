@@ -23,11 +23,11 @@ How to use:
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Confirmed cold-start badges are provably truthful: for `anime_id=34096` ("Gintama Season 5"), `in_training=False` under the loaded MF model (`item_to_index`).
-- Added a tiny helper script to validate MF membership + title lookup from artifacts.
+- Standardized all recommendation score display semantics to a single, defensible meaning: **Match score (relative)** (unitless, uncalibrated).
+- Removed mixed “Confidence/% Match” and “/10” recommendation score presentation from cards + personalized explanations.
 
 **Next action (single sentence):**
-- Phase 2 / Chunk 1: standardize score semantics (single source of truth) across UI + explanations.
+- Phase 2 / Chunk 3: make hybrid explanation shares truthful per-item and sum to ~100%.
 
 ---
 
@@ -35,7 +35,6 @@ How to use:
 
 Set one phase to **IN PROGRESS**. Keep the rest **NOT STARTED** or **DONE**.
 
-- Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): IN PROGRESS
 - Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): DONE
 - Phase 2 — Score Semantics + Explanations (Credibility): IN PROGRESS
 - Phase 3 — UX Flow + Progressive Disclosure (Clarity): NOT STARTED
@@ -180,7 +179,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 1 — Standardize score semantics (single source of truth)
 
-- [ ] Standardize score semantics across the app (e.g., “relative score”, “predicted rating”, or “match percentile”) and verify that the displayed explanation matches the chosen semantics everywhere (High)
+- [x] Standardize score semantics across the app (e.g., “relative score”, “predicted rating”, or “match percentile”) and verify that the displayed explanation matches the chosen semantics everywhere (High)
 
 **Done when:**
 - The app uses one named score semantic everywhere (e.g., “Match score (relative)”, “Predicted rating”, or “Percentile”).
@@ -190,6 +189,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 #### Chunk 2 — Fix personalization score bounds
 
 - [ ] Calibrate or reframe personalized scores so the explanation cannot exceed valid bounds (e.g., if showing “/10”, enforce 0–10); verify with unit tests and a manual profile run (High)
+  - **Note (2025-12-24):** Not applicable while we display **Match score (relative)** (unitless/uncalibrated). Only needed if we switch back to a bounded rating display (e.g., “Predicted rating /10”).
 
 **Done when:**
 - Manual run: at least 10 personalized recommendations show scores within the defined bounds.
@@ -390,6 +390,7 @@ Record decisions that future sessions must not re-litigate.
 - **2025-12-22:** Enforced MF artifact contract (must have `Q`, `item_to_index`, `index_to_item`) and removed all placeholder scoring. Default MF selection is `mf_sgd_v2025.11.21_202756` unless overridden by `APP_MF_MODEL_STEM`.
 - **2025-12-22:** Popularity percentiles are treated as neutral (50.0) unless a real popularity signal is loaded (Phase 1 / Chunk 2).
 - **2025-12-23:** Pytest collection is restricted to `tests/` via `pytest.ini` to avoid collecting runnable scripts under `scripts/test_*.py`.
+- **2025-12-24:** Standardized recommendation score display to **Match score (relative)** (unitless/uncalibrated). As a result, Phase 2 / Chunk 2 (bounded score enforcement) is only applicable if we later switch to a bounded “/10” semantics.
 
 ---
 
@@ -457,6 +458,23 @@ Record decisions that future sessions must not re-litigate.
   - Added [check_in_training_membership.py](check_in_training_membership.py) to quickly validate `anime_id` membership + title lookup.
 - Next session start here:
   - Phase 2 / Chunk 1: pick and standardize one score semantic across the app.
+
+- What I did (additional):
+  - Implemented Phase 2 / Chunk 1: standardized all recommendation score display to a single semantic: **Match score (relative)**.
+  - Removed mixed semantics like “Confidence”, “% Match”, and “/10” for recommendation scores.
+- Decisions made (additional):
+  - Recommendation scores are displayed as **unitless, uncalibrated match scores** (relative ranking signal). We do not claim bounds or a rating scale.
+- What I changed (additional):
+  - Added single source of truth for score semantics in [src/app/score_semantics.py](src/app/score_semantics.py)
+  - Updated score display in [src/app/components/cards.py](src/app/components/cards.py)
+  - Updated sort label + browse-mode score handling in [app/main.py](app/main.py)
+  - Updated personalized explanation formatting in [src/app/components/explanations.py](src/app/components/explanations.py)
+  - Updated help copy in [src/app/components/help.py](src/app/components/help.py)
+  - Added regression tests in [tests/test_score_semantics.py](tests/test_score_semantics.py)
+- Validation run (additional):
+  - `python -m pytest -q` (47 passed)
+- Next session start here (additional):
+  - Phase 2 / Chunk 3: compute and display truthful per-item MF/kNN/Pop contribution shares (sum to ~100%).
 
 ---
 

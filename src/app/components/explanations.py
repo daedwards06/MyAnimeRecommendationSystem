@@ -10,12 +10,14 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 import logging
 
+from src.app.score_semantics import SCORE_LABEL_SHORT, format_match_score
+
 logger = logging.getLogger(__name__)
 
 
 def generate_explanation(
     anime_id: int,
-    personalized_score: float,
+    match_score: float,
     user_profile: Dict,
     metadata_df: pd.DataFrame,
     top_n_genres: int = 3
@@ -25,7 +27,7 @@ def generate_explanation(
     
     Args:
         anime_id: ID of recommended anime
-        personalized_score: Predicted rating from personalization (0-10)
+        match_score: Recommendation match score (relative, uncalibrated)
         user_profile: User profile with ratings and stats
         metadata_df: DataFrame with anime metadata
         top_n_genres: Number of top genres to mention
@@ -65,9 +67,8 @@ def generate_explanation(
         # Build explanation
         parts = []
         
-        # Part 1: Predicted rating (convert 0-1 scale to 0-10)
-        score_out_of_10 = personalized_score * 10
-        parts.append(f"🎯 **Match: {score_out_of_10:.1f}/10**")
+        # Part 1: Match score (relative, uncalibrated)
+        parts.append(f"📈 **{SCORE_LABEL_SHORT}: {format_match_score(match_score)}**")
         
         # Part 2: Genre match (if any)
         if matching_genres:
@@ -252,7 +253,7 @@ def generate_batch_explanations(
         # Generate explanation
         explanation = generate_explanation(
             anime_id=anime_id,
-            personalized_score=score,
+            match_score=score,
             user_profile=user_profile,
             metadata_df=metadata_df
         )
