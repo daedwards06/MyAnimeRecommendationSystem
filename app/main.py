@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 # Ensure project root is on sys.path when running `streamlit run app/main.py`
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -24,7 +25,7 @@ root_str = str(ROOT_DIR)
 if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
-from src.app.artifacts_loader import build_artifacts
+from src.app.artifacts_loader import build_artifacts, ArtifactContractError
 from src.app.components.cards import render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
@@ -68,11 +69,53 @@ def load_personas(path: str) -> list[dict]:
         return json.load(f)
 
 
-if os.environ.get("APP_IMPORT_LIGHT"):
-    # Lightweight import mode for tests: avoid loading heavy artifacts.
-    bundle = {"metadata": pd.DataFrame({"anime_id": [1], "title_display": ["Dummy"], "genres": [""], "synopsis_snippet": [""]}), "models": {}, "explanations": {}, "diversity": {}}
+IMPORT_LIGHT = bool(os.environ.get("APP_IMPORT_LIGHT"))
+
+
+def _render_artifact_load_failure(err: Exception) -> None:
+    st.error("Required artifacts are missing or invalid. Recommendations are disabled until this is fixed.")
+    details: list[str] = []
+    if isinstance(err, ArtifactContractError):
+        details = getattr(err, "details", [])
+    elif isinstance(err, FileNotFoundError):
+        details = [str(err)]
+    else:
+        details = [str(err)]
+
+    st.markdown("**Checklist**")
+    st.markdown(
+        "\n".join(
+            [
+                "- data/processed/anime_metadata.parquet exists",
+                "- models/ contains MF .joblib artifact(s)",
+                "- MF artifact provides: Q, item_to_index, index_to_item",
+                "- If multiple MF artifacts exist, set APP_MF_MODEL_STEM to choose one",
+            ]
+        )
+    )
+    if details:
+        st.markdown("**Details**")
+        st.markdown("\n".join([f"- {d}" for d in details]))
+    st.stop()
+
+
+if IMPORT_LIGHT:
+    # Lightweight import mode for tests: avoid heavy artifact loading.
+    # IMPORTANT: recommendations must not run in this mode (no placeholders).
+    bundle = {
+        "metadata": pd.DataFrame(
+            {"anime_id": [1], "title_display": ["Dummy"], "genres": [""], "synopsis_snippet": [""]}
+        ),
+        "models": {},
+        "explanations": {},
+        "diversity": {},
+        "_import_light": True,
+    }
 else:
-    bundle = init_bundle()
+    try:
+        bundle = init_bundle()
+    except Exception as e:  # noqa: BLE001
+        _render_artifact_load_failure(e)
 
 metadata: pd.DataFrame = bundle["metadata"]
 personas = load_personas(PERSONAS_JSON)
@@ -739,38 +782,101 @@ else:
                         st.rerun()
 
 
-# Hybrid recommender initialization (placeholder scores) ------------------
-# NOTE: Replace placeholders with actual loaded matrices from models bundle.
-num_items = len(metadata)
-dummy_item_ids = metadata["anime_id"].to_numpy()
+# Hybrid recommender initialization (artifact-backed; no placeholders) -----
+recommender: HybridRecommender | None = None
+components: HybridComponents | None = None
+pop_percentiles: np.ndarray | None = None
 
-# Minimal dummy arrays to allow UI demonstration.
-mf_scores = None
-knn_scores = None
-pop_scores = None
-if "mf_sgd_v1.0" in bundle["models"]:
-    # Placeholder: expecting precomputed score matrix attribute or a method.
-    # Fallback zeros if not present.
-    model = bundle["models"]["mf_sgd_v1.0"]
-    if hasattr(model, "scores"):
-        mf_scores = model.scores  # type: ignore[attr-defined]
-if mf_scores is None:
-    mf_scores = (0.01 * (1 + (dummy_item_ids % 5))).reshape(1, -1)
-if knn_scores is None:
-    knn_scores = (0.005 * (1 + (dummy_item_ids % 7))).reshape(1, -1)
-if pop_scores is None:
-    pop_scores = (0.002 * (1 + (dummy_item_ids % 11)))
 
-# Precompute popularity percentiles for display (lower = more popular)
-pop_percentiles = compute_popularity_percentiles(pop_scores.astype(float))
+def _pop_pct_for_anime_id(anime_id: int) -> float:
+    """Return popularity percentile for display; defaults to neutral when unavailable."""
+    if pop_percentiles is None:
+        return 50.0
+    try:
+        idx_list = metadata.index[metadata["anime_id"] == anime_id]
+        if len(idx_list) == 0:
+            return 50.0
+        idx = int(idx_list[0])
+        if idx < 0 or idx >= len(pop_percentiles):
+            return 50.0
+        return float(pop_percentiles[idx])
+    except Exception:
+        return 50.0
 
-components = HybridComponents(
-    mf=mf_scores,
-    knn=knn_scores,
-    pop=pop_scores,
-    item_ids=dummy_item_ids,
-)
-recommender = HybridRecommender(components)
+if not IMPORT_LIGHT:
+    mf_model = bundle.get("models", {}).get("mf")
+    if mf_model is None:
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "MF model alias 'mf' not found in loaded models.",
+                details=[
+                    "Loader should add models['mf'] after validating MF contract.",
+                    "Check models/*.joblib and APP_MF_MODEL_STEM.",
+                ],
+            )
+        )
+
+    # Build item id vector in MF index order.
+    if not hasattr(mf_model, "index_to_item"):
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "MF model missing index_to_item.",
+                details=["Required attributes: Q, item_to_index, index_to_item"],
+            )
+        )
+    index_to_item = mf_model.index_to_item
+    try:
+        n_items_mf = len(index_to_item)
+        item_ids = np.asarray([int(index_to_item[i]) for i in range(n_items_mf)], dtype=np.int64)
+    except Exception as e:  # noqa: BLE001
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "MF model index_to_item is not a contiguous 0..N-1 mapping.",
+                details=[f"Error: {e}"],
+            )
+        )
+
+    # Compute a real MF score vector for the demo user index (0).
+    # This avoids any placeholder arrays while keeping behavior deterministic.
+    if not (hasattr(mf_model, "P") and hasattr(mf_model, "Q") and hasattr(mf_model, "global_mean")):
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "MF model is missing required fields to compute demo user scores (P, Q, global_mean).",
+                details=[
+                    "This is required for seedless recommendations without a user profile.",
+                    "Fix: export MF artifact with P, Q, global_mean (or enable personalization with profile ratings).",
+                ],
+            )
+        )
+    try:
+        p = mf_model.P
+        q = mf_model.Q
+        if p is None or q is None:
+            raise ValueError("P or Q is None")
+        if hasattr(q, "shape") and int(q.shape[0]) != int(item_ids.shape[0]):
+            raise ValueError(
+                f"Q has {int(q.shape[0])} rows but index_to_item has {int(item_ids.shape[0])} items"
+            )
+        if p.shape[0] < 1:
+            raise ValueError("MF model has no users in P")
+        demo_user_index = 0
+        demo_scores = float(mf_model.global_mean) + (p[demo_user_index] @ q.T)
+        mf_scores = np.asarray(demo_scores, dtype=np.float32).reshape(1, -1)
+    except Exception as e:  # noqa: BLE001
+        _render_artifact_load_failure(
+            ArtifactContractError(
+                "Failed computing demo MF scores from MF artifact.",
+                details=[f"Error: {e}"],
+            )
+        )
+
+    components = HybridComponents(
+        mf=mf_scores,
+        knn=None,
+        pop=None,
+        item_ids=item_ids,
+    )
+    recommender = HybridRecommender(components)
 
 
 st.markdown("---")
@@ -845,7 +951,7 @@ if browse_mode:
                             "explanation": None,  # No explanation in browse mode
                             "_mal_score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
                             "_year": 0,
-                            "_popularity": float(pop_percentiles[idx]) if idx < len(pop_percentiles) else 50.0
+                            "_popularity": float(pop_percentiles[idx]) if (pop_percentiles is not None and idx < len(pop_percentiles)) else 50.0
                         })
                         # Extract year for sorting
                         aired_from = row.get("aired_from")
@@ -893,7 +999,13 @@ else:
     n_requested = min(top_n * filter_multiplier, components.num_items if hasattr(components, "num_items") else len(metadata))
     
     recs: list[dict] = []
-    if n_requested > 0:
+    if recommender is None or components is None:
+        st.error(
+            "Recommendation engine is unavailable because required artifacts did not load. "
+            "Disable APP_IMPORT_LIGHT and ensure MF artifacts are present/valid."
+        )
+        recs = []
+    elif n_requested > 0:
         # Compute recommendations with progress indicator
         with st.spinner("🔍 Finding recommendations..."):
             with latency_timer("recommendations"):
@@ -970,8 +1082,11 @@ else:
                         if blended_scores is not None and aid in id_to_index:
                             hybrid_val = float(blended_scores[id_to_index[aid]])
                             # Popularity percentile (invert so lower percentile => higher boost)
-                            pop_pct = float(pop_percentiles[id_to_index[aid]]) if id_to_index[aid] < len(pop_percentiles) else 50.0
-                            popularity_boost = max(0.0, (50.0 - pop_pct) / 50.0)  # scale 0..1 favoring more popular mildly
+                            if pop_percentiles is not None and id_to_index[aid] < len(pop_percentiles):
+                                pop_pct = float(pop_percentiles[id_to_index[aid]])
+                                popularity_boost = max(0.0, (50.0 - pop_pct) / 50.0)  # scale 0..1
+                            else:
+                                popularity_boost = 0.0
                         else:
                             hybrid_val = 0.0
                             popularity_boost = 0.0
@@ -1158,7 +1273,7 @@ else:
                                 rec_copy["_year"] = int(aired_from[:4])
                             except Exception:
                                 pass
-                        rec_copy["_popularity"] = float(pop_percentiles[metadata.index[metadata["anime_id"] == anime_id][0]]) if len(metadata.index[metadata["anime_id"] == anime_id]) > 0 else 50.0
+                        rec_copy["_popularity"] = _pop_pct_for_anime_id(int(anime_id))
                         enriched_recs.append(rec_copy)
                 
                 # Sort based on selected option
@@ -1254,18 +1369,32 @@ if recs:
         st.markdown(f"<p style='color: #7F8C8D; font-size: 0.9rem; margin-top: -8px; margin-bottom: 20px;'>Sorted by: {sort_by}</p>", unsafe_allow_html=True)
     
     # Calculate diversity mix
-    pop_count = sum(1 for r in recs if "Top 25%" in str(badge_payload(
-        is_in_training=True,
-        pop_percentile=float(pop_percentiles[metadata.index[metadata["anime_id"] == r["anime_id"]][0]]) if len(metadata.index[metadata["anime_id"] == r["anime_id"]]) > 0 else 50.0,
-        user_genre_hist={},
-        item_genres=[]
-    ).get("popularity_band", "")))
-    long_tail_count = sum(1 for r in recs if "Long-tail" in str(badge_payload(
-        is_in_training=True,
-        pop_percentile=float(pop_percentiles[metadata.index[metadata["anime_id"] == r["anime_id"]][0]]) if len(metadata.index[metadata["anime_id"] == r["anime_id"]]) > 0 else 50.0,
-        user_genre_hist={},
-        item_genres=[]
-    ).get("popularity_band", "")))
+    pop_count = sum(
+        1
+        for r in recs
+        if "Top 25%"
+        in str(
+            badge_payload(
+                is_in_training=True,
+                pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
+                user_genre_hist={},
+                item_genres=[],
+            ).get("popularity_band", "")
+        )
+    )
+    long_tail_count = sum(
+        1
+        for r in recs
+        if "Long-tail"
+        in str(
+            badge_payload(
+                is_in_training=True,
+                pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
+                user_genre_hist={},
+                item_genres=[],
+            ).get("popularity_band", "")
+        )
+    )
     mid_count = len(recs) - pop_count - long_tail_count
     
     # Modern diversity visualization with gradient bar
@@ -1318,8 +1447,7 @@ if recs:
                     row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
                     if not row_df.empty:
                         row = row_df.iloc[0]
-                        idx = metadata.index[metadata["anime_id"] == anime_id][0]
-                        pop_pct = float(pop_percentiles[idx])
+                        pop_pct = _pop_pct_for_anime_id(int(anime_id))
                         with col:
                             render_card_grid(row, rec, pop_pct)
     else:
@@ -1330,8 +1458,7 @@ if recs:
             if row_df.empty:
                 continue
             row = row_df.iloc[0]
-            idx = metadata.index[metadata["anime_id"] == anime_id][0]
-            pop_pct = float(pop_percentiles[idx])
+            pop_pct = _pop_pct_for_anime_id(int(anime_id))
             render_card(row, rec, pop_pct)
 else:
     if selected_seed_ids and not recs:

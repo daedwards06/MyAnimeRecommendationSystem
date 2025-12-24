@@ -46,3 +46,8 @@ MIN_METADATA_COLUMNS = [
 # Filenames / paths (central references)
 METADATA_PARQUET = "anime_metadata.parquet"
 PERSONAS_JSON = "data/samples/personas.json"
+
+# Default artifact stems (used when multiple candidates exist and env vars are not set).
+# Override at runtime with APP_MF_MODEL_STEM / APP_KNN_MODEL_STEM.
+DEFAULT_MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
+DEFAULT_KNN_MODEL_STEM = "item_knn_sklearn_v2025.11.21_202756"
