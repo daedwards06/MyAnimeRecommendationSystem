@@ -74,6 +74,7 @@ IMPORT_LIGHT = bool(os.environ.get("APP_IMPORT_LIGHT"))
 
 def _render_artifact_load_failure(err: Exception) -> None:
     st.error("Required artifacts are missing or invalid. Recommendations are disabled until this is fixed.")
+    st.markdown("**Active scoring path:** Recommendations disabled")
     details: list[str] = []
     if isinstance(err, ArtifactContractError):
         details = getattr(err, "details", [])
@@ -999,6 +1000,7 @@ else:
     n_requested = min(top_n * filter_multiplier, components.num_items if hasattr(components, "num_items") else len(metadata))
     
     recs: list[dict] = []
+    personalization_applied = False
     if recommender is None or components is None:
         st.error(
             "Recommendation engine is unavailable because required artifacts did not load. "
@@ -1148,6 +1150,7 @@ else:
                     weights=weights,
                     exclude_item_ids=watched_ids
                 )
+                personalization_applied = True
             elif personalization_strength > 0.01:
                 # Blend personalized and seed-based
                 personalized_recs = recommender.get_personalized_recommendations(
@@ -1157,6 +1160,7 @@ else:
                     weights=weights,
                     exclude_item_ids=watched_ids
                 )
+                personalization_applied = True
                 
                 # Create score dictionaries
                 personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
@@ -1291,6 +1295,20 @@ else:
             # After all filtering and sorting, trim to requested top_n
             recs = recs[:top_n]
 
+# Active scoring path indicator (single source of truth: derived from executed flags)
+active_scoring_path = None
+if browse_mode:
+    active_scoring_path = "Browse"
+else:
+    if recommender is None or components is None:
+        active_scoring_path = "Recommendations disabled"
+    elif locals().get("personalization_applied", False):
+        active_scoring_path = "Personalized"
+    elif selected_seed_ids:
+        active_scoring_path = "Seed-based" if len(selected_seed_ids) == 1 else "Multi-seed"
+    else:
+        active_scoring_path = "Seedless"
+
 def _compute_confidence_stars(score: float) -> str:
     """Convert recommendation score to visual star rating (1-5 stars)."""
     # Normalize score to 0-5 range (assuming scores typically 0-1 or 0-10)
@@ -1330,6 +1348,7 @@ def _coerce_genres(value) -> str:
     return str(value)
 
 if recs:
+    st.markdown(f"**Active scoring path:** {active_scoring_path}")
     # Result count with total anime count badge
     total_anime = len(metadata)
     result_count = len(recs)
@@ -1461,7 +1480,13 @@ if recs:
             pop_pct = _pop_pct_for_anime_id(int(anime_id))
             render_card(row, rec, pop_pct)
 else:
-    if selected_seed_ids and not recs:
+    if (browse_mode or active_scoring_path == "Recommendations disabled"):
+        st.markdown(f"**Active scoring path:** {active_scoring_path}")
+
+    if browse_mode:
+        # Browse mode already renders its own guidance above; avoid showing recommendation-focused empty states.
+        pass
+    elif selected_seed_ids and not recs:
         st.markdown("""
         <div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>
             <p style='color: #8A6D3B; font-weight: 500; margin: 0;'>⚠️ No similar titles found – try another seed or adjust filters</p>
