@@ -12,6 +12,7 @@ Features:
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import sys
 from pathlib import Path
@@ -493,6 +494,13 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🎯 Personalization")
 
+
+def _ratings_signature(ratings_dict: dict) -> str:
+    """Stable signature for rating dict (for cache invalidation)."""
+    items = sorted((int(k), float(v)) for k, v in (ratings_dict or {}).items())
+    payload = json.dumps(items, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
 # Initialize personalization state
 if "personalization_enabled" not in st.session_state:
     st.session_state["personalization_enabled"] = False
@@ -500,6 +508,10 @@ if "personalization_strength" not in st.session_state:
     st.session_state["personalization_strength"] = 100
 if "user_embedding" not in st.session_state:
     st.session_state["user_embedding"] = None
+if "user_embedding_meta" not in st.session_state:
+    st.session_state["user_embedding_meta"] = {}
+if "personalization_blocked_reason" not in st.session_state:
+    st.session_state["personalization_blocked_reason"] = None
 
 # Check if profile has ratings
 profile_has_ratings = False
@@ -528,20 +540,72 @@ if profile_has_ratings:
         )
         st.session_state["personalization_strength"] = personalization_strength
         
-        # Generate user embedding if not already cached
-        if st.session_state["user_embedding"] is None:
+        # Generate / refresh user embedding when inputs change.
+        # Single source of truth for MF model: bundle['models']['mf'] selected by artifacts_loader.
+        mf_model = bundle.get("models", {}).get("mf")
+        mf_stem = bundle.get("models", {}).get("_mf_stem")
+        profile_username = (
+            st.session_state.get("active_profile", {}) or {}
+        ).get("username")
+        ratings_sig = _ratings_signature(ratings)
+        cached = st.session_state.get("user_embedding_meta", {}) or {}
+
+        needs_refresh = (
+            st.session_state["user_embedding"] is None
+            or cached.get("ratings_sig") != ratings_sig
+            or cached.get("mf_stem") != mf_stem
+            or cached.get("profile_username") != profile_username
+        )
+
+        if mf_model is None:
+            st.session_state["user_embedding"] = None
+            st.session_state["user_embedding_meta"] = {
+                "ratings_sig": ratings_sig,
+                "mf_stem": mf_stem,
+                "profile_username": profile_username,
+            }
+            st.session_state["personalization_blocked_reason"] = (
+                "MF model is not available (artifact load/selection failed)."
+            )
+            st.sidebar.error("Personalization unavailable: MF model missing")
+        elif needs_refresh:
             with st.spinner("Generating taste profile..."):
                 from src.models.user_embedding import generate_user_embedding
-                mf_model = bundle["models"].get("mf")
-                if mf_model:
+                try:
                     user_embedding = generate_user_embedding(
                         ratings_dict=ratings,
                         mf_model=mf_model,
                         method="weighted_average",
-                        normalize=True
+                        normalize=True,
                     )
-                    st.session_state["user_embedding"] = user_embedding
-                    st.sidebar.success(f"✓ Profile ready ({len(ratings)} ratings)")
+                except Exception as e:  # noqa: BLE001
+                    st.session_state["user_embedding"] = None
+                    st.session_state["personalization_blocked_reason"] = (
+                        f"Failed generating user embedding: {e}"
+                    )
+                    st.sidebar.error("Personalization unavailable: embedding failed")
+                else:
+                    # Guard against zero/near-zero embeddings (typically means no overlap with training set).
+                    try:
+                        emb_norm = float(np.linalg.norm(user_embedding))
+                    except Exception:
+                        emb_norm = 0.0
+                    if emb_norm <= 1e-8:
+                        st.session_state["user_embedding"] = None
+                        st.session_state["personalization_blocked_reason"] = (
+                            "Your rated items do not overlap the MF model training set."
+                        )
+                        st.sidebar.warning("Personalization unavailable: no MF overlap")
+                    else:
+                        st.session_state["user_embedding"] = user_embedding
+                        st.session_state["personalization_blocked_reason"] = None
+                        st.sidebar.success(f"✓ Profile ready ({len(ratings)} ratings)")
+
+                st.session_state["user_embedding_meta"] = {
+                    "ratings_sig": ratings_sig,
+                    "mf_stem": mf_stem,
+                    "profile_username": profile_username,
+                }
         else:
             st.sidebar.caption(f"✓ Using {len(ratings)} ratings")
         
@@ -551,6 +615,9 @@ if profile_has_ratings:
             render_taste_profile_panel(st.session_state["active_profile"], metadata)
 else:
     st.sidebar.caption("💡 Rate anime to enable personalization")
+    # Prevent stale session state from making personalization appear enabled without ratings.
+    st.session_state["personalization_enabled"] = False
+    st.session_state["personalization_blocked_reason"] = None
 
 # ============================================================================
 # SIDEBAR: SEARCH & SEEDS (Section 3 - Discovery Tools)
@@ -1132,60 +1199,98 @@ else:
         user_embedding = st.session_state.get("user_embedding")
         personalization_strength = st.session_state.get("personalization_strength", 100) / 100.0  # Convert to 0-1
         
-        # Apply personalization if enabled and user has embedding
-        if recs and personalization_enabled and user_embedding is not None:
-            mf_model = bundle["models"].get("mf")
+        # Apply personalization if enabled and requirements are met.
+        if recs and personalization_enabled:
+            mf_model = bundle.get("models", {}).get("mf")
+            mf_stem = bundle.get("models", {}).get("_mf_stem")
+            cached = st.session_state.get("user_embedding_meta", {}) or {}
+            if mf_model is None:
+                st.session_state["personalization_blocked_reason"] = (
+                    "MF model is not available (artifact load/selection failed)."
+                )
+            elif user_embedding is None:
+                st.session_state["personalization_blocked_reason"] = (
+                    "User embedding is not available."
+                )
+            elif cached.get("mf_stem") != mf_stem:
+                # Defensive: embeddings must correspond to the active MF artifact.
+                st.session_state["personalization_blocked_reason"] = (
+                    "User embedding was generated from a different MF artifact; rerun to refresh."
+                )
+            elif st.session_state.get("personalization_blocked_reason"):
+                # Blocked earlier in the sidebar generation step.
+                pass
+            else:
+                st.session_state["personalization_blocked_reason"] = None
             
             # Get watched anime IDs for exclusion
             watched_ids = []
             if st.session_state["active_profile"]:
                 watched_ids = st.session_state["active_profile"].get("watched_ids", [])
             
-            if personalization_strength >= 0.99:
-                # Pure personalized recommendations (100% strength)
-                recs = recommender.get_personalized_recommendations(
-                    user_embedding=user_embedding,
-                    mf_model=mf_model,
-                    n=n_requested,
-                    weights=weights,
-                    exclude_item_ids=watched_ids
-                )
-                personalization_applied = True
-            elif personalization_strength > 0.01:
-                # Blend personalized and seed-based
-                personalized_recs = recommender.get_personalized_recommendations(
-                    user_embedding=user_embedding,
-                    mf_model=mf_model,
-                    n=n_requested,
-                    weights=weights,
-                    exclude_item_ids=watched_ids
-                )
-                personalization_applied = True
+                if st.session_state.get("personalization_blocked_reason") is None:
+                    try:
+                        if personalization_strength >= 0.99:
+                            # Pure personalized recommendations (100% strength)
+                            personalized_recs = recommender.get_personalized_recommendations(
+                                user_embedding=user_embedding,
+                                mf_model=mf_model,
+                                n=n_requested,
+                                weights=weights,
+                                exclude_item_ids=watched_ids,
+                            )
+                            if not personalized_recs:
+                                st.session_state["personalization_blocked_reason"] = (
+                                    "MF personalization returned no results (likely no overlap with MF items)."
+                                )
+                            else:
+                                recs = personalized_recs
+                                personalization_applied = True
+                        elif personalization_strength > 0.01:
+                            # Blend personalized and seed-based
+                            personalized_recs = recommender.get_personalized_recommendations(
+                                user_embedding=user_embedding,
+                                mf_model=mf_model,
+                                n=n_requested,
+                                weights=weights,
+                                exclude_item_ids=watched_ids,
+                            )
+                            if not personalized_recs:
+                                st.session_state["personalization_blocked_reason"] = (
+                                    "MF personalization returned no results (likely no overlap with MF items)."
+                                )
+                            else:
+                                personalization_applied = True
+                    except Exception as e:  # noqa: BLE001
+                        st.session_state["personalization_blocked_reason"] = (
+                            f"Personalization failed at scoring time: {e}"
+                        )
                 
-                # Create score dictionaries
-                personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
-                seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
-                
-                # Collect all unique anime IDs
-                all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
-                
-                # Blend scores
-                blended = []
-                for aid in all_anime_ids:
-                    p_score = personalized_scores.get(aid, 0.0)
-                    s_score = seed_scores.get(aid, 0.0)
-                    
-                    # Weighted blend based on personalization strength
-                    final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
-                    
-                    blended.append({
-                        "anime_id": aid,
-                        "score": final_score,
-                    })
-                
-                # Sort and take top N
-                blended.sort(key=lambda x: x["score"], reverse=True)
-                recs = blended[:n_requested]
+                    if personalization_applied and personalization_strength > 0.01 and personalization_strength < 0.99:
+                        # Create score dictionaries
+                        personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
+                        seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
+
+                        # Collect all unique anime IDs
+                        all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
+
+                        # Blend scores
+                        blended = []
+                        for aid in all_anime_ids:
+                            p_score = personalized_scores.get(aid, 0.0)
+                            s_score = seed_scores.get(aid, 0.0)
+
+                            # Weighted blend based on personalization strength
+                            final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
+
+                            blended.append({
+                                "anime_id": aid,
+                                "score": final_score,
+                            })
+
+                        # Sort and take top N
+                        blended.sort(key=lambda x: x["score"], reverse=True)
+                        recs = blended[:n_requested]
             # else: personalization_strength <= 0.01, keep seed-based recs as-is
         
         # Generate explanations for personalized recommendations
@@ -1309,6 +1414,12 @@ else:
     else:
         active_scoring_path = "Seedless"
 
+# If personalization was requested but couldn't run, reflect that explicitly.
+personalization_requested = st.session_state.get("personalization_enabled", False)
+blocked_reason = st.session_state.get("personalization_blocked_reason")
+if personalization_requested and not locals().get("personalization_applied", False) and blocked_reason:
+    active_scoring_path = f"{active_scoring_path} (Personalization unavailable)"
+
 def _compute_confidence_stars(score: float) -> str:
     """Convert recommendation score to visual star rating (1-5 stars)."""
     # Normalize score to 0-5 range (assuming scores typically 0-1 or 0-10)
@@ -1349,6 +1460,14 @@ def _coerce_genres(value) -> str:
 
 if recs:
     st.markdown(f"**Active scoring path:** {active_scoring_path}")
+    # Be explicit when personalization is enabled but blocked.
+    blocked_reason = st.session_state.get("personalization_blocked_reason")
+    if (
+        st.session_state.get("personalization_enabled", False)
+        and not locals().get("personalization_applied", False)
+        and blocked_reason
+    ):
+        st.warning(f"Personalization enabled but not applied: {blocked_reason}")
     # Result count with total anime count badge
     total_anime = len(metadata)
     result_count = len(recs)

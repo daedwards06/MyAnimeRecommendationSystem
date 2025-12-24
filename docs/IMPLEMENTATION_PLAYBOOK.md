@@ -30,7 +30,7 @@ How to use:
 - Implemented a single “Active scoring path” indicator that reflects the executed browse/recommend/personalization/seed path.
 
 **Next action (single sentence):**
-- Phase 1 / Chunk 3: wire personalization end-to-end (ensure the personalized path uses the selected MF artifact key and ranking changes when ratings change).
+- Phase 1 / Chunk 4: make cold-start detection real (derive is_in_training from MF factor availability and verify badges).
 
 ---
 
@@ -149,7 +149,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 3 — Wire personalization end-to-end
 
-- [ ] Ensure personalization works end-to-end by wiring the correct MF model key from the loaded `bundle["models"]` and verifying the personalized ranking changes when user ratings change (High)
+- [x] Ensure personalization works end-to-end by wiring the correct MF model key from the loaded `bundle["models"]` and verifying the personalized ranking changes when user ratings change (High)
 
 **Done when:**
 - With a loaded profile that has ratings, enabling personalization produces a different top-N list than seed-only at the same filters.
@@ -425,14 +425,20 @@ Record decisions that future sessions must not re-litigate.
   - Added the indicator + safe “Recommendations disabled” labeling in [app/main.py](app/main.py).
 - Decisions made:
   - Label priority is: Browse → Recommendations disabled → Personalized (only when personalization is applied) → Multi-seed/Seed-based → Seedless.
+- Decisions made (additional):
+  - Personalization is considered **unavailable** (and must be stated explicitly) if: no ratings, embedding is missing/near-zero, MF model is missing, MF stem changed since embedding generation, or personalized scoring returns no results. In these cases the app does not silently fall back.
 - Validation run:
   - `python -m pytest -q` (40 passed)
   - Manual: set `APP_MF_MODEL_STEM=__bad__` and verified the app shows an actionable error + disables recommendations.
+  - Manual (personalization): with the same seeds/filters, Personalization OFF vs ON (Strength 100%) produced a different top-N; editing at least one profile rating changed the top-N again after rerun; the “Active scoring path” label reflected the executed branch.
+- What I changed (additional):
+  - Wired personalization to the bundle-selected MF artifact and added cache invalidation on ratings/profile/MF stem changes in [app/main.py](app/main.py).
+  - Added a small integration test proving rating changes change personalized top-1 in [tests/test_personalization.py](tests/test_personalization.py).
 - Next session start here:
   - Manual: toggled Browse / seeds / personalization and verified the “Active scoring path” label changes as expected.
   - (Optional) Verified Browse mode shows Browse and does not claim recommendation scoring.
 - Next session start here:
-  - Phase 1 / Chunk 3: personalization wiring + verification (start in [app/main.py](app/main.py) around the personalization block and model selection).
+  - Phase 1 / Chunk 4: cold-start detection (start in [app/main.py](app/main.py) where `badge_payload(... is_in_training=True ...)` is currently hard-coded).
 
 ---
 

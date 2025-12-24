@@ -15,6 +15,8 @@ from src.models.user_embedding import (
     get_user_taste_profile,
 )
 
+from src.app.recommender import HybridComponents, HybridRecommender
+
 
 class MockMFModel:
     """Mock MF model for testing."""
@@ -111,6 +113,44 @@ class TestEmbeddingGeneration:
         # With single rating, embedding should be normalized version of that item's factor
         expected = mock_mf_model.Q[0] / np.linalg.norm(mock_mf_model.Q[0])
         assert np.allclose(embedding, expected, atol=1e-5), "Single rating embedding incorrect"
+
+
+class TestPersonalizedRankingIntegration:
+    """Light integration checks: embedding -> recommender ranking."""
+
+    class TinyMFModel:
+        def __init__(self):
+            # Two items in 2D; item0 aligns with x-axis, item1 aligns with y-axis.
+            self.Q = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+            self.item_to_index = {0: 0, 1: 1}
+            self.index_to_item = {0: 0, 1: 1}
+
+    def test_ratings_change_changes_top1(self):
+        mf_model = self.TinyMFModel()
+        components = HybridComponents(mf=None, knn=None, pop=None, item_ids=np.asarray([0, 1], dtype=np.int64))
+        recommender = HybridRecommender(components)
+
+        emb_a = generate_user_embedding({0: 10}, mf_model, method="weighted_average", normalize=True)
+        emb_b = generate_user_embedding({1: 10}, mf_model, method="weighted_average", normalize=True)
+
+        recs_a = recommender.get_personalized_recommendations(
+            user_embedding=emb_a,
+            mf_model=mf_model,
+            n=2,
+            weights={"mf": 1.0, "pop": 0.0, "knn": 0.0},
+            exclude_item_ids=None,
+        )
+        recs_b = recommender.get_personalized_recommendations(
+            user_embedding=emb_b,
+            mf_model=mf_model,
+            n=2,
+            weights={"mf": 1.0, "pop": 0.0, "knn": 0.0},
+            exclude_item_ids=None,
+        )
+
+        assert recs_a and recs_b
+        assert recs_a[0]["anime_id"] == 0
+        assert recs_b[0]["anime_id"] == 1
     
     def test_missing_items_handled(self, mock_mf_model):
         """Test that items not in model are gracefully skipped."""
