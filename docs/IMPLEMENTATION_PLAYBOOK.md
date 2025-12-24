@@ -27,9 +27,10 @@ How to use:
 - Enforced MF artifact contracts at load-time and fail-loud UI errors at startup.
 - Validated Phase 1 / Chunk 1 via pytest + a manual UI “bad stem” failure test.
 - Added pytest collection config so `scripts/test_*.py` scripts are not collected as tests.
+- Implemented a single “Active scoring path” indicator that reflects the executed browse/recommend/personalization/seed path.
 
 **Next action (single sentence):**
-- Phase 1 / Chunk 2: implement an explicit “Active scoring path” indicator that reflects the real code path used.
+- Phase 1 / Chunk 3: wire personalization end-to-end (ensure the personalized path uses the selected MF artifact key and ranking changes when ratings change).
 
 ---
 
@@ -138,7 +139,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 2 — Add “active scoring path” indicator
 
-- [ ] Implement an explicit “active scoring path” status indicator (e.g., MF-only, Hybrid, Personalized, Cold-start content) that reflects the actual code path used for the current results (High)
+- [x] Implement an explicit “active scoring path” status indicator (e.g., MF-only, Hybrid, Personalized, Cold-start content) that reflects the actual code path used for the current results (High)
 
 **Done when:**
 - The UI displays a single “Active scoring path” label for every run.
@@ -418,11 +419,20 @@ Record decisions that future sessions must not re-litigate.
   - Confirmed the app fails loudly when an invalid MF artifact stem is requested.
 - What I changed:
   - Added [pytest.ini](pytest.ini) so `python -m pytest -q` only collects `tests/` (not runnable scripts under `scripts/`).
+- What I did (additional):
+  - Implemented a single “Active scoring path” label that is computed from the same flags/branches that actually execute.
+- What I changed (additional):
+  - Added the indicator + safe “Recommendations disabled” labeling in [app/main.py](app/main.py).
+- Decisions made:
+  - Label priority is: Browse → Recommendations disabled → Personalized (only when personalization is applied) → Multi-seed/Seed-based → Seedless.
 - Validation run:
   - `python -m pytest -q` (40 passed)
   - Manual: set `APP_MF_MODEL_STEM=__bad__` and verified the app shows an actionable error + disables recommendations.
 - Next session start here:
-  - Implement Phase 1 / Chunk 2 “Active scoring path” indicator in [app/main.py](app/main.py).
+  - Manual: toggled Browse / seeds / personalization and verified the “Active scoring path” label changes as expected.
+  - (Optional) Verified Browse mode shows Browse and does not claim recommendation scoring.
+- Next session start here:
+  - Phase 1 / Chunk 3: personalization wiring + verification (start in [app/main.py](app/main.py) around the personalization block and model selection).
 
 ---
 
