@@ -27,5 +27,12 @@ def render_diversity_panel(recs: list[dict], metadata: pd.DataFrame) -> None:
     with col2:
         st.metric("Genre Exposure Ratio", f"{genre_ratio:.3f}")
     with col3:
-        st.metric("Avg Novelty", f"{avg_nov:.3f}")
-    st.caption("Popularity bands shown per item (Top 10%, Top 25%, Mid, Long Tail).")
+        if avg_nov is None:
+            st.metric("Avg Novelty (profile)", "NA")
+        else:
+            st.metric("Avg Novelty (profile)", f"{avg_nov:.3f}")
+
+    st.caption(
+        "Novelty is only computed when a rated profile is active. "
+        "Popularity bands shown per item (Top 10%, Top 25%, Mid, Long Tail)."
+    )

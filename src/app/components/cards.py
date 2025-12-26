@@ -7,6 +7,14 @@ from src.app.components.tooltips import format_badge_tooltip
 from src.app.components.rating import render_quick_rating_buttons
 from src.app.score_semantics import SCORE_LABEL_SHORT, format_match_score, has_match_score
 
+
+def _get_user_genre_hist_from_session() -> dict:
+    try:
+        hist = st.session_state.get("user_genre_hist")
+        return hist if isinstance(hist, dict) else {}
+    except Exception:  # pragma: no cover
+        return {}
+
 def coerce_genres(value) -> str:
     if value is None:
         return ""
@@ -83,10 +91,11 @@ def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
     raw_genres = row.get("genres")
     genres = coerce_genres(raw_genres)
     item_genres = [g for g in genres.split("|") if g]
+    user_genre_hist = _get_user_genre_hist_from_session()
     badges = badge_payload(
         is_in_training=is_in_training,
         pop_percentile=pop_pct,
-        user_genre_hist={g: 1 for g in item_genres},
+        user_genre_hist=user_genre_hist,
         item_genres=item_genres,
     )
     
@@ -211,10 +220,11 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
     raw_genres = row.get("genres")
     genres = coerce_genres(raw_genres)
     item_genres = [g for g in genres.split("|") if g]
+    user_genre_hist = _get_user_genre_hist_from_session()
     badges = badge_payload(
         is_in_training=is_in_training,
         pop_percentile=pop_pct,
-        user_genre_hist={g: 1 for g in item_genres},
+        user_genre_hist=user_genre_hist,
         item_genres=item_genres,
     )
     rec["badges"] = badges
@@ -368,9 +378,12 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
             pop_icon = "🔥" if "Top" in badges['popularity_band'] else "📊"
             st.markdown(f"{pop_icon} {badges['popularity_band']}")
         with cols[2]:
-            nov_val = badges['novelty_ratio']
-            nov_icon = "🌟" if nov_val > 0.6 else "🎯"
-            st.markdown(f"{nov_icon} Novelty {nov_val:.2f}")
+            nov_val = badges.get('novelty_ratio')
+            if nov_val is None:
+                st.markdown("— Novelty NA")
+            else:
+                nov_icon = "🌟" if float(nov_val) > 0.6 else "🎯"
+                st.markdown(f"{nov_icon} Novelty {float(nov_val):.2f}")
         
         # Synopsis - show full text directly
         if display_synopsis:
@@ -409,7 +422,7 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         with st.expander("ℹ️ Details", expanded=False):
             cs_tooltip = format_badge_tooltip("cold_start", badges['cold_start'])
             pop_tooltip = format_badge_tooltip("popularity_band", badges['popularity_band'])
-            nov_tooltip = format_badge_tooltip("novelty_ratio", badges['novelty_ratio'])
+            nov_tooltip = format_badge_tooltip("novelty_ratio", badges.get('novelty_ratio'))
             
             st.caption(cs_tooltip)
             st.caption(pop_tooltip)

@@ -54,6 +54,7 @@ from src.app.diversity import (
     coverage,
     genre_exposure_ratio,
     average_novelty,
+    build_user_genre_hist,
 )
 
 
@@ -501,6 +502,33 @@ def _ratings_signature(ratings_dict: dict) -> str:
     items = sorted((int(k), float(v)) for k, v in (ratings_dict or {}).items())
     payload = json.dumps(items, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+# User genre history (for novelty) -----------------------------------------
+if "user_genre_hist" not in st.session_state:
+    st.session_state["user_genre_hist"] = {}
+if "user_genre_hist_meta" not in st.session_state:
+    st.session_state["user_genre_hist_meta"] = {}
+
+if st.session_state.get("active_profile"):
+    _ratings = st.session_state["active_profile"].get("ratings", {})
+    _ratings_sig = _ratings_signature(_ratings)
+    _profile_username = (st.session_state.get("active_profile") or {}).get("username")
+    _cached = st.session_state.get("user_genre_hist_meta") or {}
+    _needs_refresh = (
+        not isinstance(st.session_state.get("user_genre_hist"), dict)
+        or _cached.get("ratings_sig") != _ratings_sig
+        or _cached.get("profile_username") != _profile_username
+    )
+    if _needs_refresh:
+        st.session_state["user_genre_hist"] = build_user_genre_hist(_ratings, metadata)
+        st.session_state["user_genre_hist_meta"] = {
+            "ratings_sig": _ratings_sig,
+            "profile_username": _profile_username,
+        }
+else:
+    st.session_state["user_genre_hist"] = {}
+    st.session_state["user_genre_hist_meta"] = {}
 
 # Initialize personalization state
 if "personalization_enabled" not in st.session_state:

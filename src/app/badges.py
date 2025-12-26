@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 
 def cold_start_flag(is_in_training: bool) -> bool:
@@ -20,11 +20,29 @@ def popularity_band(pop_percentile: float) -> str:
     return "Long Tail"
 
 
-def novelty_ratio(user_genre_hist: Dict[str, int], item_genres: List[str]) -> float:
+def novelty_ratio(user_genre_hist: Dict[str, int], item_genres: List[str]) -> Optional[float]:
+    """Compute novelty ratio for an item relative to a user's genre history.
+
+    Returns None when there is no user history to compare against (i.e., not
+    personalized). This prevents displaying misleading novelty values.
+    """
+    if not user_genre_hist:
+        return None
     if not item_genres:
-        return 0.0
-    unseen = sum(1 for g in item_genres if g not in user_genre_hist)
-    return unseen / len(item_genres)
+        return None
+    # Compare case-insensitively; history keys are expected to be normalized.
+    unseen = 0
+    denom = 0
+    for g in item_genres:
+        gg = str(g).strip().lower()
+        if not gg:
+            continue
+        denom += 1
+        if gg not in user_genre_hist:
+            unseen += 1
+    if denom <= 0:
+        return None
+    return unseen / denom
 
 
 def badge_payload(
