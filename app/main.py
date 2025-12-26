@@ -1,12 +1,13 @@
-"""Streamlit application entry point for Phase 5.
+"""Streamlit application entry point.
 
 Features:
-  - Persona selection (sample personas JSON)
-  - Title fuzzy search
-  - Hybrid weight toggle (balanced vs diversity-emphasized)
-  - Top-N recommendations with explanation shares & badges
-  - Diversity summary placeholder (coverage / novelty to be integrated)
-  - Help / FAQ section
+    - Seed-based recommendations (1–5 titles)
+    - Optional personalization from profile ratings
+    - Browse-by-genre mode (metadata-only)
+    - Hybrid weight toggle (balanced vs diversity-emphasized)
+    - Top-N recommendations with explanation shares & badges
+    - Diversity summary panel
+    - Help / FAQ section
 """
 
 from __future__ import annotations
@@ -700,7 +701,7 @@ st.sidebar.markdown("### 🎛️ Filters & Display")
 browse_mode = st.sidebar.checkbox(
     "🗂️ Browse by Genre",
     value=st.session_state.get("browse_mode", False),
-    help="Explore anime by genre without needing a seed recommendation"
+    help="Explore anime by genre without seeds or match scores"
 )
 st.session_state["browse_mode"] = browse_mode
 
@@ -826,11 +827,11 @@ st.sidebar.markdown("---")
 with st.sidebar.expander("💡 Quick Guide", expanded=False):
     st.markdown("""
     <div style='font-size: 0.9rem; line-height: 1.8;'>
-    1️⃣ <b>Load Profile</b> – Import MAL or create new<br>
-    2️⃣ <b>Personalize</b> – Enable & adjust strength<br>
-    3️⃣ <b>Find Seeds</b> – Search titles to blend<br>
-    4️⃣ <b>Adjust Filters</b> – Sort, genre, year, type<br>
-    5️⃣ <b>Explore</b> – Check badges & explanations
+    1️⃣ <b>Pick a mode</b> – Seeds (recommendations) or Browse by Genre<br>
+    2️⃣ <b>Seeds</b> – Choose 1–5 titles (or use the sample buttons)<br>
+    3️⃣ <b>(Optional) Profile</b> – Load/import to exclude watched titles<br>
+    4️⃣ <b>(Optional) Personalize</b> – Requires ratings; adjust strength<br>
+    5️⃣ <b>Refine</b> – Hybrid weights + filters + explanations
     </div>
     """, unsafe_allow_html=True)
 
@@ -1786,17 +1787,17 @@ else:
         st.markdown("""
         <div style='background: linear-gradient(135deg, #E8F4F8 0%, #F0F8FF 100%); border-radius: 12px; padding: 40px; margin: 40px 0; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.08);'>
             <h2 style='color: #2C3E50; margin-bottom: 16px;'>👋 Welcome to Anime Recommender!</h2>
-            <p style='color: #7F8C8D; font-size: 1.1rem; margin-bottom: 32px;'>Get personalized anime recommendations powered by AI</p>
+            <p style='color: #7F8C8D; font-size: 1.1rem; margin-bottom: 32px;'>Get seed-based recommendations, or browse the catalog by genre.</p>
             <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 700px; margin: 0 auto;'>
                 <div style='background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);'>
                     <div style='font-size: 2rem; margin-bottom: 12px;'>🔍</div>
-                    <h4 style='color: #2C3E50; margin-bottom: 8px;'>Browse Titles</h4>
-                    <p style='color: #7F8C8D; font-size: 0.9rem;'>Use the 'Search Title' dropdown in the sidebar to explore 13,000+ anime</p>
+                    <h4 style='color: #2C3E50; margin-bottom: 8px;'>Get Recommendations</h4>
+                    <p style='color: #7F8C8D; font-size: 0.9rem;'>Select 1–5 titles under <b>Search & Seeds</b> to generate recommendations (match score is relative).</p>
                 </div>
                 <div style='background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);'>
                     <div style='font-size: 2rem; margin-bottom: 12px;'>⚡</div>
-                    <h4 style='color: #2C3E50; margin-bottom: 8px;'>Quick Start</h4>
-                    <p style='color: #7F8C8D; font-size: 0.9rem;'>Click one of the popular titles in the sidebar for instant recommendations</p>
+                    <h4 style='color: #2C3E50; margin-bottom: 8px;'>Browse by Genre</h4>
+                    <p style='color: #7F8C8D; font-size: 0.9rem;'>Toggle <b>Browse by Genre</b>, pick at least one genre, and sort by MAL score / year / popularity.</p>
                 </div>
             </div>
         </div>
@@ -1811,4 +1812,4 @@ render_diversity_panel(recs, metadata)
 # Help / FAQ ---------------------------------------------------------------
 render_help_panel()
 
-st.sidebar.caption("Phase 5 prototype – performance instrumentation active.")
+st.sidebar.caption("Prototype – performance instrumentation active.")

@@ -23,11 +23,11 @@ How to use:
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Implemented **Phase 2 / Chunk 4**: diversity metrics are now computed from the correct inputs.
-- Novelty is computed vs **user rating history** when available; otherwise it is shown as **NA** (not personalized).
+- Implemented **Phase 3 / Chunk 1**: onboarding/help/empty-state copy now matches the actual UI (profiles + seeds + browse mode).
+- Removed persona language from onboarding/help (persona selection is not present/functional in the current UI).
 
 **Next action (single sentence):**
-- Phase 3 / Chunk 1: align onboarding copy to the implemented UX and remove persona mismatch.
+- Phase 3 / Chunk 2: add a single “choose your mode” decision (progressive disclosure) without changing scoring.
 
 ---
 
@@ -228,7 +228,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 1 — Align onboarding and remove persona mismatch
 
-- [ ] Align onboarding copy to the implemented UX (profiles + seeds + browse mode); remove persona language unless personas are fully implemented and visible in the UI (High)
+- [x] Align onboarding copy to the implemented UX (profiles + seeds + browse mode); remove persona language unless personas are fully implemented and visible in the UI (High)
 
 **Done when:**
 - On first load, onboarding references only controls that actually exist.
@@ -422,8 +422,24 @@ Record decisions that future sessions must not re-litigate.
 - Validation run (additional):
   - `python -m pytest -q` (52 passed, 3 warnings)
 
+- What I did (additional):
+  - Implemented **Phase 3 / Chunk 1**: aligned onboarding + help + first-load empty-state copy to the implemented UX (Seeds / Browse by Genre / optional Personalization).
+  - Removed persona references from user-facing copy and avoided implying personalization when no rated history exists (novelty remains **NA** without ratings).
+
+- Decisions made (additional):
+  - Personas are treated as **not implemented** for UX copy until a visible, functional persona selector exists in the UI.
+
+- What I changed (additional):
+  - Updated onboarding instructions in [src/app/components/instructions.py](src/app/components/instructions.py)
+  - Updated Help / FAQ wording in [src/app/components/help.py](src/app/components/help.py)
+  - Updated sidebar Quick Guide + first-load empty-state copy in [app/main.py](app/main.py)
+  - Updated this playbook in [docs/IMPLEMENTATION_PLAYBOOK.md](docs/IMPLEMENTATION_PLAYBOOK.md)
+
+- Validation run (additional):
+  - `python -m pytest -q` (52 passed, 3 warnings)
+
 - Next session start here (additional):
-  - Phase 3 / Chunk 1: onboarding/help copy alignment and remove any persona mismatch.
+  - Phase 3 / Chunk 2: choose-a-mode gating (progressive disclosure).
 
 ### Session 2025-12-22
 
