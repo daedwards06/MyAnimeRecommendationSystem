@@ -42,6 +42,7 @@ from src.app.recommender import (
     HybridComponents,
     HybridRecommender,
     choose_weights,
+    compute_component_shares,
     compute_dense_similarity,
 )
 from src.app.search import fuzzy_search, normalize_title
@@ -864,23 +865,17 @@ else:
 # Hybrid recommender initialization (artifact-backed; no placeholders) -----
 recommender: HybridRecommender | None = None
 components: HybridComponents | None = None
-pop_percentiles: np.ndarray | None = None
+pop_percentile_by_anime_id: dict[int, float] | None = None
 
 
 def _pop_pct_for_anime_id(anime_id: int) -> float:
     """Return popularity percentile for display; defaults to neutral when unavailable."""
-    if pop_percentiles is None:
-        return 50.0
+    if not pop_percentile_by_anime_id:
+        return 0.5
     try:
-        idx_list = metadata.index[metadata["anime_id"] == anime_id]
-        if len(idx_list) == 0:
-            return 50.0
-        idx = int(idx_list[0])
-        if idx < 0 or idx >= len(pop_percentiles):
-            return 50.0
-        return float(pop_percentiles[idx])
+        return float(pop_percentile_by_anime_id.get(int(anime_id), 0.5))
     except Exception:
-        return 50.0
+        return 0.5
 
 
 def _is_in_training(anime_id: int) -> bool:
@@ -991,6 +986,42 @@ if not IMPORT_LIGHT:
         pop=None,
         item_ids=item_ids,
     )
+
+    # Wire a popularity prior if an item-kNN artifact is available.
+    # We use its learned per-item popularity vector (normalized 0..1) and align it to MF item_ids.
+    # This enables truthful MF/Pop shares and makes the weight presets visibly affect shares.
+    try:
+        knn_model = bundle.get("models", {}).get("knn")
+        if (
+            knn_model is not None
+            and hasattr(knn_model, "item_pop")
+            and hasattr(knn_model, "item_to_index")
+            and knn_model.item_pop is not None
+            and knn_model.item_to_index is not None
+        ):
+            pop_vec = np.zeros(len(item_ids), dtype=np.float32)
+            it2i = knn_model.item_to_index
+            pop_arr = knn_model.item_pop
+
+            # Percentiles keyed by anime_id for UI badges and browse/sorting (covers cold-start too).
+            try:
+                pop_pct_arr = compute_popularity_percentiles(np.asarray(pop_arr, dtype=np.float32))
+                pop_percentile_by_anime_id = {
+                    int(aid): float(pop_pct_arr[int(idx)])
+                    for aid, idx in it2i.items()
+                    if idx is not None and 0 <= int(idx) < len(pop_pct_arr)
+                }
+            except Exception:
+                pop_percentile_by_anime_id = None
+
+            for j, aid in enumerate(item_ids):
+                idx = it2i.get(int(aid))
+                if idx is not None and int(idx) >= 0 and int(idx) < len(pop_arr):
+                    pop_vec[j] = float(pop_arr[int(idx)])
+            components.pop = pop_vec
+    except Exception:
+        # Popularity prior is optional; do not block app startup.
+        pass
     recommender = HybridRecommender(components)
 
 
@@ -1067,7 +1098,7 @@ if browse_mode:
                             "explanation": None,  # No explanation in browse mode
                             "_mal_score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
                             "_year": 0,
-                            "_popularity": float(pop_percentiles[idx]) if (pop_percentiles is not None and idx < len(pop_percentiles)) else 50.0
+                            "_popularity": _pop_pct_for_anime_id(anime_id)
                         })
                         # Extract year for sorting
                         aired_from = row.get("aired_from")
@@ -1196,17 +1227,16 @@ else:
                         }
                         num_seeds_matched = sum(1 for count in overlap_per_seed.values() if count > 0)
                         
+                        # Popularity boost is independent of MF index membership (cold-start items still have popularity).
+                        pop_pct = _pop_pct_for_anime_id(aid)
+                        # pop_pct is 0..1 where 0 is most popular. Boost favors popular titles.
+                        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)  # scale 0..1
+
+                        # Hybrid signal requires the item to be present in the MF-aligned component index.
                         if blended_scores is not None and aid in id_to_index:
                             hybrid_val = float(blended_scores[id_to_index[aid]])
-                            # Popularity percentile (invert so lower percentile => higher boost)
-                            if pop_percentiles is not None and id_to_index[aid] < len(pop_percentiles):
-                                pop_pct = float(pop_percentiles[id_to_index[aid]])
-                                popularity_boost = max(0.0, (50.0 - pop_pct) / 50.0)  # scale 0..1
-                            else:
-                                popularity_boost = 0.0
                         else:
                             hybrid_val = 0.0
-                            popularity_boost = 0.0
                         
                         # Weighted average scoring: emphasize matches across multiple seeds
                         # (matches/num_seeds) gives proportion of seeds matched
@@ -1218,6 +1248,32 @@ else:
                         if score <= 0:
                             continue
                         
+                        # Track per-item raw contributions for truthful shares.
+                        # We map seed overlap/coverage into the kNN/content bucket.
+                        raw_mf = 0.0
+                        raw_knn = (0.5 * weighted_overlap) + (0.2 * seed_coverage)
+                        raw_pop = (0.05 * popularity_boost)
+                        used_components: list[str] = ["knn", "pop"]
+                        if aid in id_to_index:
+                            idx = id_to_index[aid]
+                            # Pull the underlying hybrid raw components and scale by the 0.25 hybrid coefficient.
+                            try:
+                                raw_hybrid = recommender.raw_components_for_item(user_index, idx, weights)
+                            except Exception:
+                                raw_hybrid = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
+                            raw_mf += 0.25 * float(raw_hybrid.get("mf", 0.0))
+                            raw_knn += 0.25 * float(raw_hybrid.get("knn", 0.0))
+                            raw_pop += 0.25 * float(raw_hybrid.get("pop", 0.0))
+
+                            # Determine which components were actually used.
+                            used_components = sorted(
+                                set(used_components) | set(recommender.used_components_for_weights(weights)),
+                                key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
+                            )
+
+                        raw_components = {"mf": raw_mf, "knn": raw_knn, "pop": raw_pop}
+                        shares = compute_component_shares(raw_components, used_components=used_components)
+
                         explanation = {
                             "seed_titles": selected_seed_titles,
                             "overlap_per_seed": overlap_per_seed,
@@ -1226,14 +1282,19 @@ else:
                             "seed_coverage": seed_coverage,
                             "common_genres": list(all_seed_genres & item_genres),
                         }
-                        # Append hybrid contribution shares if available
-                        if aid in id_to_index:
-                            explanation.update(recommender.explain_item(user_index, id_to_index[aid], weights))
+                        # Append truthful per-item shares.
+                        explanation.update(shares)
                         
                         scored.append({
                             "anime_id": aid,
                             "score": score,
                             "explanation": explanation,
+                            "_raw_components": raw_components,
+                            "_used_components": used_components,
+                            "_explanation_meta": {
+                                "seed_titles": selected_seed_titles,
+                                "seeds_matched": num_seeds_matched,
+                            },
                         })
                     
                     scored.sort(key=lambda x: x["score"], reverse=True)
@@ -1319,6 +1380,20 @@ else:
                         personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
                         seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
 
+                        # Keep raw components so we can compute truthful shares after blending.
+                        personalized_raw = {
+                            rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                            for rec in personalized_recs
+                        }
+                        seed_raw = {
+                            rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                            for rec in recs
+                        }
+                        personalized_used = {
+                            rec["anime_id"]: rec.get("_used_components", []) for rec in personalized_recs
+                        }
+                        seed_used = {rec["anime_id"]: rec.get("_used_components", []) for rec in recs}
+
                         # Collect all unique anime IDs
                         all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
 
@@ -1331,9 +1406,26 @@ else:
                             # Weighted blend based on personalization strength
                             final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
 
+                            pr = personalized_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                            sr = seed_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                            raw_components = {
+                                "mf": (personalization_strength * float(pr.get("mf", 0.0)))
+                                + ((1 - personalization_strength) * float(sr.get("mf", 0.0))),
+                                "knn": (personalization_strength * float(pr.get("knn", 0.0)))
+                                + ((1 - personalization_strength) * float(sr.get("knn", 0.0))),
+                                "pop": (personalization_strength * float(pr.get("pop", 0.0)))
+                                + ((1 - personalization_strength) * float(sr.get("pop", 0.0))),
+                            }
+                            used_components = sorted(
+                                set(personalized_used.get(aid, [])) | set(seed_used.get(aid, [])),
+                                key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
+                            )
+
                             blended.append({
                                 "anime_id": aid,
                                 "score": final_score,
+                                "_raw_components": raw_components,
+                                "_used_components": used_components,
                             })
 
                         # Sort and take top N
@@ -1349,6 +1441,27 @@ else:
                 user_profile=st.session_state["active_profile"],
                 metadata_df=metadata
             )
+
+        # Ensure all cards show truthful MF/kNN/Pop shares (and hide components not used).
+        # This runs *after* optional personalized explanation text generation so we can append shares.
+        for rec in recs:
+            raw = rec.get("_raw_components")
+            used = rec.get("_used_components")
+            if not isinstance(raw, dict) or not isinstance(used, list) or not used:
+                continue
+            shares = compute_component_shares(raw, used_components=used)
+
+            contributions = {"mf": shares.get("mf", 0.0), "knn": shares.get("knn", 0.0), "pop": shares.get("pop", 0.0), "_used": shares.get("_used", used)}
+            meta = rec.get("_explanation_meta")
+            if isinstance(meta, dict):
+                contributions.update(meta)
+            share_text = format_explanation(contributions)
+
+            existing = rec.get("explanation")
+            if isinstance(existing, str) and existing.strip():
+                rec["explanation"] = f"{existing} • {share_text}"
+            else:
+                rec["explanation"] = share_text
         
         # Apply user filters and sorting
         if recs:

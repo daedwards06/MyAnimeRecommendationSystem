@@ -17,7 +17,7 @@ How to use:
 
 **Current phase:** Phase 2
 
-**Last updated:** 2025-12-24
+**Last updated:** 2025-12-26
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
@@ -188,7 +188,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 2 — Fix personalization score bounds
 
-- [ ] Calibrate or reframe personalized scores so the explanation cannot exceed valid bounds (e.g., if showing “/10”, enforce 0–10); verify with unit tests and a manual profile run (High)
+- [~] Calibrate or reframe personalized scores so the explanation cannot exceed valid bounds (e.g., if showing “/10”, enforce 0–10); verify with unit tests and a manual profile run (High)
   - **Note (2025-12-24):** Not applicable while we display **Match score (relative)** (unitless/uncalibrated). Only needed if we switch back to a bounded rating display (e.g., “Predicted rating /10”).
 
 **Done when:**
@@ -197,11 +197,13 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 3 — Truthful hybrid explanation shares
 
-- [ ] Make hybrid explanations truthful by showing per-item source contributions computed from the actual score components used for that item; verify contributions sum to ~100% and reflect the active model path (High)
+- [x] Make hybrid explanations truthful by showing per-item source contributions computed from the actual score components used for that item; verify contributions sum to ~100% and reflect the active model path (High)
 
 **Done when:**
 - For at least 5 items, the displayed MF/kNN/Pop shares sum to ~100%.
 - Switching weight preset changes at least one item’s shares in a visible way.
+
+**Notes (UI):** In Seed-based mode, the popularity share is often present but tiny (e.g., ~0.02%–0.05%) and can round to `0.0%` because the UI formats shares to 1 decimal percent.
 
 #### Chunk 4 — Diversity metrics computed from correct inputs
 
@@ -388,13 +390,19 @@ Record decisions that future sessions must not re-litigate.
 
 - **2025-12-20:** Created this playbook to persist Phase 1 assumptions + contracts.
 - **2025-12-22:** Enforced MF artifact contract (must have `Q`, `item_to_index`, `index_to_item`) and removed all placeholder scoring. Default MF selection is `mf_sgd_v2025.11.21_202756` unless overridden by `APP_MF_MODEL_STEM`.
-- **2025-12-22:** Popularity percentiles are treated as neutral (50.0) unless a real popularity signal is loaded (Phase 1 / Chunk 2).
+- **2025-12-22:** Popularity percentiles are treated as neutral (0.5) unless a real popularity signal is loaded (Phase 1 / Chunk 2). Percentiles are on a 0..1 scale where lower means more popular.
 - **2025-12-23:** Pytest collection is restricted to `tests/` via `pytest.ini` to avoid collecting runnable scripts under `scripts/test_*.py`.
 - **2025-12-24:** Standardized recommendation score display to **Match score (relative)** (unitless/uncalibrated). As a result, Phase 2 / Chunk 2 (bounded score enforcement) is only applicable if we later switch to a bounded “/10” semantics.
 
 ---
 
 ## 7) Session Log (Tiny, but consistent)
+
+### Session 2025-12-26
+
+- What I validated:
+  - Confirmed Seed-based (Active Profile = none) top-30 can legitimately show only ~2/30 items with `pop > 0.0%` due to 1-decimal rounding (most pop shares are non-zero but < 0.05%).
+  - Confirmed earlier ranking mismatch was caused by using the wrong title column in an ad-hoc reproduction (`title` vs `title_display`). The UI seed “Steins;Gate” resolves via `title_display`.
 
 ### Session 2025-12-22
 
@@ -475,6 +483,22 @@ Record decisions that future sessions must not re-litigate.
   - `python -m pytest -q` (47 passed)
 - Next session start here (additional):
   - Phase 2 / Chunk 3: compute and display truthful per-item MF/kNN/Pop contribution shares (sum to ~100%).
+
+- What I did (additional):
+  - Implemented Phase 2 / Chunk 3: **truthful hybrid explanation shares** computed from actual per-item weighted contributions (not the global weight knobs).
+  - Ensured unused components are hidden based on the executed scoring path.
+  - Wired a real popularity prior (from the optional kNN artifact’s `item_pop`) into hybrid scoring so MF/Pop shares are meaningful in the UI.
+- What I changed (additional):
+  - Updated hybrid per-item share computation in [src/app/recommender.py](src/app/recommender.py)
+  - Updated formatting to respect `_used` components in [src/app/explanations.py](src/app/explanations.py)
+  - Updated multi-seed and blended personalization explanation plumbing in [app/main.py](app/main.py)
+  - Added regression tests in [tests/test_truthful_shares.py](tests/test_truthful_shares.py)
+- Validation run (additional):
+  - `python -m pytest -q` (51 passed)
+  - Artifact-backed sanity check: shares sum to 1.0 per item; switching presets changes at least one item’s MF/Pop shares.
+  - Manual UI: started Streamlit via `python -m streamlit run app/main.py` and spot-checked that explanations render MF/Pop shares.
+- Next session start here (additional):
+  - UI spot-check: Multi-seed path should show kNN/content + Pop shares (and sums) for at least 5 items; confirm the displayed shares visibly change when switching weight presets.
 
 ---
 
