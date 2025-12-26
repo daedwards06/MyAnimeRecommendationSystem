@@ -76,21 +76,39 @@ class HybridRecommender:
             pop_part = weights.get("pop", 0.0) * self.c.pop
         return mf_part + knn_part + pop_part
 
-    def explain_item(self, user_index: int, item_index: int, weights: Dict[str, float]) -> Dict[str, float]:
-        """Return normalized source contribution shares for a specific user-item."""
+    def used_components_for_weights(self, weights: Dict[str, float]) -> list[str]:
+        """Which components are actually active for this run (artifact present and weight != 0)."""
+        used: list[str] = []
+        if self.c.mf is not None and float(weights.get("mf", 0.0)) != 0.0:
+            used.append("mf")
+        if self.c.knn is not None and float(weights.get("knn", 0.0)) != 0.0:
+            used.append("knn")
+        if self.c.pop is not None and float(weights.get("pop", 0.0)) != 0.0:
+            used.append("pop")
+        return used
+
+    def raw_components_for_item(self, user_index: int, item_index: int, weights: Dict[str, float]) -> Dict[str, float]:
+        """Return the raw weighted component contributions for a single item."""
         mf_val = 0.0
         knn_val = 0.0
         pop_val = 0.0
         if self.c.mf is not None:
-            mf_val = weights.get("mf", 0.0) * float(self.c.mf[user_index, item_index])
+            mf_val = float(weights.get("mf", 0.0)) * float(self.c.mf[user_index, item_index])
         if self.c.knn is not None:
-            knn_val = weights.get("knn", 0.0) * float(self.c.knn[user_index, item_index])
+            knn_val = float(weights.get("knn", 0.0)) * float(self.c.knn[user_index, item_index])
         if self.c.pop is not None:
-            pop_val = weights.get("pop", 0.0) * float(self.c.pop[item_index])
-        total = mf_val + knn_val + pop_val
-        if total <= 0:
-            return {"mf": 0.0, "knn": 0.0, "pop": 0.0}
-        return {"mf": mf_val / total, "knn": knn_val / total, "pop": pop_val / total}
+            pop_val = float(weights.get("pop", 0.0)) * float(self.c.pop[item_index])
+        return {"mf": mf_val, "knn": knn_val, "pop": pop_val}
+
+    def explain_item(self, user_index: int, item_index: int, weights: Dict[str, float]) -> Dict[str, float]:
+        """Return normalized source contribution shares for a specific user-item.
+
+        Shares are computed from the *actual weighted raw contributions* used for that item.
+        Negative contributions are clamped to 0 for share display.
+        """
+        raw = self.raw_components_for_item(user_index, item_index, weights)
+        used = self.used_components_for_weights(weights)
+        return compute_component_shares(raw, used_components=used)
 
     def get_top_n_for_user(
         self,
@@ -99,19 +117,7 @@ class HybridRecommender:
         weights: Optional[Dict[str, float]] = None,
         exclude_item_ids: Optional[Sequence[int]] = None,
     ) -> List[Dict[str, float]]:
-        """Compute top-N recommendations for a user index.
-
-        Parameters
-        ----------
-        user_index : int
-            Internal user index (aligned with score matrices).
-        n : int
-            Number of items to return.
-        weights : Optional[Dict[str, float]]
-            Blending weights; defaults to BALANCED_WEIGHTS.
-        exclude_item_ids : Optional[Sequence[int]]
-            External item IDs to force out of ranking (e.g., already liked).
-        """
+        """Compute top-N recommendations for a user index."""
         w = weights or BALANCED_WEIGHTS
         scores = self._blend(user_index, w)
         if exclude_item_ids:
@@ -122,12 +128,16 @@ class HybridRecommender:
         top_idx = np.argpartition(scores, -n)[-n:]
         ordered = top_idx[np.argsort(scores[top_idx])[::-1]]
         result: List[Dict[str, float]] = []
+        used = self.used_components_for_weights(w)
         for i in ordered:
+            raw = self.raw_components_for_item(user_index, int(i), w)
             result.append(
                 {
                     "anime_id": int(self.c.item_ids[i]),
                     "score": float(scores[i]),
-                    "explanation": self.explain_item(user_index, i, w),
+                    "explanation": compute_component_shares(raw, used_components=used),
+                    "_raw_components": raw,
+                    "_used_components": used,
                 }
             )
         return result
@@ -140,26 +150,7 @@ class HybridRecommender:
         weights: Optional[Dict[str, float]] = None,
         exclude_item_ids: Optional[Sequence[int]] = None,
     ) -> List[Dict[str, float]]:
-        """Compute top-N personalized recommendations using user embedding.
-
-        Parameters
-        ----------
-        user_embedding : np.ndarray
-            User embedding vector (shape: [n_factors]) generated from ratings.
-        mf_model
-            Matrix factorization model with Q (item factors) and item_to_index mapping.
-        n : int
-            Number of items to return.
-        weights : Optional[Dict[str, float]]
-            Blending weights; defaults to BALANCED_WEIGHTS.
-        exclude_item_ids : Optional[Sequence[int]]
-            External item IDs to exclude from ranking.
-        
-        Returns
-        -------
-        List[Dict[str, float]]
-            Top-N recommendations with anime_id, score, and explanation.
-        """
+        """Compute top-N personalized recommendations using user embedding."""
         w = weights or BALANCED_WEIGHTS
 
         # Enforce MF artifact contract for personalization.
@@ -176,57 +167,90 @@ class HybridRecommender:
                 + ", ".join(missing)
                 + ". Required: Q, item_to_index, index_to_item."
             )
-        
-        # Compute personalized MF scores using user embedding
-        personalized_mf_scores = compute_personalized_scores(
-            user_embedding, mf_model, exclude_anime_ids=None
-        )
 
-        # If we cannot score anything (e.g., no overlap with training items),
-        # return no results rather than ranking arbitrary items.
+        personalized_mf_scores = compute_personalized_scores(user_embedding, mf_model, exclude_anime_ids=None)
         if not personalized_mf_scores:
             return []
-        
-        # Build personalized MF score array aligned with item_ids
-        # Initialize with zeros
+
         mf_scores_array = np.zeros(len(self.c.item_ids), dtype=np.float32)
         for idx, item_id in enumerate(self.c.item_ids):
             if item_id in personalized_mf_scores:
                 mf_scores_array[idx] = personalized_mf_scores[item_id]
-        
-        # Blend personalized MF with kNN and popularity
-        scores = w.get("mf", 0.0) * mf_scores_array
-        if self.c.knn is not None and "knn" in w:
-            # For kNN, use seed-based scoring (no user-specific kNN yet)
-            # Could be extended later with seed blending
-            pass
+
+        # Blend personalized MF with popularity (kNN is not used in this path today)
+        scores = float(w.get("mf", 0.0)) * mf_scores_array
         if self.c.pop is not None:
-            scores += w.get("pop", 0.0) * self.c.pop
-        
-        # Apply exclusion filter
+            scores += float(w.get("pop", 0.0)) * self.c.pop
+
         if exclude_item_ids:
             mask = np.isin(self.c.item_ids, np.asarray(exclude_item_ids))
             scores = scores.copy()
             scores[mask] = -np.inf
-        
-        # Efficient partial selection
+
         top_idx = np.argpartition(scores, -n)[-n:]
         ordered = top_idx[np.argsort(scores[top_idx])[::-1]]
-        
+
         result: List[Dict[str, float]] = []
+        used: list[str] = []
+        if float(w.get("mf", 0.0)) != 0.0:
+            used.append("mf")
+        if self.c.pop is not None and float(w.get("pop", 0.0)) != 0.0:
+            used.append("pop")
+
         for i in ordered:
+            raw_mf = float(w.get("mf", 0.0)) * float(mf_scores_array[int(i)])
+            raw_pop = 0.0
+            if self.c.pop is not None:
+                raw_pop = float(w.get("pop", 0.0)) * float(self.c.pop[int(i)])
+            raw = {"mf": raw_mf, "knn": 0.0, "pop": raw_pop}
             result.append(
                 {
                     "anime_id": int(self.c.item_ids[i]),
                     "score": float(scores[i]),
-                    "explanation": {
-                        "mf": w.get("mf", 0.0),
-                        "knn": 0.0,
-                        "pop": w.get("pop", 0.0),
-                    },
+                    "explanation": compute_component_shares(raw, used_components=used),
+                    "_raw_components": raw,
+                    "_used_components": used,
                 }
             )
         return result
+
+
+COMPONENT_ORDER: tuple[str, ...] = ("mf", "knn", "pop")
+
+
+def compute_component_shares(
+    raw_components: Dict[str, float],
+    *,
+    used_components: Optional[Sequence[str]] = None,
+    clamp_negative_to_zero: bool = True,
+) -> Dict[str, float]:
+    """Convert raw component contributions into normalized shares.
+
+    Rules:
+      - Only components listed in used_components participate in the normalization.
+      - If clamp_negative_to_zero=True, negative raw contributions are treated as 0 for sharing.
+      - If the (clamped) total is <= 0, all shares are 0.
+
+    Returns a dict with keys mf/knn/pop always present plus:
+      - _used: ordered list of the components considered
+    """
+    used_set = set(used_components) if used_components is not None else set(COMPONENT_ORDER)
+    used_ordered = [k for k in COMPONENT_ORDER if k in used_set]
+
+    contrib: dict[str, float] = {}
+    for k in used_ordered:
+        v = float(raw_components.get(k, 0.0) or 0.0)
+        if clamp_negative_to_zero:
+            v = max(0.0, v)
+        contrib[k] = v
+    total = float(sum(contrib.values()))
+
+    out: Dict[str, float] = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
+    if total > 0.0:
+        for k in used_ordered:
+            out[k] = contrib[k] / total
+    out["_used"] = used_ordered
+    return out
 
 
 # --- Similarity Utilities -------------------------------------------------
@@ -275,6 +299,7 @@ def choose_weights(mode: str) -> Dict[str, float]:
 __all__ = [
     "HybridComponents",
     "HybridRecommender",
+    "compute_component_shares",
     "compute_dense_similarity",
     "get_content_only_recs_for_new_item",
     "choose_weights",

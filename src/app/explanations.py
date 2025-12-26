@@ -13,7 +13,13 @@ def format_explanation(contributions: Dict[str, Any]) -> str:
     parts = []
     
     # Hybrid model contributions (MF, kNN, Popularity)
-    for key in ("mf", "knn", "pop"):
+    used = contributions.get("_used")
+    if isinstance(used, (list, tuple)) and used:
+        keys = [k for k in ("mf", "knn", "pop") if k in set(used)]
+    else:
+        keys = ["mf", "knn", "pop"]
+
+    for key in keys:
         val = contributions.get(key, 0.0) * 100.0
         parts.append(f"{key} {val:.1f}%")
     
