@@ -10,7 +10,7 @@ metadata to produce summary indicators:
 
 from __future__ import annotations
 
-from typing import Iterable, List, Dict, Any
+from typing import Iterable, List, Dict, Any, Optional, Mapping
 import numpy as np
 import pandas as pd
 
@@ -121,16 +121,62 @@ def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> 
     return len(rec_genres) / len(all_catalog_genres)
 
 
-def average_novelty(recs: List[Dict[str, Any]]) -> float:
+def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) -> Dict[str, int]:
+    """Build a simple user genre history histogram from profile ratings.
+
+    The result is used for novelty calculations. If the user has no ratings
+    (or none can be resolved into metadata), this returns an empty dict.
+    """
+    if not ratings or metadata.empty or "anime_id" not in metadata.columns:
+        return {}
+
+    try:
+        meta_idx = metadata.set_index("anime_id", drop=False)
+    except Exception:
+        meta_idx = metadata
+
+    hist: Dict[str, int] = {}
+    for raw_anime_id in ratings.keys():
+        try:
+            anime_id = int(raw_anime_id)
+        except Exception:
+            continue
+
+        try:
+            row = meta_idx.loc[anime_id]
+        except Exception:
+            # Fall back to slower lookup when index isn't available.
+            row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
+            if row_df.empty:
+                continue
+            row = row_df.iloc[0]
+
+        gstr = _coerce_genres(getattr(row, "get", lambda k, d=None: d)("genres"))
+        for g in gstr.split("|"):
+            gg = g.strip().lower()
+            if not gg:
+                continue
+            hist[gg] = hist.get(gg, 0) + 1
+    return hist
+
+
+def average_novelty(recs: List[Dict[str, Any]]) -> Optional[float]:
+    """Return average novelty ratio across recs, or None when unavailable."""
     if not recs:
-        return 0.0
-    vals = []
+        return None
+    vals: List[float] = []
     for r in recs:
         badge = r.get("badges")
-        if badge and "novelty_ratio" in badge:
-            vals.append(float(badge["novelty_ratio"]))
+        if not badge:
+            continue
+        if "novelty_ratio" not in badge:
+            continue
+        v = badge.get("novelty_ratio")
+        if v is None:
+            continue
+        vals.append(float(v))
     if not vals:
-        return 0.0
+        return None
     return float(np.mean(vals))
 
 
@@ -138,5 +184,6 @@ __all__ = [
     "compute_popularity_percentiles",
     "coverage",
     "genre_exposure_ratio",
+    "build_user_genre_hist",
     "average_novelty",
 ]

@@ -112,6 +112,11 @@ def format_badge_tooltip(badge_key: str, badge_value) -> str:
     elif badge_key == "popularity_band":
         return explain_popularity_band(str(badge_value))
     elif badge_key == "novelty_ratio":
+        if badge_value is None:
+            return (
+                "**Genre Novelty: NA**: Novelty is only computed when a rated profile is active. "
+                "Load a profile and rate a few anime to enable novelty vs your history."
+            )
         return explain_novelty_ratio(float(badge_value))
     return f"Badge: {badge_key} = {badge_value}"
 

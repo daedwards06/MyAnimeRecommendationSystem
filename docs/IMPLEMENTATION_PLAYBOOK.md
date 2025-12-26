@@ -13,9 +13,9 @@ How to use:
 
 **Project:** Anime Recommendation System (Streamlit portfolio app)
 
-**Primary goal right now:** Phase 2
+**Primary goal right now:** Phase 3
 
-**Current phase:** Phase 2
+**Current phase:** Phase 3
 
 **Last updated:** 2025-12-26
 
@@ -23,11 +23,11 @@ How to use:
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Standardized all recommendation score display semantics to a single, defensible meaning: **Match score (relative)** (unitless, uncalibrated).
-- Removed mixed “Confidence/% Match” and “/10” recommendation score presentation from cards + personalized explanations.
+- Implemented **Phase 2 / Chunk 4**: diversity metrics are now computed from the correct inputs.
+- Novelty is computed vs **user rating history** when available; otherwise it is shown as **NA** (not personalized).
 
 **Next action (single sentence):**
-- Phase 2 / Chunk 3: make hybrid explanation shares truthful per-item and sum to ~100%.
+- Phase 3 / Chunk 1: align onboarding copy to the implemented UX and remove persona mismatch.
 
 ---
 
@@ -36,8 +36,8 @@ How to use:
 Set one phase to **IN PROGRESS**. Keep the rest **NOT STARTED** or **DONE**.
 
 - Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): DONE
-- Phase 2 — Score Semantics + Explanations (Credibility): IN PROGRESS
-- Phase 3 — UX Flow + Progressive Disclosure (Clarity): NOT STARTED
+- Phase 2 — Score Semantics + Explanations (Credibility): DONE
+- Phase 3 — UX Flow + Progressive Disclosure (Clarity): IN PROGRESS
 - Phase 4 — Refactor + Tests + Performance (Maintainability): NOT STARTED 
 - Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal): NOT STARTED 
 
@@ -207,7 +207,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 4 — Diversity metrics computed from correct inputs
 
-- [ ] Validate that diversity metrics shown in-app (coverage, genre exposure ratio, novelty) are computed from correct inputs (user history + catalog genres); verify with a controlled test set and sanity checks (Medium)
+- [x] Validate that diversity metrics shown in-app (coverage, genre exposure ratio, novelty) are computed from correct inputs (user history + catalog genres); verify with a controlled test set and sanity checks (Medium)
 
 **Done when:**
 - With a rated profile, novelty uses the user’s genre history (not item genres as a proxy).
@@ -403,6 +403,27 @@ Record decisions that future sessions must not re-litigate.
 - What I validated:
   - Confirmed Seed-based (Active Profile = none) top-30 can legitimately show only ~2/30 items with `pop > 0.0%` due to 1-decimal rounding (most pop shares are non-zero but < 0.05%).
   - Confirmed earlier ranking mismatch was caused by using the wrong title column in an ad-hoc reproduction (`title` vs `title_display`). The UI seed “Steins;Gate” resolves via `title_display`.
+
+- What I did (additional):
+  - Implemented Phase 2 / Chunk 4: diversity metrics computed from correct inputs (coverage/genre exposure from displayed list; novelty from user history when available).
+  - Ensured novelty never displays a misleading numeric value when no rated profile history exists (shows **NA**).
+
+- Decisions made (additional):
+  - Treat novelty as **not available** without rated user history; do not compute novelty from item genres or catalog proxies.
+
+- What I changed (additional):
+  - Updated novelty + diversity helpers in [src/app/diversity.py](src/app/diversity.py)
+  - Updated novelty badge semantics in [src/app/badges.py](src/app/badges.py)
+  - Wired profile genre history into UI badges in [src/app/components/cards.py](src/app/components/cards.py)
+  - Made diversity panel show novelty as NA when not personalized in [src/app/components/diversity.py](src/app/components/diversity.py)
+  - Stored computed user genre history in session state in [app/main.py](app/main.py)
+  - Added deterministic wiring test in [tests/test_diversity.py](tests/test_diversity.py)
+
+- Validation run (additional):
+  - `python -m pytest -q` (52 passed, 3 warnings)
+
+- Next session start here (additional):
+  - Phase 3 / Chunk 1: onboarding/help copy alignment and remove any persona mismatch.
 
 ### Session 2025-12-22
 
