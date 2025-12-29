@@ -6,10 +6,10 @@ from src.app.diversity import coverage, genre_exposure_ratio, average_novelty
 from .cards import coerce_genres
 
 
-def render_diversity_panel(recs: list[dict], metadata: pd.DataFrame) -> None:
+def render_diversity_panel(recs: list[dict], metadata: pd.DataFrame, *, is_browse: bool = False) -> None:
     st.subheader("Diversity & Novelty Summary")
     if not recs:
-        st.info("No recommendations to summarize yet.")
+        st.info("No titles to summarize yet." if is_browse else "No recommendations to summarize yet.")
         return
     cov = coverage(recs)
     safe_metadata = metadata

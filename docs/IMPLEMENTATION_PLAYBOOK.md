@@ -17,17 +17,17 @@ How to use:
 
 **Current phase:** Phase 3
 
-**Last updated:** 2025-12-26
+**Last updated:** 2025-12-29
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Implemented **Phase 3 / Chunk 1**: onboarding/help/empty-state copy now matches the actual UI (profiles + seeds + browse mode).
-- Removed persona language from onboarding/help (persona selection is not present/functional in the current UI).
+- Implemented **Phase 3 / Chunk 2**: single top-level mode selector (Personalized / Seed-based / Browse) and progressive disclosure.
+- Manual QA pass completed for Chunk 2 across all three modes.
 
 **Next action (single sentence):**
-- Phase 3 / Chunk 2: add a single “choose your mode” decision (progressive disclosure) without changing scoring.
+- Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
 
 ---
 
@@ -398,6 +398,20 @@ Record decisions that future sessions must not re-litigate.
 
 ## 7) Session Log (Tiny, but consistent)
 
+### Session 2025-12-29
+
+- What I did:
+  - Completed manual QA checks for Phase 3 / Chunk 2 (mode selector + progressive disclosure) across Browse / Seed-based / Personalized.
+
+- What I changed:
+  - No code changes in this session.
+
+- Validation run:
+  - Manual-only (Streamlit UI).
+
+- Next session start here:
+  - Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
+
 ### Session 2025-12-26
 
 - What I validated:
@@ -440,6 +454,30 @@ Record decisions that future sessions must not re-litigate.
 
 - Next session start here (additional):
   - Phase 3 / Chunk 2: choose-a-mode gating (progressive disclosure).
+
+- What I did (Phase 3 / Chunk 2):
+  - Added a single top-level **Choose your mode** control: **Personalized / Seed-based / Browse**.
+  - Implemented progressive disclosure so only mode-relevant controls and copy are shown.
+  - Ensured Personalized mode does **not** silently fall back: when unavailable, the UI states why and how to fix it.
+  - Kept score semantics unchanged (**Match score (relative)**) and preserved novelty behavior (novelty stays **NA** without rated history).
+
+- Decisions made (Phase 3 / Chunk 2):
+  - The mode selector is the single source of truth for `browse_mode` (legacy flag remains for compatibility).
+  - Personalized mode is **gated**: if rated history / embedding is unavailable (or personalization disabled), the app shows an explicit reason instead of showing non-personalized results.
+  - To meet the ≤2-action requirement, personalization auto-enables once when entering Personalized mode with a rated profile (user can still disable it).
+
+- What I changed (Phase 3 / Chunk 2):
+  - Mode selector + progressive disclosure + personalized gating in [app/main.py](app/main.py)
+  - Mode-aware onboarding steps in [src/app/components/instructions.py](src/app/components/instructions.py)
+  - Updated Help/FAQ mode definitions in [src/app/components/help.py](src/app/components/help.py)
+  - Genre badge clicks now switch the top-level mode to Browse in [src/app/components/cards.py](src/app/components/cards.py)
+  - Diversity panel copy is Browse-safe (no “recommendations” wording) in [src/app/components/diversity.py](src/app/components/diversity.py)
+
+- Validation run (Phase 3 / Chunk 2):
+  - `python -m pytest -q` (52 passed, 3 warnings)
+
+- Next session start here:
+  - Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
 
 ### Session 2025-12-22
 

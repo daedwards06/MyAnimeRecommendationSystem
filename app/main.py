@@ -128,6 +128,22 @@ personas = load_personas(PERSONAS_JSON)
 st.set_page_config(page_title="Anime Recommender", layout="wide", page_icon="🎬")
 theme = get_theme()
 
+# ---------------------------------------------------------------------------
+# Phase 3 / Chunk 2: Choose-a-mode gating (progressive disclosure)
+# Single top-level mode: Personalized / Seed-based / Browse.
+# This is UI-only routing; scoring behavior and score semantics remain unchanged.
+# ---------------------------------------------------------------------------
+if "ui_mode" not in st.session_state:
+    # Respect existing browse_mode if present (e.g., set by card genre clicks).
+    if bool(st.session_state.get("browse_mode", False)):
+        st.session_state["ui_mode"] = "Browse"
+    else:
+        st.session_state["ui_mode"] = "Seed-based"
+if "_ui_mode_prev" not in st.session_state:
+    st.session_state["_ui_mode_prev"] = st.session_state.get("ui_mode")
+if "_personalization_autoset" not in st.session_state:
+    st.session_state["_personalization_autoset"] = False
+
 # Custom CSS for modern, polished aesthetic
 st.markdown("""
 <style>
@@ -211,15 +227,61 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎬 Anime Recommendation System")
-st.markdown("<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Discover your next favorite anime with AI-powered recommendations</p>", unsafe_allow_html=True)
+_ui_mode_for_header = str(st.session_state.get("ui_mode", "Seed-based"))
+if _ui_mode_for_header == "Browse":
+    st.title("🎬 Anime Explorer")
+    st.markdown(
+        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Explore the catalog by genre, type, and year (metadata-only)</p>",
+        unsafe_allow_html=True,
+    )
+elif _ui_mode_for_header == "Personalized":
+    st.title("🎬 Personalized Anime Recommendations")
+    st.markdown(
+        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Ranked using your rated history (when available)</p>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.title("🎬 Anime Recommendation System")
+    st.markdown(
+        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Discover your next favorite anime with AI-powered recommendations</p>",
+        unsafe_allow_html=True,
+    )
 
 if os.environ.get("APP_IMPORT_LIGHT"):
     st.warning("Lightweight import mode is active (APP_IMPORT_LIGHT=1). Images and full metadata may be unavailable. Restart without this flag to see thumbnails.")
-render_onboarding()
+render_onboarding(ui_mode=_ui_mode_for_header)
 
 # Sidebar Controls ---------------------------------------------------------
 st.sidebar.header("Controls")
+
+# Top-level mode selector (single control)
+ui_mode = st.sidebar.radio(
+    "Choose your mode",
+    ["Personalized", "Seed-based", "Browse"],
+    index={"Personalized": 0, "Seed-based": 1, "Browse": 2}.get(str(st.session_state.get("ui_mode")), 1),
+    help=(
+        "Personalized: ranked results using your rated profile history. "
+        "Seed-based: ranked results anchored to 1–5 seed titles. "
+        "Browse: filters/sorts metadata only (no match score)."
+    ),
+)
+
+prev_mode = st.session_state.get("_ui_mode_prev")
+st.session_state["ui_mode"] = ui_mode
+st.session_state["_ui_mode_prev"] = ui_mode
+
+# Derive legacy flags used throughout the app.
+browse_mode = ui_mode == "Browse"
+st.session_state["browse_mode"] = browse_mode
+
+# Prevent misleading personalization in non-personalized modes.
+if ui_mode != "Personalized":
+    st.session_state["personalization_enabled"] = False
+    st.session_state["_personalization_autoset"] = False
+elif prev_mode != "Personalized":
+    # Allow auto-enable when entering Personalized mode.
+    st.session_state["_personalization_autoset"] = False
+
 if st.sidebar.button("Reload artifacts"):
     try:
         init_bundle.clear()  # type: ignore[attr-defined]
@@ -242,7 +304,9 @@ for key, default in {
     "weight_mode": _qp_get("wm", "Balanced"),
     "top_n": int(_qp_get("n", DEFAULT_TOP_N)),
     "sort_by": _qp_get("sort", "Match score"),
+    "browse_mode": bool(st.session_state.get("browse_mode", False)),
     "genre_filter": [],
+    "type_filter": [],
     "year_min": 1960,
     "year_max": 2025,
     "view_mode": "list",
@@ -495,6 +559,7 @@ else:
 # SIDEBAR: PERSONALIZATION (Section 2 - Separate from Profile)
 # ============================================================================
 st.sidebar.markdown("---")
+ui_mode = str(st.session_state.get("ui_mode", "Seed-based"))
 st.sidebar.markdown("### 🎯 Personalization")
 
 
@@ -549,28 +614,59 @@ if st.session_state["active_profile"]:
     ratings = st.session_state["active_profile"].get("ratings", {})
     profile_has_ratings = len(ratings) > 0
 
-# Personalization toggle
-if profile_has_ratings:
-    personalization_enabled = st.sidebar.checkbox(
-        "Enable Personalized Recommendations",
-        value=st.session_state["personalization_enabled"],
-        help=f"Use your {len(ratings)} ratings to personalize recommendations"
-    )
-    st.session_state["personalization_enabled"] = personalization_enabled
-    
-    if personalization_enabled:
-        # Personalization strength slider
-        personalization_strength = st.sidebar.slider(
-            "Strength",
-            min_value=0,
-            max_value=100,
-            value=st.session_state["personalization_strength"],
-            help="0% = seed-based only, 100% = fully personalized",
-            format="%d%%"
+# Track personalized-mode gating reason so we can avoid silent fallback.
+personalized_mode_blocked_reason: str | None = None
+
+if ui_mode != "Personalized":
+    # Progressive disclosure: personalization is not relevant outside Personalized mode.
+    with st.sidebar.expander("🎯 Personalization (Personalized mode only)", expanded=False):
+        st.caption("Switch to **Personalized** mode to use rated history.")
+        st.caption("Novelty remains **NA** without rated profile history.")
+    st.session_state["personalization_enabled"] = False
+    st.session_state["personalization_blocked_reason"] = None
+else:
+    # Personalized mode: require rated history and avoid misleading fallbacks.
+    if not st.session_state.get("active_profile"):
+        personalized_mode_blocked_reason = "No active profile selected."
+        st.sidebar.warning("Personalized mode unavailable: select a profile")
+        st.sidebar.caption("Fix: Choose an **Active Profile** (top of sidebar) and add at least one rating.")
+        st.session_state["personalization_enabled"] = False
+        st.session_state["personalization_blocked_reason"] = "No active profile selected."
+    elif not profile_has_ratings:
+        personalized_mode_blocked_reason = "Active profile has no ratings."
+        st.sidebar.warning("Personalized mode unavailable: no ratings")
+        st.sidebar.caption("Fix: Add at least one rating (use the in-card rating buttons after selecting a profile).")
+        st.session_state["personalization_enabled"] = False
+        st.session_state["personalization_blocked_reason"] = "No ratings in active profile."
+    else:
+        # Auto-enable personalization when entering Personalized mode (keeps ≤2 actions from cold start).
+        if not st.session_state.get("personalization_enabled", False) and not st.session_state.get("_personalization_autoset", False):
+            st.session_state["personalization_enabled"] = True
+            st.session_state["_personalization_autoset"] = True
+
+        personalization_enabled = st.sidebar.checkbox(
+            "Enable personalization",
+            value=bool(st.session_state.get("personalization_enabled", False)),
+            help=f"Use your {len(ratings)} ratings to personalize ranked results",
         )
-        st.session_state["personalization_strength"] = personalization_strength
-        
-        # Generate / refresh user embedding when inputs change.
+        st.session_state["personalization_enabled"] = personalization_enabled
+
+        if not personalization_enabled:
+            personalized_mode_blocked_reason = "Personalization is disabled."
+            st.sidebar.info("Enable personalization to run Personalized mode")
+        else:
+            # Personalization strength slider
+            personalization_strength = st.sidebar.slider(
+                "Strength",
+                min_value=0,
+                max_value=100,
+                value=int(st.session_state.get("personalization_strength", 100)),
+                help="0% = seed-based only, 100% = fully personalized",
+                format="%d%%",
+            )
+            st.session_state["personalization_strength"] = personalization_strength
+
+            # Generate / refresh user embedding when inputs change.
         # Single source of truth for MF model: bundle['models']['mf'] selected by artifacts_loader.
         mf_model = bundle.get("models", {}).get("mf")
         mf_stem = bundle.get("models", {}).get("_mf_stem")
@@ -639,15 +735,10 @@ if profile_has_ratings:
         else:
             st.sidebar.caption(f"✓ Using {len(ratings)} ratings")
         
-        # Taste profile visualization
-        if st.sidebar.checkbox("🎨 View Taste Profile", key="show_taste_profile", value=False):
-            from src.app.components.taste_profile import render_taste_profile_panel
-            render_taste_profile_panel(st.session_state["active_profile"], metadata)
-else:
-    st.sidebar.caption("💡 Rate anime to enable personalization")
-    # Prevent stale session state from making personalization appear enabled without ratings.
-    st.session_state["personalization_enabled"] = False
-    st.session_state["personalization_blocked_reason"] = None
+            # Taste profile visualization
+            if st.sidebar.checkbox("🎨 View Taste Profile", key="show_taste_profile", value=False):
+                from src.app.components.taste_profile import render_taste_profile_panel
+                render_taste_profile_panel(st.session_state["active_profile"], metadata)
 
 # ============================================================================
 # SIDEBAR: SEARCH & SEEDS (Section 3 - Discovery Tools)
@@ -655,41 +746,54 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔍 Search & Seeds")
 
-# Searchable title dropdown - prefer English titles
-def get_display_title(row):
-    """Get best display title preferring English"""
-    title_eng = row.get("title_english")
-    if title_eng and isinstance(title_eng, str) and title_eng.strip():
-        return title_eng
-    title_disp = row.get("title_display")
-    if title_disp and isinstance(title_disp, str) and title_disp.strip():
-        return title_disp
-    return None
+show_seeds_controls = ui_mode in {"Seed-based", "Personalized"}
 
-# Create title mapping: display_title -> anime_id for lookup
-title_to_id = {}
-for _, row in metadata.iterrows():
-    title = get_display_title(row)
-    if title:
-        title_to_id[title] = int(row["anime_id"])
+if not show_seeds_controls:
+    with st.sidebar.expander("🔍 Search & Seeds (not used in Browse)", expanded=False):
+        st.caption("Browse mode uses genre/type/year filters only.")
+    selected_titles = []
+    query = ""
+    weight_mode = str(st.session_state.get("weight_mode", "Balanced"))
+else:
+    # Searchable title dropdown - prefer English titles
+    def get_display_title(row):
+        """Get best display title preferring English"""
+        title_eng = row.get("title_english")
+        if title_eng and isinstance(title_eng, str) and title_eng.strip():
+            return title_eng
+        title_disp = row.get("title_display")
+        if title_disp and isinstance(title_disp, str) and title_disp.strip():
+            return title_disp
+        return None
 
-available_titles = sorted(title_to_id.keys())
+    # Create title mapping: display_title -> anime_id for lookup
+    title_to_id = {}
+    for _, row in metadata.iterrows():
+        title = get_display_title(row)
+        if title:
+            title_to_id[title] = int(row["anime_id"])
 
-# Multi-select for seeds (max 5)
-current_seed_titles = st.session_state.get("selected_seed_titles", [])
-selected_titles = st.sidebar.multiselect(
-    "Search Titles (1-5 seeds)",
-    options=available_titles,
-    default=current_seed_titles,
-    max_selections=5,
-    help="Select 1-5 anime to blend their recommendations. More seeds = broader discovery!"
-)
+    available_titles = sorted(title_to_id.keys())
 
-# Update query for backward compatibility
-query = selected_titles[0] if selected_titles else ""
+    # Multi-select for seeds (max 5)
+    current_seed_titles = st.session_state.get("selected_seed_titles", [])
+    selected_titles = st.sidebar.multiselect(
+        "Search Titles (1-5 seeds)",
+        options=available_titles,
+        default=current_seed_titles,
+        max_selections=5,
+        help="Select 1-5 anime to blend their ranked results. More seeds = broader discovery!",
+    )
 
-weight_mode = st.sidebar.radio("Hybrid Weights", ["Balanced", "Diversity"], index=(0 if st.session_state.get("weight_mode") != "Diversity" else 1), horizontal=True)
-top_n = st.sidebar.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N)))
+    # Update query for backward compatibility
+    query = selected_titles[0] if selected_titles else ""
+
+    weight_mode = st.sidebar.radio(
+        "Hybrid Weights",
+        ["Balanced", "Diversity"],
+        index=(0 if st.session_state.get("weight_mode") != "Diversity" else 1),
+        horizontal=True,
+    )
 
 # ============================================================================
 # SIDEBAR: FILTERS & DISPLAY (Section 4)
@@ -697,16 +801,15 @@ top_n = st.sidebar.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFA
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🎛️ Filters & Display")
 
-# Browse mode toggle
-browse_mode = st.sidebar.checkbox(
-    "🗂️ Browse by Genre",
-    value=st.session_state.get("browse_mode", False),
-    help="Explore anime by genre without seeds or match scores"
-)
-st.session_state["browse_mode"] = browse_mode
+# Top-N applies to both ranked results and Browse.
+top_n = st.sidebar.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N)))
+st.session_state["top_n"] = top_n
+
+# Mode-derived browse flag (single source of truth: Choose your mode)
+browse_mode = bool(st.session_state.get("browse_mode", False))
 
 if browse_mode:
-    st.sidebar.info("💡 Select at least one genre to browse")
+    st.sidebar.info("💡 Browse: select at least one genre")
 
 default_sort_for_mode = "MAL Score" if browse_mode else "Match score"
 sort_options = ["MAL Score", "Year (Newest)", "Year (Oldest)", "Popularity"] if browse_mode else [
@@ -827,11 +930,11 @@ st.sidebar.markdown("---")
 with st.sidebar.expander("💡 Quick Guide", expanded=False):
     st.markdown("""
     <div style='font-size: 0.9rem; line-height: 1.8;'>
-    1️⃣ <b>Pick a mode</b> – Seeds (recommendations) or Browse by Genre<br>
-    2️⃣ <b>Seeds</b> – Choose 1–5 titles (or use the sample buttons)<br>
-    3️⃣ <b>(Optional) Profile</b> – Load/import to exclude watched titles<br>
-    4️⃣ <b>(Optional) Personalize</b> – Requires ratings; adjust strength<br>
-    5️⃣ <b>Refine</b> – Hybrid weights + filters + explanations
+    1️⃣ <b>Choose your mode</b> – Personalized / Seed-based / Browse<br>
+    2️⃣ <b>Seed-based</b> – Pick 1–5 seeds (or use the sample buttons)<br>
+    3️⃣ <b>Browse</b> – Pick ≥1 genre (filters apply; metadata-only)<br>
+    4️⃣ <b>Personalized</b> – Select a rated profile (no ratings → unavailable)<br>
+    5️⃣ <b>Refine</b> – Filters (and hybrid weights in ranked modes)
     </div>
     """, unsafe_allow_html=True)
 
@@ -844,14 +947,15 @@ st.query_params.update({"q": query, "wm": weight_mode, "n": str(top_n)})
 weights = choose_weights(weight_mode)
 
 # Seed selection indicator & handler --------------------------------------
-# Convert selected titles to IDs
-selected_seed_ids = []
-selected_seed_titles = []
-for title in selected_titles:
-    aid = title_to_id.get(title)
-    if aid:
-        selected_seed_ids.append(aid)
-        selected_seed_titles.append(title)
+selected_seed_ids: list[int] = []
+selected_seed_titles: list[str] = []
+if show_seeds_controls:
+    # Convert selected titles to IDs
+    for title in selected_titles:
+        aid = title_to_id.get(title)
+        if aid:
+            selected_seed_ids.append(aid)
+            selected_seed_titles.append(title)
 
 # Update session state
 st.session_state["selected_seed_ids"] = selected_seed_ids
@@ -870,25 +974,26 @@ if selected_seed_ids and selected_seed_titles:
         st.session_state["selected_seed_titles"] = []
         st.rerun()
 else:
-    # Sample search suggestions
-    st.sidebar.info("💡 **Try these popular titles:**")
-    sample_titles = ["Steins;Gate", "Cowboy Bebop", "Death Note", "Fullmetal Alchemist: Brotherhood"]
-    available_samples = [t for t in sample_titles if t in available_titles]
-    if available_samples:
-        cols = st.sidebar.columns(2)
-        for i, sample in enumerate(available_samples[:4]):
-            with cols[i % 2]:
-                if st.button(sample, key=f"sample_{i}", use_container_width=True):
-                    # Add to existing seeds (up to max 5)
-                    current_ids = st.session_state.get("selected_seed_ids", [])
-                    current_titles = st.session_state.get("selected_seed_titles", [])
-                    aid = title_to_id.get(sample)
-                    if aid and sample not in current_titles and len(current_ids) < 5:
-                        current_ids.append(aid)
-                        current_titles.append(sample)
-                        st.session_state["selected_seed_ids"] = current_ids
-                        st.session_state["selected_seed_titles"] = current_titles
-                        st.rerun()
+    if show_seeds_controls:
+        # Sample search suggestions
+        st.sidebar.info("💡 **Try these popular titles:**")
+        sample_titles = ["Steins;Gate", "Cowboy Bebop", "Death Note", "Fullmetal Alchemist: Brotherhood"]
+        available_samples = [t for t in sample_titles if t in available_titles]
+        if available_samples:
+            cols = st.sidebar.columns(2)
+            for i, sample in enumerate(available_samples[:4]):
+                with cols[i % 2]:
+                    if st.button(sample, key=f"sample_{i}", use_container_width=True):
+                        # Add to existing seeds (up to max 5)
+                        current_ids = st.session_state.get("selected_seed_ids", [])
+                        current_titles = st.session_state.get("selected_seed_titles", [])
+                        aid = title_to_id.get(sample)
+                        if aid and sample not in current_titles and len(current_ids) < 5:
+                            current_ids.append(aid)
+                            current_titles.append(sample)
+                            st.session_state["selected_seed_ids"] = current_ids
+                            st.session_state["selected_seed_titles"] = current_titles
+                            st.rerun()
 
 
 # Hybrid recommender initialization (artifact-backed; no placeholders) -----
@@ -1156,6 +1261,7 @@ if browse_mode:
                 st.warning("No anime found matching your filters. Try adjusting your genre or year selections.")
 else:
     # Recommendation mode (existing logic)
+    ui_mode_main = str(st.session_state.get("ui_mode", "Seed-based"))
     if selected_seed_ids and selected_seed_titles:
         if len(selected_seed_titles) == 1:
             st.subheader(f"Similar to: {selected_seed_titles[0]}")
@@ -1165,7 +1271,7 @@ else:
                 seed_display += f" +{len(selected_seed_titles)-3} more"
             st.subheader(f"Blended from: {seed_display}")
     else:
-        st.subheader("Recommendations")
+        st.subheader("Personalized recommendations" if ui_mode_main == "Personalized" else "Recommendations")
     user_index = 0  # demo user index (persona mapping to be added)
     
     # Request extra recommendations to account for filtering
@@ -1176,13 +1282,35 @@ else:
     
     recs: list[dict] = []
     personalization_applied = False
+    personalized_gate_reason: str | None = None
+
+    if ui_mode_main == "Personalized":
+        active_profile = st.session_state.get("active_profile")
+        ratings = (active_profile or {}).get("ratings", {}) if isinstance(active_profile, dict) else {}
+        blocked_reason = st.session_state.get("personalization_blocked_reason")
+        user_embedding = st.session_state.get("user_embedding")
+        if not active_profile:
+            personalized_gate_reason = "Select an Active Profile to use Personalized mode."
+        elif not isinstance(ratings, dict) or len(ratings) == 0:
+            personalized_gate_reason = "Add at least one rating to your active profile to use Personalized mode."
+        elif not st.session_state.get("personalization_enabled", False):
+            personalized_gate_reason = "Enable personalization in the sidebar to run Personalized mode."
+        elif blocked_reason:
+            personalized_gate_reason = blocked_reason
+        elif user_embedding is None:
+            personalized_gate_reason = "Taste profile is not ready yet."
+
+        if personalized_gate_reason:
+            st.warning(f"Personalized mode selected, but it can't run: {personalized_gate_reason}")
+            st.info("Fix it by adding ratings (or choosing a rated profile), or switch to **Seed-based** mode.")
+
     if recommender is None or components is None:
         st.error(
             "Recommendation engine is unavailable because required artifacts did not load. "
             "Disable APP_IMPORT_LIGHT and ensure MF artifacts are present/valid."
         )
         recs = []
-    elif n_requested > 0:
+    elif n_requested > 0 and not personalized_gate_reason:
         # Compute recommendations with progress indicator
         with st.spinner("🔍 Finding recommendations..."):
             with latency_timer("recommendations"):
@@ -1595,19 +1723,29 @@ active_scoring_path = None
 if browse_mode:
     active_scoring_path = "Browse"
 else:
-    if recommender is None or components is None:
-        active_scoring_path = "Recommendations disabled"
-    elif locals().get("personalization_applied", False):
-        active_scoring_path = "Personalized"
-    elif selected_seed_ids:
-        active_scoring_path = "Seed-based" if len(selected_seed_ids) == 1 else "Multi-seed"
+    ui_mode_main = str(st.session_state.get("ui_mode", "Seed-based"))
+    personalized_gate_reason = locals().get("personalized_gate_reason")
+    if ui_mode_main == "Personalized" and personalized_gate_reason:
+        active_scoring_path = "Personalized (Unavailable)"
     else:
-        active_scoring_path = "Seedless"
+        if recommender is None or components is None:
+            active_scoring_path = "Recommendations disabled"
+        elif locals().get("personalization_applied", False):
+            active_scoring_path = "Personalized"
+        elif selected_seed_ids:
+            active_scoring_path = "Seed-based" if len(selected_seed_ids) == 1 else "Multi-seed"
+        else:
+            active_scoring_path = "Seedless"
 
 # If personalization was requested but couldn't run, reflect that explicitly.
 personalization_requested = st.session_state.get("personalization_enabled", False)
 blocked_reason = st.session_state.get("personalization_blocked_reason")
-if personalization_requested and not locals().get("personalization_applied", False) and blocked_reason:
+if (
+    personalization_requested
+    and not locals().get("personalization_applied", False)
+    and blocked_reason
+    and str(st.session_state.get("ui_mode", "Seed-based")) != "Personalized"
+):
     active_scoring_path = f"{active_scoring_path} (Personalization unavailable)"
 
 def _coerce_genres(value) -> str:
@@ -1727,9 +1865,10 @@ if recs:
     
     bar_html = ''.join(bar_segments)
     
+    mix_label = "Catalog Mix" if browse_mode else "Recommendation Mix"
     st.markdown(f"""
     <div style="background: #F8F9FA; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-        <p style="color: #7F8C8D; font-size: 0.9rem; margin-bottom: 12px; font-weight: 500;">Recommendation Mix</p>
+        <p style="color: #7F8C8D; font-size: 0.9rem; margin-bottom: 12px; font-weight: 500;">{mix_label}</p>
         <div style="display: flex; height: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             {bar_html}
         </div>
@@ -1776,6 +1915,14 @@ else:
     if browse_mode:
         # Browse mode already renders its own guidance above; avoid showing recommendation-focused empty states.
         pass
+    elif str(st.session_state.get("ui_mode", "Seed-based")) == "Personalized":
+        st.markdown(
+            "<div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>"
+            "<p style='color: #8A6D3B; font-weight: 500; margin: 0;'>⚠️ Personalized mode needs a rated profile</p>"
+            "<p style='color: #8A6D3B; margin: 8px 0 0 0;'>Select a profile with ratings (or add a rating), then ensure personalization is enabled in the sidebar.</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
     elif selected_seed_ids and not recs:
         st.markdown("""
         <div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>
@@ -1806,7 +1953,8 @@ else:
 
 st.markdown("---")
 # Note: Old explanation panel removed - explanations now shown inline on cards
-render_diversity_panel(recs, metadata)
+render_diversity_panel(recs, metadata, is_browse=browse_mode)
+
 
 
 # Help / FAQ ---------------------------------------------------------------
