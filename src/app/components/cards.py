@@ -186,6 +186,7 @@ def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
                             use_container_width=True
                         ):
                             # Enable browse mode and set genre filter
+                            st.session_state["ui_mode"] = "Browse"
                             st.session_state["browse_mode"] = True
                             st.session_state["genre_filter"] = [genre]
                             st.session_state["selected_seed_ids"] = []
@@ -362,6 +363,7 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
                         use_container_width=True
                     ):
                         # Enable browse mode and set genre filter
+                        st.session_state["ui_mode"] = "Browse"
                         st.session_state["browse_mode"] = True
                         st.session_state["genre_filter"] = [genre]
                         st.session_state["selected_seed_ids"] = []

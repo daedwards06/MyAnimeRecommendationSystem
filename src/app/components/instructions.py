@@ -1,22 +1,35 @@
 """Onboarding / usage instructions component for the Streamlit app.
 
-Provides a dismissible panel so first‑time users understand the current UX:
-- Seed-based recommendations (pick 1–5 titles)
-- Optional personalization (requires ratings)
-- Browse-by-genre mode (no recommender scoring)
+Provides a dismissible panel so first‑time users understand the current UX.
+
+Phase 3 / Chunk 2 adds a top-level mode selector, so this component
+supports mode-aware copy.
 """
 from __future__ import annotations
 import streamlit as st
 
-_HELP_STEPS = [
-    "Pick 1–5 seed titles in the sidebar (Search & Seeds) to get recommendations.",
-    "(Optional) Load a profile to exclude watched titles; add ratings to enable personalization.",
-    "(Optional) Turn on Personalization (only works when you have ratings in your active profile).",
-    "Adjust Hybrid Weights + filters (genre/type/year) to steer discovery.",
-    "Use Browse by Genre to explore the catalog without match scores or explanations.",
-]
+def _steps_for_mode(ui_mode: str) -> list[str]:
+    if ui_mode == "Browse":
+        return [
+            "Choose **Browse** mode in the sidebar.",
+            "Pick at least one genre (Filters) to see titles.",
+            "Refine with type/year and sort by MAL score / year / popularity.",
+        ]
+    if ui_mode == "Personalized":
+        return [
+            "Choose **Personalized** mode in the sidebar.",
+            "Select an **Active Profile** with at least one rating (or rate an anime after loading a profile).",
+            "Personalization runs only when rated history overlaps the MF model; if unavailable, the sidebar explains why.",
+        ]
+    # Seed-based (default)
+    return [
+        "Choose **Seed-based** mode in the sidebar.",
+        "Pick 1–5 seed titles in **Search & Seeds** (or use the sample buttons) to get ranked results.",
+        "Adjust Hybrid Weights + filters (genre/type/year) to steer discovery.",
+    ]
 
-def render_onboarding():
+
+def render_onboarding(*, ui_mode: str = "Seed-based"):
     # Persist dismissal
     key = "__ONBOARD_DISMISSED__"
     dismissed = st.session_state.get(key, False)
@@ -24,17 +37,22 @@ def render_onboarding():
         return
     with st.expander("How to use this app (click to hide)", expanded=True):
         st.markdown("### Quick Start")
-        st.write("Follow these steps to generate meaningful recommendations:")
-        for i, step in enumerate(_HELP_STEPS, start=1):
+        if ui_mode == "Browse":
+            st.write("Follow these steps to start browsing:")
+        else:
+            st.write("Follow these steps to get ranked results:")
+
+        for i, step in enumerate(_steps_for_mode(ui_mode), start=1):
             st.markdown(f"**{i}.** {step}")
         st.markdown("---")
         st.write("What the modes mean")
         st.caption(
-            "Seed-based recommendations use your selected title(s) as anchors. "
-            "Personalization uses your rated history (if available). "
-            "Browse by Genre filters/sorts metadata only (no recommender match score)."
+            "Seed-based uses your selected title(s) as anchors. "
+            "Personalized uses your rated history (when available). "
+            "Browse filters/sorts metadata only (no recommender match score)."
         )
-        st.markdown("**Tip:** When seeds are active, the sidebar shows an **Active Seed(s)** indicator.")
+        if ui_mode in {"Seed-based", "Personalized"}:
+            st.markdown("**Tip:** When seeds are active, the sidebar shows an **Active Seed(s)** indicator.")
         if st.button("Got it – hide instructions"):
             st.session_state[key] = True
 
