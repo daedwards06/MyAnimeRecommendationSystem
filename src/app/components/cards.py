@@ -203,7 +203,12 @@ def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         elif len(current_ids) >= 5:
             st.caption("⚠️ Max 5")
         else:
-            if st.button("🔄", key=f"grid_more_{anime_id}", help="Add to Seeds", use_container_width=True):
+            if st.button(
+                "🔄",
+                key=f"grid_more_{anime_id}",
+                help="Add as a seed (used in Seed-based / Personalized modes)",
+                use_container_width=True,
+            ):
                 current_ids.append(anime_id)
                 current_titles.append(title_display)
                 st.session_state["selected_seed_ids"] = current_ids
@@ -440,7 +445,12 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         elif len(current_ids) >= 5:
             st.caption("⚠️ Max 5 seeds (clear some first)")
         else:
-            if st.button(f"🔄 Add to Seeds", key=f"more_like_{anime_id}", use_container_width=True):
+            if st.button(
+                "🔄 Add to Seeds",
+                key=f"more_like_{anime_id}",
+                help="Add as a seed (up to 5) for Seed-based ranking",
+                use_container_width=True,
+            ):
                 current_ids.append(anime_id)
                 current_titles.append(title_display)
                 st.session_state["selected_seed_ids"] = current_ids

@@ -77,8 +77,8 @@ IMPORT_LIGHT = bool(os.environ.get("APP_IMPORT_LIGHT"))
 
 
 def _render_artifact_load_failure(err: Exception) -> None:
-    st.error("Required artifacts are missing or invalid. Recommendations are disabled until this is fixed.")
-    st.markdown("**Active scoring path:** Recommendations disabled")
+    st.error("Required artifacts are missing or invalid. Ranked modes are disabled until this is fixed.")
+    st.markdown("**Active scoring path:** Ranked modes disabled")
     details: list[str] = []
     if isinstance(err, ArtifactContractError):
         details = getattr(err, "details", [])
@@ -125,20 +125,18 @@ else:
 metadata: pd.DataFrame = bundle["metadata"]
 personas = load_personas(PERSONAS_JSON)
 
-st.set_page_config(page_title="Anime Recommender", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Anime Explorer", layout="wide", page_icon="🎬")
 theme = get_theme()
 
 # ---------------------------------------------------------------------------
 # Phase 3 / Chunk 2: Choose-a-mode gating (progressive disclosure)
 # Single top-level mode: Personalized / Seed-based / Browse.
 # This is UI-only routing; scoring behavior and score semantics remain unchanged.
+#
+# NOTE: Do not pre-set st.session_state["ui_mode"] here.
+# Streamlit widgets manage their own key; pre-setting can trigger:
+# "The widget with key 'ui_mode' was created with a default value but also had its value set via the Session State API."
 # ---------------------------------------------------------------------------
-if "ui_mode" not in st.session_state:
-    # Respect existing browse_mode if present (e.g., set by card genre clicks).
-    if bool(st.session_state.get("browse_mode", False)):
-        st.session_state["ui_mode"] = "Browse"
-    else:
-        st.session_state["ui_mode"] = "Seed-based"
 if "_ui_mode_prev" not in st.session_state:
     st.session_state["_ui_mode_prev"] = st.session_state.get("ui_mode")
 if "_personalization_autoset" not in st.session_state:
@@ -237,13 +235,13 @@ if _ui_mode_for_header == "Browse":
 elif _ui_mode_for_header == "Personalized":
     st.title("🎬 Personalized Anime Recommendations")
     st.markdown(
-        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Ranked using your rated history (when available)</p>",
+        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Ranked using your rated history (shows ‘unavailable’ when it can’t run)</p>",
         unsafe_allow_html=True,
     )
 else:
-    st.title("🎬 Anime Recommendation System")
+    st.title("🎬 Seed-based Anime Recommendations")
     st.markdown(
-        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Discover your next favorite anime with AI-powered recommendations</p>",
+        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Ranked from 1–5 seed titles using Match score (relative)</p>",
         unsafe_allow_html=True,
     )
 
@@ -256,15 +254,23 @@ st.sidebar.header("Controls")
 
 # Top-level mode selector (single control)
 prev_mode = st.session_state.get("_ui_mode_prev")
+_ui_mode_options = ["Personalized", "Seed-based", "Browse"]
+_ui_mode_current = st.session_state.get("ui_mode")
+_legacy_browse = bool(st.session_state.get("browse_mode", False))
+if _ui_mode_current in _ui_mode_options:
+    _ui_mode_index = _ui_mode_options.index(str(_ui_mode_current))
+else:
+    _ui_mode_index = 2 if _legacy_browse else 1
+
 ui_mode = st.sidebar.radio(
     "Choose your mode",
-    ["Personalized", "Seed-based", "Browse"],
-    index={"Personalized": 0, "Seed-based": 1, "Browse": 2}.get(str(st.session_state.get("ui_mode")), 1),
+    _ui_mode_options,
+    index=_ui_mode_index,
     key="ui_mode",
     help=(
         "Personalized: ranked results using your rated profile history. "
         "Seed-based: ranked results anchored to 1–5 seed titles. "
-        "Browse: filters/sorts metadata only (no match score)."
+        "Browse: filters/sorts catalog metadata only (no ranking)."
     ),
 )
 
@@ -350,7 +356,7 @@ selected_profile = st.sidebar.selectbox(
     "Active Profile",
     options=profile_options,
     index=profile_options.index(current_selection) if current_selection in profile_options else 0,
-    help="Select a profile to hide already-watched anime from recommendations",
+    help="Select a profile to hide already-watched titles from results",
     label_visibility="collapsed"
 )
 
@@ -653,7 +659,10 @@ else:
         personalization_enabled = st.sidebar.checkbox(
             "Enable personalization",
             value=bool(st.session_state.get("personalization_enabled", False)),
-            help=f"Use your {len(ratings)} ratings to personalize ranked results",
+            help=(
+                f"Applies only in Personalized mode. Uses your {len(ratings)} ratings to rerank results. "
+                "If personalization is unavailable (no ratings / no MF overlap / missing model), the UI says why and shows no fallback results."
+            ),
         )
         st.session_state["personalization_enabled"] = personalization_enabled
 
@@ -667,7 +676,10 @@ else:
                 min_value=0,
                 max_value=100,
                 value=int(st.session_state.get("personalization_strength", 100)),
-                help="0% = seed-based only, 100% = fully personalized",
+                help=(
+                    "Controls how strongly your rated-history signal influences ranking. "
+                    "0% = seed-based only, 100% = fully personalized. Applied only when personalization is enabled and available."
+                ),
                 format="%d%%",
             )
             st.session_state["personalization_strength"] = personalization_strength
@@ -788,7 +800,9 @@ else:
         options=available_titles,
         default=current_seed_titles,
         max_selections=5,
-        help="Select 1-5 anime to blend their ranked results. More seeds = broader discovery!",
+        help=(
+            "Select 1–5 seed titles. Ranked results are anchored to these seeds and show Match score (relative) for the current run."
+        ),
     )
 
     # Update query for backward compatibility
@@ -799,6 +813,10 @@ else:
         ["Balanced", "Diversity"],
         index=(0 if st.session_state.get("weight_mode") != "Diversity" else 1),
         horizontal=True,
+        help=(
+            "Changes how the ranking blends signals (e.g., similarity vs popularity emphasis). "
+            "Useful when you want broader discovery; most noticeable in Seed-based and Personalized modes."
+        ),
     )
 
 # ============================================================================
@@ -849,7 +867,9 @@ genre_filter = st.sidebar.multiselect(
     "Filter by Genre",
     options=genre_options,
     default=st.session_state.get("genre_filter", []),
-    help="Show only anime with these genres"
+    help=(
+        "Applies in all modes. In Browse, select at least one genre to see titles."
+    ),
 )
 
 # Get unique types from metadata for filter
@@ -863,7 +883,7 @@ type_filter = st.sidebar.multiselect(
     "Filter by Type",
     options=type_options,
     default=st.session_state.get("type_filter", []),
-    help="Show only TV series, Movies, OVAs, etc."
+    help="Applies in all modes to the displayed list (TV, Movie, OVA, etc.)",
 )
 
 year_range = st.sidebar.slider(
@@ -871,7 +891,7 @@ year_range = st.sidebar.slider(
     min_value=1960,
     max_value=2025,
     value=(st.session_state.get("year_min", 1960), st.session_state.get("year_max", 2025)),
-    help="Filter anime by release year"
+    help="Applies in all modes to the displayed list",
 )
 
 st.session_state["sort_by"] = sort_by
@@ -915,9 +935,15 @@ with st.sidebar.expander("⚡ Performance", expanded=False):
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.caption("No timing data yet - generate recommendations first")
+                st.caption(
+                    "No timing data yet — run a ranked mode first" if not browse_mode
+                    else "No timing data yet — timing is shown for ranked modes (Seed-based / Personalized)"
+                )
     except Exception:
-        st.caption("Run recommendations to see metrics")
+        st.caption(
+            "Run a ranked mode to see metrics" if not browse_mode
+            else "Timing is shown for ranked modes (Seed-based / Personalized)"
+        )
     
     import sys
     if hasattr(bundle, '__sizeof__'):
@@ -1182,7 +1208,7 @@ if browse_mode:
     if not genre_filter:
         st.info(
             "Pick ≥1 genre in Filters to start browsing. "
-            "Browse mode filters/sorts metadata only (no match score)."
+            "Browse mode filters/sorts catalog metadata only (no ranking)."
         )
         recs = []
     else:
@@ -1322,7 +1348,10 @@ else:
 
         if personalized_gate_reason:
             st.warning(f"Personalized mode selected, but it can't run: {personalized_gate_reason}")
-            st.info("Fix it by adding ratings (or choosing a rated profile), or switch to **Seed-based** mode.")
+            st.info(
+                "Fix it by adding ratings (or choosing a rated profile), then enable personalization in the sidebar. "
+                "This app does not silently fall back to Seed-based results."
+            )
 
     if recommender is None or components is None:
         st.error(
@@ -1749,7 +1778,7 @@ else:
         active_scoring_path = "Personalized (Unavailable)"
     else:
         if recommender is None or components is None:
-            active_scoring_path = "Recommendations disabled"
+            active_scoring_path = "Ranked modes disabled"
         elif locals().get("personalization_applied", False):
             active_scoring_path = "Personalized"
         elif selected_seed_ids:
@@ -1815,7 +1844,7 @@ if recs:
     # Header with count badge
     mode_icon = "📚" if browse_mode else "✨"
     mode_label = "Browsing" if browse_mode else "Showing"
-    item_type = "anime" if browse_mode else "Recommendations"
+    item_type = "titles" if browse_mode else "recommendations"
     st.markdown(f"""
     <div style='display: flex; align-items: center; gap: 12px; margin-bottom: 12px;'>
         <h3 style='color: #2C3E50; margin: 0;'>{mode_icon} {mode_label} {len(recs)} {item_type}{filters_text}</h3>
@@ -1929,7 +1958,7 @@ if recs:
             pop_pct = _pop_pct_for_anime_id(int(anime_id))
             render_card(row, rec, pop_pct, is_in_training=_is_in_training(int(anime_id)))
 else:
-    if (browse_mode or active_scoring_path == "Recommendations disabled"):
+    if (browse_mode or active_scoring_path == "Ranked modes disabled"):
         st.markdown(f"**Active scoring path:** {active_scoring_path}")
 
     if browse_mode:
@@ -2014,5 +2043,6 @@ render_diversity_panel(recs, metadata, is_browse=browse_mode)
 
 # Help / FAQ ---------------------------------------------------------------
 render_help_panel()
+render_help_panel(ui_mode=str(st.session_state.get("ui_mode", "Seed-based")))
 
 st.sidebar.caption("Prototype – performance instrumentation active.")
