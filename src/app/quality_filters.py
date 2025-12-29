@@ -7,6 +7,7 @@ This module provides filtering logic to exclude:
 """
 
 from __future__ import annotations
+import re
 import pandas as pd
 from typing import Optional
 
@@ -19,6 +20,70 @@ MAX_POPULARITY_RANK = 23000  # Don't recommend extremely obscure titles (was 200
 BLACKLIST_IDS = [
     28489,  # Jigoku Koushien (no score, no synopsis, 422 members)
 ]
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 / Chunk A2: Candidate hygiene (ranked modes only)
+#
+# Goal: reduce "obviously wrong" ranked recommendations (recaps/summaries/
+# specials/shorts) by conservatively excluding known low-signal formats.
+#
+# Defaults are intentionally aligned with the Phase 4 golden-queries expectations
+# (data/samples/golden_queries_phase4.json) so improvements are measurable and
+# not re-litigated.
+# ---------------------------------------------------------------------------
+
+# Low-signal formats to exclude from ranked candidate lists.
+RANKED_HYGIENE_DISALLOW_TYPES: tuple[str, ...] = (
+    "Special",
+    "Music",
+)
+
+# Conservative title heuristics for recap/summary artifacts.
+RANKED_HYGIENE_BAD_TITLE_REGEX: str = r"(?i)\b(?:recap|recaps|summary|digest|compilation|episode\s*0)\b"
+
+
+def build_ranked_candidate_hygiene_exclude_ids(
+    metadata: pd.DataFrame,
+    *,
+    disallow_types: tuple[str, ...] = RANKED_HYGIENE_DISALLOW_TYPES,
+    bad_title_regex: str = RANKED_HYGIENE_BAD_TITLE_REGEX,
+) -> set[int]:
+    """Return anime_ids to exclude from ranked recommendation candidates.
+
+    This function is intentionally deterministic and easy to reason about:
+      - Excludes items with a disallowed `type` when present.
+      - Excludes items whose title matches a conservative recap/summary regex.
+
+    Notes:
+      - It is safe to call even if metadata columns are missing.
+      - Intended for ranked modes only (Seed-based + Personalized).
+    """
+    if metadata is None or metadata.empty:
+        return set()
+    if "anime_id" not in metadata.columns:
+        return set()
+
+    exclude: set[int] = set()
+
+    if disallow_types and "type" in metadata.columns:
+        typ = metadata["type"]
+        mask = typ.notna() & typ.astype(str).str.strip().isin(tuple(disallow_types))
+        if bool(mask.any()):
+            exclude.update(metadata.loc[mask, "anime_id"].astype(int).tolist())
+
+    if bad_title_regex and "title_display" in metadata.columns:
+        title = metadata["title_display"]
+        try:
+            re_pat = re.compile(bad_title_regex)
+        except re.error:
+            re_pat = None
+        if re_pat is not None:
+            mask = title.notna() & title.astype(str).str.contains(re_pat, regex=True, na=False)
+            if bool(mask.any()):
+                exclude.update(metadata.loc[mask, "anime_id"].astype(int).tolist())
+
+    return exclude
 
 
 def passes_quality_filter(
@@ -138,4 +203,11 @@ def apply_quality_filters(
     return filtered
 
 
-__all__ = ['passes_quality_filter', 'apply_quality_filters', 'BLACKLIST_IDS']
+__all__ = [
+    'passes_quality_filter',
+    'apply_quality_filters',
+    'BLACKLIST_IDS',
+    'RANKED_HYGIENE_DISALLOW_TYPES',
+    'RANKED_HYGIENE_BAD_TITLE_REGEX',
+    'build_ranked_candidate_hygiene_exclude_ids',
+]

@@ -1,0 +1,65 @@
+{
+  "schema": "jikan_feature_probe_v1",
+  "timestamp_utc": "20251229181340",
+  "golden_json": "reports/artifacts/phase4_golden_queries_20251229165531.json",
+  "n_rows": 240,
+  "n_violations": 44,
+  "summary": [
+    {
+      "feature": "overlap_genres",
+      "violation_mean": 0.4352272727272727,
+      "non_violation_mean": 0.43418367346938774,
+      "delta_non_minus_violation": -0.0010435992578849418,
+      "n_total": 240,
+      "n_violations": 44
+    },
+    {
+      "feature": "overlap_themes",
+      "violation_mean": 0.045454545454545456,
+      "non_violation_mean": 0.08312074829931973,
+      "delta_non_minus_violation": 0.037666202844774274,
+      "n_total": 240,
+      "n_violations": 44
+    },
+    {
+      "feature": "overlap_studios",
+      "violation_mean": 0.022727272727272728,
+      "non_violation_mean": 0.02040816326530612,
+      "delta_non_minus_violation": -0.002319109461966607,
+      "n_total": 240,
+      "n_violations": 44
+    },
+    {
+      "feature": "overlap_demographics",
+      "violation_mean": 0.022727272727272728,
+      "non_violation_mean": 0.03316326530612245,
+      "delta_non_minus_violation": 0.010435992578849723,
+      "n_total": 240,
+      "n_violations": 44
+    },
+    {
+      "feature": "overlap_producers",
+      "violation_mean": 0.022727272727272728,
+      "non_violation_mean": 0.0031887755102040817,
+      "delta_non_minus_violation": -0.019538497217068646,
+      "n_total": 240,
+      "n_violations": 44
+    },
+    {
+      "feature": "type_match",
+      "violation_mean": 0.0,
+      "non_violation_mean": 0.08163265306122448,
+      "delta_non_minus_violation": 0.08163265306122448,
+      "n_total": 240,
+      "n_violations": 44
+    },
+    {
+      "feature": "source_match",
+      "violation_mean": 0.1590909090909091,
+      "non_violation_mean": 0.16326530612244897,
+      "delta_non_minus_violation": 0.004174397031539878,
+      "n_total": 240,
+      "n_violations": 44
+    }
+  ]
+}

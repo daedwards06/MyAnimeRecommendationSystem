@@ -36,6 +36,7 @@ from src.app.artifacts_loader import build_artifacts, set_determinism
 from src.app.recommender import HybridComponents, HybridRecommender, choose_weights
 from src.app.search import fuzzy_search
 from src.app.diversity import compute_popularity_percentiles
+from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
 
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
@@ -309,9 +310,12 @@ def _seed_based_scores(
     weights: dict[str, float],
     pop_pct_by_id: dict[int, float],
     top_n: int,
+    exclude_ids: set[int] | None = None,
 ) -> list[dict[str, Any]]:
     if not seed_ids:
         return []
+
+    exclude_ids = set(exclude_ids or set())
 
     # Stable iteration order
     work = metadata.sort_values("anime_id", kind="mergesort")
@@ -343,6 +347,8 @@ def _seed_based_scores(
 
     for _, row in work.iterrows():
         aid = int(row["anime_id"])
+        if aid in exclude_ids:
+            continue
         if aid in seed_ids:
             continue
 
@@ -408,6 +414,9 @@ def _evaluate_golden_queries(
     bundle = build_artifacts()
     metadata, components, recommender, pop_pct_by_id = _build_app_like_recommender(bundle)
 
+    # Phase 4 / Chunk A2: apply app-like ranked candidate hygiene in golden harness.
+    ranked_hygiene_exclude_ids = build_ranked_candidate_hygiene_exclude_ids(metadata)
+
     weights = choose_weights(weight_mode)
 
     default_expect = GoldenExpectations(
@@ -439,6 +448,7 @@ def _evaluate_golden_queries(
             weights=weights,
             pop_pct_by_id=pop_pct_by_id,
             top_n=top_n,
+            exclude_ids=ranked_hygiene_exclude_ids,
         )
 
         violations: list[dict[str, Any]] = []

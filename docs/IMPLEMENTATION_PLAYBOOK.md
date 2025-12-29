@@ -284,8 +284,8 @@ Notes:
 
 #### Chunk A1 — Golden queries + offline evaluation harness
 
-- [ ] Create a small “golden queries / failure cases” set (10–30 titles) with expected good/bad behaviors (e.g., “Tokyo Ghoul should not surface recaps/specials in top-N”).
-- [ ] Add a repeatable offline evaluation entrypoint that outputs: headline ranking metrics (e.g., NDCG@K/MAP@K), coverage/novelty summaries, and a human-readable report for the golden queries.
+- [x] Create a small “golden queries / failure cases” set (10–30 titles) with expected good/bad behaviors (e.g., “Tokyo Ghoul should not surface recaps/specials in top-N”).
+- [x] Add a repeatable offline evaluation entrypoint that outputs: headline ranking metrics (e.g., NDCG@K/MAP@K), coverage/novelty summaries, and a human-readable report for the golden queries.
 
 **Done when:**
 - A single command generates an evaluation report artifact under `reports/` (metrics + golden query examples).
@@ -293,8 +293,8 @@ Notes:
 
 #### Chunk A2 — Candidate hygiene (format/type guardrails)
 
-- [ ] Add explicit candidate filtering/penalties for low-signal or non-standard formats (recaps/summaries/specials/shorts) using metadata fields (e.g., `type`) and conservative title heuristics as a fallback.
-- [ ] Verify the guardrails apply only to ranked modes (Seed-based / Personalized), not Browse.
+- [x] Add explicit candidate filtering/penalties for low-signal or non-standard formats (recaps/summaries/specials/shorts) using metadata fields (e.g., `type`) and conservative title heuristics as a fallback.
+- [x] Verify the guardrails apply only to ranked modes (Seed-based / Personalized), not Browse.
 
 **Done when:**
 - Golden queries no longer surface obvious recap/special entries in top-N for representative seeds.
@@ -440,6 +440,15 @@ Notes:
 ---
 
 ## 6) Decision Log (Keep This Short)
+### 2025-12-29 — Phase 4 / Chunk A2: Ranked candidate hygiene
+
+- **Decision:** In ranked modes only, exclude candidates when:
+  - `type` is in {`Special`, `Music`}
+  - `title_display` matches the conservative recap/summary regex: `(?i)\b(recap|recaps|summary|digest|compilation|episode\s*0)\b`
+- **Where implemented:** `src/app/quality_filters.py` (`build_ranked_candidate_hygiene_exclude_ids`) and applied in ranked choke points in `app/main.py` and `scripts/evaluate_phase4_golden.py`.
+- **Rationale:** Directly targets Phase 4 golden failures (e.g., Tokyo Ghoul showing specials/recaps) while minimizing over-filtering; rules match the golden expectations defaults.
+- **Tradeoffs:** Legitimate specials (or music entries) may be suppressed in ranked recommendations; Browse mode remains unchanged and can still surface them via metadata filters.
+
 
 Record decisions that future sessions must not re-litigate.
 
@@ -507,6 +516,22 @@ Record decisions that future sessions must not re-litigate.
 
 - Next session start here:
   - Phase 4 / Chunk A2: implement candidate hygiene (type/title guardrails) and validate improvements against the golden queries report.
+
+### Session 2025-12-29 (Phase 4 / Chunk A2)
+
+- **Goal:** Reduce ranked-mode junk (recaps/specials/shorts) with conservative, deterministic guardrails.
+- **Changes:**
+  - Added ranked hygiene exclusion helper in `src/app/quality_filters.py`.
+  - Applied hygiene exclusions in ranked app paths (`app/main.py`) and the golden harness (`scripts/evaluate_phase4_golden.py`).
+  - Added unit test for hygiene exclusion logic.
+- **Validation (run locally):**
+  - `python -m pytest -q` (pass)
+  - `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50`
+    - Wrote: `experiments/metrics/phase4_eval_20251229175855.json`
+    - Wrote: `reports/phase4_golden_queries_20251229175855.md`
+    - Wrote: `reports/artifacts/phase4_golden_queries_20251229175855.json`
+  - Golden delta (baseline `20251229165531` → `20251229175855`): Tokyo Ghoul violations `3 → 0`.
+- **Next:** If future golden updates include OVA/ONA as “bad formats”, prefer a *penalty* (downrank) over exclusion and re-validate.
 
 ### Session 2025-12-26
 
