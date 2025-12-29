@@ -23,11 +23,11 @@ How to use:
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Implemented **Phase 3 / Chunk 2**: single top-level mode selector (Personalized / Seed-based / Browse) and progressive disclosure.
-- Manual QA pass completed for Chunk 2 across all three modes.
+- Implemented **Phase 3 / Chunk 3**: mode-aware first-load clarity + empty-state recovery prompts (Browse / Seed-based / Personalized).
+- Fixed a mode-switch sync issue so the main-area prompt updates immediately when changing modes.
 
 **Next action (single sentence):**
-- Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
+- Phase 3 / Chunk 4: consistent mode-specific copy + tooltips.
 
 ---
 
@@ -236,7 +236,7 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 2 — Choose-a-mode gating (progressive disclosure)
 
-- [ ] Add a single “Choose your mode” decision at the top (Personalized / Seed-based / Browse) with only relevant controls shown per mode; verify a first-time user can get results in ≤2 actions (High)
+- [x] Add a single “Choose your mode” decision at the top (Personalized / Seed-based / Browse) with only relevant controls shown per mode; verify a first-time user can get results in ≤2 actions (High)
 
 **Done when:**
 - Only relevant controls are shown for the selected mode.
@@ -244,8 +244,8 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 3 — First-load clarity and empty-state recovery
 
-- [ ] Ensure the app clearly answers “What is this / Why care / What next” on first load (1–2 sentences + primary CTA); verify via a cold-start screenshot (Medium)
-- [ ] In recommendation mode, show an explicit empty-state checklist when results are empty (e.g., “remove filters”, “try fewer seeds”, “disable browse mode”); verify each suggestion is actionable in-app (Medium)
+- [x] Ensure the app clearly answers “What is this / Why care / What next” on first load (1–2 sentences + primary CTA); verify via a cold-start screenshot (Medium)
+- [x] In recommendation mode, show an explicit empty-state checklist when results are empty (e.g., “remove filters”, “try fewer seeds”, “disable browse mode”); verify each suggestion is actionable in-app (Medium)
 
 **Done when:**
 - A cold-start screenshot includes: what this is, why it matters, and what to do next.
@@ -401,16 +401,20 @@ Record decisions that future sessions must not re-litigate.
 ### Session 2025-12-29
 
 - What I did:
-  - Completed manual QA checks for Phase 3 / Chunk 2 (mode selector + progressive disclosure) across Browse / Seed-based / Personalized.
+  - Implemented Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
+  - Verified mode-aware prompts for Browse / Seed-based / Personalized and ensured no silent fallback.
 
 - What I changed:
-  - No code changes in this session.
+  - Mode-aware first-load + empty-state recovery prompts in [app/main.py](app/main.py)
+  - Mode-switch sync: force rerun on mode change so main area updates immediately in [app/main.py](app/main.py)
+  - Aligned Browse onboarding wording in [src/app/components/instructions.py](src/app/components/instructions.py)
 
 - Validation run:
-  - Manual-only (Streamlit UI).
+  - Manual: mode-switch + empty-state checks in Streamlit UI
+  - `python -m pytest -q` (52 passed, 3 warnings)
 
 - Next session start here:
-  - Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
+  - Phase 3 / Chunk 4: consistent mode-specific copy + tooltips.
 
 ### Session 2025-12-26
 
