@@ -12,7 +12,7 @@ def _steps_for_mode(ui_mode: str) -> list[str]:
     if ui_mode == "Browse":
         return [
             "Choose **Browse** mode in the sidebar.",
-            "Pick at least one genre (Filters) to see titles.",
+            "Pick ≥1 genre in Filters to see titles.",
             "Refine with type/year and sort by MAL score / year / popularity.",
         ]
     if ui_mode == "Personalized":

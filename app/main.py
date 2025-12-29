@@ -255,10 +255,12 @@ render_onboarding(ui_mode=_ui_mode_for_header)
 st.sidebar.header("Controls")
 
 # Top-level mode selector (single control)
+prev_mode = st.session_state.get("_ui_mode_prev")
 ui_mode = st.sidebar.radio(
     "Choose your mode",
     ["Personalized", "Seed-based", "Browse"],
     index={"Personalized": 0, "Seed-based": 1, "Browse": 2}.get(str(st.session_state.get("ui_mode")), 1),
+    key="ui_mode",
     help=(
         "Personalized: ranked results using your rated profile history. "
         "Seed-based: ranked results anchored to 1–5 seed titles. "
@@ -266,8 +268,9 @@ ui_mode = st.sidebar.radio(
     ),
 )
 
-prev_mode = st.session_state.get("_ui_mode_prev")
-st.session_state["ui_mode"] = ui_mode
+# When the mode changes, force a rerun so the main-area branch and prompts
+# reflect the new mode immediately.
+mode_changed = prev_mode is not None and ui_mode != prev_mode
 st.session_state["_ui_mode_prev"] = ui_mode
 
 # Derive legacy flags used throughout the app.
@@ -281,6 +284,9 @@ if ui_mode != "Personalized":
 elif prev_mode != "Personalized":
     # Allow auto-enable when entering Personalized mode.
     st.session_state["_personalization_autoset"] = False
+
+if mode_changed:
+    st.rerun()
 
 if st.sidebar.button("Reload artifacts"):
     try:
@@ -1174,7 +1180,10 @@ if browse_mode:
         st.subheader("📚 Browse Anime by Genre")
     
     if not genre_filter:
-        st.info("👈 Select at least one genre from the sidebar to start browsing")
+        st.info(
+            "Pick ≥1 genre in Filters to start browsing. "
+            "Browse mode filters/sorts metadata only (no match score)."
+        )
         recs = []
     else:
         # Browse mode: filter metadata directly without recommendations
@@ -1258,7 +1267,18 @@ if browse_mode:
             recs = browse_results[:min(top_n, len(browse_results))]
             
             if not recs:
-                st.warning("No anime found matching your filters. Try adjusting your genre or year selections.")
+                st.warning("No titles found matching your filters.")
+                st.markdown("**Try:**")
+                st.markdown(
+                    "\n".join(
+                        [
+                            "- Widen the year range (Filters)",
+                            "- Remove the type filter (Filters)",
+                            "- Reduce the number of selected genres (Filters)",
+                            "- Use **Reset Filters** in the sidebar",
+                        ]
+                    )
+                )
 else:
     # Recommendation mode (existing logic)
     ui_mode_main = str(st.session_state.get("ui_mode", "Seed-based"))
@@ -1913,42 +1933,77 @@ else:
         st.markdown(f"**Active scoring path:** {active_scoring_path}")
 
     if browse_mode:
-        # Browse mode already renders its own guidance above; avoid showing recommendation-focused empty states.
+        # Browse mode renders its empty state guidance above.
         pass
-    elif str(st.session_state.get("ui_mode", "Seed-based")) == "Personalized":
-        st.markdown(
-            "<div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>"
-            "<p style='color: #8A6D3B; font-weight: 500; margin: 0;'>⚠️ Personalized mode needs a rated profile</p>"
-            "<p style='color: #8A6D3B; margin: 8px 0 0 0;'>Select a profile with ratings (or add a rating), then ensure personalization is enabled in the sidebar.</p>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    elif selected_seed_ids and not recs:
-        st.markdown("""
-        <div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>
-            <p style='color: #8A6D3B; font-weight: 500; margin: 0;'>⚠️ No similar titles found – try another seed or adjust filters</p>
-        </div>
-        """, unsafe_allow_html=True)
     else:
-        # Enhanced empty state with modern design
-        st.markdown("""
-        <div style='background: linear-gradient(135deg, #E8F4F8 0%, #F0F8FF 100%); border-radius: 12px; padding: 40px; margin: 40px 0; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.08);'>
-            <h2 style='color: #2C3E50; margin-bottom: 16px;'>👋 Welcome to Anime Recommender!</h2>
-            <p style='color: #7F8C8D; font-size: 1.1rem; margin-bottom: 32px;'>Get seed-based recommendations, or browse the catalog by genre.</p>
-            <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 700px; margin: 0 auto;'>
-                <div style='background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);'>
-                    <div style='font-size: 2rem; margin-bottom: 12px;'>🔍</div>
-                    <h4 style='color: #2C3E50; margin-bottom: 8px;'>Get Recommendations</h4>
-                    <p style='color: #7F8C8D; font-size: 0.9rem;'>Select 1–5 titles under <b>Search & Seeds</b> to generate recommendations (match score is relative).</p>
-                </div>
-                <div style='background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);'>
-                    <div style='font-size: 2rem; margin-bottom: 12px;'>⚡</div>
-                    <h4 style='color: #2C3E50; margin-bottom: 8px;'>Browse by Genre</h4>
-                    <p style='color: #7F8C8D; font-size: 0.9rem;'>Toggle <b>Browse by Genre</b>, pick at least one genre, and sort by MAL score / year / popularity.</p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        ui_mode_now = str(st.session_state.get("ui_mode", "Seed-based"))
+
+        if ui_mode_now == "Personalized":
+            active_profile = st.session_state.get("active_profile")
+            ratings = (active_profile or {}).get("ratings", {}) if isinstance(active_profile, dict) else {}
+            blocked_reason = st.session_state.get("personalization_blocked_reason")
+            user_embedding = st.session_state.get("user_embedding")
+            personalization_enabled = bool(st.session_state.get("personalization_enabled", False))
+
+            personalized_unavailable_reason: str | None = None
+            if not active_profile:
+                personalized_unavailable_reason = "Select a rated profile"
+            elif not isinstance(ratings, dict) or len(ratings) == 0:
+                personalized_unavailable_reason = "Add at least one rating"
+            elif not personalization_enabled:
+                personalized_unavailable_reason = "Enable personalization"
+            elif blocked_reason or user_embedding is None:
+                personalized_unavailable_reason = "Personalization is not ready"
+
+            if personalized_unavailable_reason:
+                st.markdown(
+                    "<div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); "
+                    "border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>"
+                    "<p style='color: #8A6D3B; font-weight: 600; margin: 0;'>Personalized mode is selected, but it isn’t running yet.</p>"
+                    "<p style='color: #8A6D3B; margin: 8px 0 0 0;'>What next: <b>Select a rated profile</b>, <b>add at least one rating</b>, and <b>enable personalization</b> in the sidebar.</p>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.warning("No personalized results found with the current filters.")
+                st.markdown("**Try:**")
+                st.markdown(
+                    "\n".join(
+                        [
+                            "- Use **Reset Filters** in the sidebar",
+                            "- Widen the year range (Filters)",
+                            "- Remove the type filter (Filters)",
+                            "- Switch to **Seed-based** mode to explore via a seed",
+                        ]
+                    )
+                )
+
+        elif selected_seed_ids:
+            st.warning("No similar titles found with the current filters.")
+            st.markdown("**Try:**")
+            st.markdown(
+                "\n".join(
+                    [
+                        "- Use **Reset Filters** in the sidebar",
+                        "- Try fewer seeds (1–2) or a different seed",
+                        "- Widen the year range (Filters)",
+                        "- Remove the type filter (Filters)",
+                    ]
+                )
+            )
+        else:
+            # Cold-start / first-load clarity (mode-aware)
+            st.markdown(
+                "<div style='background: linear-gradient(135deg, #E8F4F8 0%, #F0F8FF 100%); border-radius: 12px; "
+                "padding: 28px; margin: 28px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);'>"
+                "<h3 style='color: #2C3E50; margin: 0 0 10px 0;'>What this is</h3>"
+                "<p style='color: #7F8C8D; font-size: 1.0rem; margin: 0 0 10px 0;'>"
+                "A hybrid anime recommender that ranks titles similar to your chosen seed title(s)."
+                "</p>"
+                "<p style='color: #2C3E50; font-weight: 600; margin: 0;'>What next: Pick a sample seed or choose 1 title in <b>Search &amp; Seeds</b>.</p>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
 
 st.markdown("---")
