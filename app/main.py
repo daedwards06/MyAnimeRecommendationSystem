@@ -33,7 +33,7 @@ from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
 from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
-from src.app.quality_filters import apply_quality_filters
+from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
 from src.app.theme import get_theme
 from src.app.constants import (
     DEFAULT_TOP_N,
@@ -1319,6 +1319,12 @@ else:
     else:
         st.subheader("Personalized recommendations" if ui_mode_main == "Personalized" else "Recommendations")
     user_index = 0  # demo user index (persona mapping to be added)
+
+    # Phase 4 / Chunk A2: Candidate hygiene guardrails (ranked modes only).
+    # Build an exclusion set once and thread it through ranked pipelines.
+    ranked_hygiene_exclude_ids: set[int] = set()
+    if not bool(st.session_state.get("browse_mode", False)):
+        ranked_hygiene_exclude_ids = build_ranked_candidate_hygiene_exclude_ids(metadata)
     
     # Request extra recommendations to account for filtering
     # If filters are active (including profile exclusion), request more to ensure we have enough after filtering
@@ -1403,6 +1409,10 @@ else:
                     for _, mrow in metadata.iterrows():
                         aid = int(mrow["anime_id"])
                         if aid in selected_seed_ids:
+                            continue
+
+                        # Candidate hygiene: exclude obvious recap/special artifacts in ranked modes.
+                        if aid in ranked_hygiene_exclude_ids:
                             continue
                         
                         # Exclude watched anime (profile filter)
@@ -1507,7 +1517,12 @@ else:
                     recs = scored[:n_requested]
                 else:
                     # Default: seed-based recommendations
-                    recs = recommender.get_top_n_for_user(user_index, n=n_requested, weights=weights)
+                    recs = recommender.get_top_n_for_user(
+                        user_index,
+                        n=n_requested,
+                        weights=weights,
+                        exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
+                    )
         
         # Check if personalization is enabled (after recs are generated)
         personalization_enabled = st.session_state.get("personalization_enabled", False)
@@ -1542,101 +1557,106 @@ else:
             watched_ids = []
             if st.session_state["active_profile"]:
                 watched_ids = st.session_state["active_profile"].get("watched_ids", [])
-            
-                if st.session_state.get("personalization_blocked_reason") is None:
-                    try:
-                        if personalization_strength >= 0.99:
-                            # Pure personalized recommendations (100% strength)
-                            personalized_recs = recommender.get_personalized_recommendations(
-                                user_embedding=user_embedding,
-                                mf_model=mf_model,
-                                n=n_requested,
-                                weights=weights,
-                                exclude_item_ids=watched_ids,
-                            )
-                            if not personalized_recs:
-                                st.session_state["personalization_blocked_reason"] = (
-                                    "MF personalization returned no results (likely no overlap with MF items)."
-                                )
-                            else:
-                                recs = personalized_recs
-                                personalization_applied = True
-                        elif personalization_strength > 0.01:
-                            # Blend personalized and seed-based
-                            personalized_recs = recommender.get_personalized_recommendations(
-                                user_embedding=user_embedding,
-                                mf_model=mf_model,
-                                n=n_requested,
-                                weights=weights,
-                                exclude_item_ids=watched_ids,
-                            )
-                            if not personalized_recs:
-                                st.session_state["personalization_blocked_reason"] = (
-                                    "MF personalization returned no results (likely no overlap with MF items)."
-                                )
-                            else:
-                                personalization_applied = True
-                    except Exception as e:  # noqa: BLE001
-                        st.session_state["personalization_blocked_reason"] = (
-                            f"Personalization failed at scoring time: {e}"
+
+            # Candidate hygiene exclusions always apply in ranked modes.
+            exclude_ranked_ids = sorted(set(watched_ids) | set(ranked_hygiene_exclude_ids))
+
+            if st.session_state.get("personalization_blocked_reason") is None:
+                try:
+                    if personalization_strength >= 0.99:
+                        # Pure personalized recommendations (100% strength)
+                        personalized_recs = recommender.get_personalized_recommendations(
+                            user_embedding=user_embedding,
+                            mf_model=mf_model,
+                            n=n_requested,
+                            weights=weights,
+                            exclude_item_ids=exclude_ranked_ids,
                         )
-                
-                    if personalization_applied and personalization_strength > 0.01 and personalization_strength < 0.99:
-                        # Create score dictionaries
-                        personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
-                        seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
-
-                        # Keep raw components so we can compute truthful shares after blending.
-                        personalized_raw = {
-                            rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                            for rec in personalized_recs
-                        }
-                        seed_raw = {
-                            rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                            for rec in recs
-                        }
-                        personalized_used = {
-                            rec["anime_id"]: rec.get("_used_components", []) for rec in personalized_recs
-                        }
-                        seed_used = {rec["anime_id"]: rec.get("_used_components", []) for rec in recs}
-
-                        # Collect all unique anime IDs
-                        all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
-
-                        # Blend scores
-                        blended = []
-                        for aid in all_anime_ids:
-                            p_score = personalized_scores.get(aid, 0.0)
-                            s_score = seed_scores.get(aid, 0.0)
-
-                            # Weighted blend based on personalization strength
-                            final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
-
-                            pr = personalized_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                            sr = seed_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                            raw_components = {
-                                "mf": (personalization_strength * float(pr.get("mf", 0.0)))
-                                + ((1 - personalization_strength) * float(sr.get("mf", 0.0))),
-                                "knn": (personalization_strength * float(pr.get("knn", 0.0)))
-                                + ((1 - personalization_strength) * float(sr.get("knn", 0.0))),
-                                "pop": (personalization_strength * float(pr.get("pop", 0.0)))
-                                + ((1 - personalization_strength) * float(sr.get("pop", 0.0))),
-                            }
-                            used_components = sorted(
-                                set(personalized_used.get(aid, [])) | set(seed_used.get(aid, [])),
-                                key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
+                        if not personalized_recs:
+                            st.session_state["personalization_blocked_reason"] = (
+                                "MF personalization returned no results (likely no overlap with MF items)."
                             )
+                        else:
+                            recs = personalized_recs
+                            personalization_applied = True
+                    elif personalization_strength > 0.01:
+                        # Blend personalized and seed-based
+                        personalized_recs = recommender.get_personalized_recommendations(
+                            user_embedding=user_embedding,
+                            mf_model=mf_model,
+                            n=n_requested,
+                            weights=weights,
+                            exclude_item_ids=exclude_ranked_ids,
+                        )
+                        if not personalized_recs:
+                            st.session_state["personalization_blocked_reason"] = (
+                                "MF personalization returned no results (likely no overlap with MF items)."
+                            )
+                        else:
+                            personalization_applied = True
+                except Exception as e:  # noqa: BLE001
+                    st.session_state["personalization_blocked_reason"] = (
+                        f"Personalization failed at scoring time: {e}"
+                    )
 
-                            blended.append({
-                                "anime_id": aid,
-                                "score": final_score,
-                                "_raw_components": raw_components,
-                                "_used_components": used_components,
-                            })
+                if personalization_applied and personalization_strength > 0.01 and personalization_strength < 0.99:
+                    # Create score dictionaries
+                    personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
+                    seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
 
-                        # Sort and take top N
-                        blended.sort(key=lambda x: x["score"], reverse=True)
-                        recs = blended[:n_requested]
+                    # Keep raw components so we can compute truthful shares after blending.
+                    personalized_raw = {
+                        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                        for rec in personalized_recs
+                    }
+                    seed_raw = {
+                        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                        for rec in recs
+                    }
+                    personalized_used = {
+                        rec["anime_id"]: rec.get("_used_components", []) for rec in personalized_recs
+                    }
+                    seed_used = {rec["anime_id"]: rec.get("_used_components", []) for rec in recs}
+
+                    # Collect all unique anime IDs
+                    all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
+
+                    # Blend scores
+                    blended = []
+                    for aid in all_anime_ids:
+                        if aid in ranked_hygiene_exclude_ids:
+                            continue
+                        p_score = personalized_scores.get(aid, 0.0)
+                        s_score = seed_scores.get(aid, 0.0)
+
+                        # Weighted blend based on personalization strength
+                        final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
+
+                        pr = personalized_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                        sr = seed_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
+                        raw_components = {
+                            "mf": (personalization_strength * float(pr.get("mf", 0.0)))
+                            + ((1 - personalization_strength) * float(sr.get("mf", 0.0))),
+                            "knn": (personalization_strength * float(pr.get("knn", 0.0)))
+                            + ((1 - personalization_strength) * float(sr.get("knn", 0.0))),
+                            "pop": (personalization_strength * float(pr.get("pop", 0.0)))
+                            + ((1 - personalization_strength) * float(sr.get("pop", 0.0))),
+                        }
+                        used_components = sorted(
+                            set(personalized_used.get(aid, [])) | set(seed_used.get(aid, [])),
+                            key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
+                        )
+
+                        blended.append({
+                            "anime_id": aid,
+                            "score": final_score,
+                            "_raw_components": raw_components,
+                            "_used_components": used_components,
+                        })
+
+                    # Sort and take top N
+                    blended.sort(key=lambda x: x["score"], reverse=True)
+                    recs = blended[:n_requested]
             # else: personalization_strength <= 0.01, keep seed-based recs as-is
         
         # Generate explanations for personalized recommendations
