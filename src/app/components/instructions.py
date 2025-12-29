@@ -46,11 +46,19 @@ def render_onboarding(*, ui_mode: str = "Seed-based"):
             st.markdown(f"**{i}.** {step}")
         st.markdown("---")
         st.write("What the modes mean")
-        st.caption(
-            "Seed-based uses your selected title(s) as anchors. "
-            "Personalized uses your rated history (when available). "
-            "Browse filters/sorts metadata only (no recommender match score)."
-        )
+        if ui_mode == "Browse":
+            st.caption(
+                "Browse filters/sorts catalog metadata only. "
+                "Seed-based uses your selected title(s) as anchors. "
+                "Personalized uses your rated history (when available)."
+            )
+        else:
+            st.caption(
+                "Seed-based uses your selected title(s) as anchors. "
+                "Personalized uses your rated history (when available). "
+                "Browse filters/sorts catalog metadata only."
+            )
+            st.caption("Ranked modes display scores as **Match score (relative)** (unitless; compare within a run).")
         if ui_mode in {"Seed-based", "Personalized"}:
             st.markdown("**Tip:** When seeds are active, the sidebar shows an **Active Seed(s)** indicator.")
         if st.button("Got it – hide instructions"):

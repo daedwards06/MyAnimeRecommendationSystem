@@ -24,10 +24,11 @@ How to use:
 
 **What changed last session (short):**
 - Implemented **Phase 3 / Chunk 3**: mode-aware first-load clarity + empty-state recovery prompts (Browse / Seed-based / Personalized).
-- Fixed a mode-switch sync issue so the main-area prompt updates immediately when changing modes.
+- Implemented **Phase 3 / Chunk 4**: consistent mode-specific copy + tooltips (Browse-safe wording; no scoring/model changes).
+- Fixed Streamlit startup warning by ensuring the `ui_mode` radio widget owns its session-state key.
 
 **Next action (single sentence):**
-- Phase 3 / Chunk 4: consistent mode-specific copy + tooltips.
+- Phase 4: (candidate) centralize filtering utilities to reduce duplication (no UX change).
 
 ---
 
@@ -253,8 +254,8 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 #### Chunk 4 — Consistent mode-specific copy + tooltips
 
-- [ ] Ensure “Browse by Genre” mode disables or visually de-emphasizes seed-specific copy; verify headings and help text match mode consistently (Medium)
-- [ ] Add consistent tooltips/help text for key controls (Hybrid Weights, personalization strength, filters); verify every control has either help text or is self-explanatory (Low)
+- [x] Ensure “Browse by Genre” mode disables or visually de-emphasizes seed-specific copy; verify headings and help text match mode consistently (Medium)
+- [x] Add consistent tooltips/help text for key controls (Hybrid Weights, personalization strength, filters); verify every control has either help text or is self-explanatory (Low)
 
 **Done when:**
 - Mode headings match the mode (Browse vs Recommendations) at all times.
@@ -264,15 +265,71 @@ Each chunk should be doable in ~30–90 minutes. Prefer completing an entire chu
 
 ### Phase 4 — Refactor + Tests + Performance (Maintainability)
 
-**Goal:** Reduce `app/main.py` complexity, remove duplicated logic, improve responsiveness, and add basic test coverage.
+**Goal:** Improve recommendation quality safely (repeatable evaluation + better signals) while reducing `app/main.py` complexity, removing duplicated logic, improving responsiveness, and strengthening test coverage.
 
 **Dependencies:** Phase 1–3 (avoid refactoring unstable behavior).
 
 **Phase 4 done when:**
-- App behavior is unchanged from the user perspective, but the code is modular and readable.
+- Recommendation quality improvements are measurable and reproducible (offline eval + “golden queries”), and new/updated artifacts are versioned and load safely in-app.
+- App behavior is unchanged from the user perspective unless explicitly called out by a specific chunk.
 - Duplicated parsing/filtering logic is removed (single implementation per concern).
 - Basic smoke + unit tests run cleanly.
 - Performance improves measurably or remains stable while complexity drops.
+
+**Track A — Model Quality / Re-evaluation**
+
+Goal: reduce “obviously wrong” recommendations (e.g., recap/special artifacts) and improve relevance + novelty + cold-start quality by iterating on candidate hygiene, content features, collaborative models, and hybrid tuning.
+
+Notes:
+- Keep the app’s inference contracts stable (see Section 2: Artifact Inventory). If new artifacts are introduced (e.g., embeddings), define their contract here before wiring them into the UI.
+- Prefer changes that are measurable offline first, then validated in the Streamlit app.
+
+#### Chunk A1 — Golden queries + offline evaluation harness
+
+- [ ] Create a small “golden queries / failure cases” set (10–30 titles) with expected good/bad behaviors (e.g., “Tokyo Ghoul should not surface recaps/specials in top-N”).
+- [ ] Add a repeatable offline evaluation entrypoint that outputs: headline ranking metrics (e.g., NDCG@K/MAP@K), coverage/novelty summaries, and a human-readable report for the golden queries.
+
+**Done when:**
+- A single command generates an evaluation report artifact under `reports/` (metrics + golden query examples).
+- The report is stable/reproducible for a fixed artifact snapshot (seeded randomness, pinned inputs).
+
+#### Chunk A2 — Candidate hygiene (format/type guardrails)
+
+- [ ] Add explicit candidate filtering/penalties for low-signal or non-standard formats (recaps/summaries/specials/shorts) using metadata fields (e.g., `type`) and conservative title heuristics as a fallback.
+- [ ] Verify the guardrails apply only to ranked modes (Seed-based / Personalized), not Browse.
+
+**Done when:**
+- Golden queries no longer surface obvious recap/special entries in top-N for representative seeds.
+- Any exclusions/penalties are recorded in the Decision Log (so they don’t get re-litigated).
+
+#### Chunk A3 — Content features (parquet + new data)
+
+- [ ] Use additional metadata columns from `data/processed/anime_metadata.parquet` as features for similarity/ranking (genres, type, studios, year/season, themes/tags if available).
+- [ ] Optionally add new data/features (e.g., synopsis embeddings) for stronger semantic similarity and better cold-start behavior.
+
+**Done when:**
+- Cold-start quality improves vs baseline (define a simple metric and/or a qualitative golden-query checklist).
+- New feature artifacts are versioned and their load contract is documented.
+
+#### Chunk A4 — Collaborative retrain / alternative CF model
+
+- [ ] Retrain MF with improved training setup (regularization/objective/data filtering) and/or evaluate alternative CF (e.g., implicit ALS/BPR) against the current MF artifact.
+- [ ] Ensure the selected model artifact still satisfies the MF contract required by the app (or update the app contract explicitly if changing model type).
+
+**Done when:**
+- Offline ranking metrics improve vs the current baseline artifact (with documented deltas).
+- The chosen artifact is versioned (timestamped) and can be swapped via `APP_MF_MODEL_STEM` without app changes.
+
+#### Chunk A5 — Hybrid tuning + novelty/popularity controls
+
+- [ ] Tune hybrid weights (MF / content / popularity components) using a repeatable search procedure (e.g., Optuna) and evaluate the relevance vs novelty tradeoff.
+- [ ] Add/verify simple debiasing controls (e.g., cap popularity contribution, or rerank for diversity) only if they improve golden queries without harming relevance.
+
+**Done when:**
+- A tuned preset exists with documented tradeoffs and reproducible evaluation outputs.
+- Golden queries improve for both “relevance” and “no obvious junk” cases.
+
+**Track B — Maintainability (Refactor + Tests + Performance)**
 
 #### Chunk 1 — Modularize the app entrypoint
 
@@ -403,18 +460,27 @@ Record decisions that future sessions must not re-litigate.
 - What I did:
   - Implemented Phase 3 / Chunk 3: first-load clarity + empty-state recovery.
   - Verified mode-aware prompts for Browse / Seed-based / Personalized and ensured no silent fallback.
+  - Implemented Phase 3 / Chunk 4: consistent mode-specific copy + lightweight tooltips (no scoring/model changes).
 
 - What I changed:
   - Mode-aware first-load + empty-state recovery prompts in [app/main.py](app/main.py)
   - Mode-switch sync: force rerun on mode change so main area updates immediately in [app/main.py](app/main.py)
   - Aligned Browse onboarding wording in [src/app/components/instructions.py](src/app/components/instructions.py)
+  - Removed Browse-visible “recommendations”/“match score” helper text and standardized mode headers/tooltips in [app/main.py](app/main.py)
+  - Made Help / FAQ mode-aware so Browse stays metadata-only in [src/app/components/help.py](src/app/components/help.py)
+  - Clarified seed-action tooltips without changing behavior in [src/app/components/cards.py](src/app/components/cards.py)
+  - Fixed Streamlit warning about widget key `ui_mode` by avoiding pre-setting `st.session_state["ui_mode"]` before creating the radio in [app/main.py](app/main.py)
+
+- Decisions made:
+  - In **Browse**, avoid “Match score” wording entirely; use “metadata-only” / “no ranking” language.
+  - Use “Ranked modes disabled” (instead of “Recommendations disabled”) for artifact failure UI copy to keep Browse wording clean.
 
 - Validation run:
-  - Manual: mode-switch + empty-state checks in Streamlit UI
+  - Manual: completed Streamlit manual checks (mode copy/tooltips + empty-state behavior; confirmed `ui_mode` warning is gone)
   - `python -m pytest -q` (52 passed, 3 warnings)
 
 - Next session start here:
-  - Phase 3 / Chunk 4: consistent mode-specific copy + tooltips.
+  - Phase 4: (candidate) centralize genre/type/year filtering utilities to reduce duplication (no UX change).
 
 ### Session 2025-12-26
 
