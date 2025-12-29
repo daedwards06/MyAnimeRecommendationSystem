@@ -1,0 +1,617 @@
+"""Phase 4 / Chunk A1: Golden queries + offline evaluation harness.
+
+One command that:
+  1) Computes headline offline ranking metrics (NDCG@K, MAP@K; plus optional coverage/Gini)
+  2) Generates a human-readable golden-queries report (top-N per query)
+
+Outputs:
+  - experiments/metrics/phase4_eval_<ts>.json
+  - experiments/metrics/summary.csv (append)
+  - reports/phase4_golden_queries_<ts>.md
+  - reports/artifacts/phase4_golden_queries_<ts>.json
+
+This script is evaluation-only: it does not change training pipelines or app UX.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import numpy as np
+import pandas as pd
+from joblib import load
+
+from src.app.artifacts_loader import build_artifacts, set_determinism
+from src.app.recommender import HybridComponents, HybridRecommender, choose_weights
+from src.app.search import fuzzy_search
+from src.app.diversity import compute_popularity_percentiles
+
+from src.eval.metrics import ndcg_at_k, average_precision_at_k
+from src.eval.metrics_extra import item_coverage, gini_index
+from src.eval.splits import build_validation, sample_user_ids
+
+from src.models.baselines import popularity_scores
+from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, DEFAULT_HYBRID_WEIGHTS
+from src.models.data_loader import load_interactions
+from src.models.hybrid import weighted_blend
+from src.models.knn_sklearn import ItemKNNRecommender
+from src.models.mf_sgd import FunkSVDRecommender
+
+
+REPORTS_DIR = Path("reports")
+REPORTS_ARTIFACTS_DIR = REPORTS_DIR / "artifacts"
+
+
+def _json_default(o: Any):
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    if isinstance(o, (np.floating,)):
+        return float(o)
+    if isinstance(o, (np.bool_,)):
+        return bool(o)
+    if isinstance(o, (np.ndarray,)):
+        return o.tolist()
+    return str(o)
+
+
+def _stable_rank(items_to_scores: dict[int, float], *, top_k: int) -> list[int]:
+    """Deterministic ranking: sort by score desc, then item id asc."""
+    ranked = sorted(items_to_scores.items(), key=lambda x: (-float(x[1]), int(x[0])))
+    return [int(i) for i, _ in ranked[:top_k]]
+
+
+def _evaluate_recs(recommendations: dict[int, list[int]], relevant: dict[int, set[int]], k: int) -> dict[str, float]:
+    ndcgs: list[float] = []
+    maps: list[float] = []
+    for u, recs in recommendations.items():
+        rel = relevant.get(u, set())
+        ndcgs.append(ndcg_at_k(recs, rel, k))
+        maps.append(average_precision_at_k(recs, rel, k))
+    return {
+        "ndcg@k_mean": float(sum(ndcgs) / max(1, len(ndcgs))),
+        "map@k_mean": float(sum(maps) / max(1, len(maps))),
+    }
+
+
+def _run_headline_metrics(*, k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float) -> dict[str, Any]:
+    """Compute headline offline metrics for a weighted hybrid (MF + kNN + popularity).
+
+    Uses processed interactions when available, and existing v1.0 artifacts if present.
+    Falls back to fitting models if artifacts are missing.
+    """
+
+    interactions = load_interactions(DATA_PROCESSED_DIR)
+
+    train_df, val_df = build_validation(interactions)
+    users = sample_user_ids(val_df["user_id"].astype(int).unique().tolist(), sample_users)
+
+    # Load or fit models (offline-eval harness; not app inference)
+    knn_path = MODELS_DIR / "item_knn_sklearn_v1.0.joblib"
+    mf_path = MODELS_DIR / "mf_sgd_v1.0.joblib"
+
+    if knn_path.exists():
+        knn_model: ItemKNNRecommender = load(knn_path)
+    else:
+        knn_model = ItemKNNRecommender().fit(train_df)
+
+    if mf_path.exists():
+        mf_model: FunkSVDRecommender = load(mf_path)
+    else:
+        mf_model = FunkSVDRecommender().fit(train_df)
+
+    train_hist = train_df.groupby("user_id")["anime_id"].apply(set).to_dict()
+    val_hist = val_df.groupby("user_id")["anime_id"].apply(set).to_dict()
+
+    pop_series = popularity_scores(train_df)  # item_id -> score
+    pop_scores_global = {int(i): float(s) for i, s in pop_series.items()}
+
+    recs: dict[int, list[int]] = {}
+
+    weights = {"mf": float(w_mf), "knn": float(w_knn), "pop": float(w_pop)}
+
+    for u in users:
+        u = int(u)
+        seen = set(train_hist.get(u, set()))
+
+        knn_scores = knn_model.score_all(u, exclude_seen=True)
+
+        # MF scores (mask seen)
+        mf_scores_arr = mf_model.predict_user(u)
+        if mf_model.item_to_index is not None:
+            for it in seen:
+                idx = mf_model.item_to_index.get(int(it))
+                if idx is not None and 0 <= int(idx) < len(mf_scores_arr):
+                    mf_scores_arr[int(idx)] = -np.inf
+        mf_scores = {
+            int(mf_model.index_to_item[i]): float(s)
+            for i, s in enumerate(mf_scores_arr)
+            if np.isfinite(s)
+        }
+
+        pop_scores = {i: s for i, s in pop_scores_global.items() if i not in seen}
+
+        # Deterministic weighted blend
+        agg: dict[int, float] = {}
+        for source, scores in (("mf", mf_scores), ("knn", knn_scores), ("pop", pop_scores)):
+            w = float(weights.get(source, 0.0))
+            if w == 0.0:
+                continue
+            for item_id, sc in scores.items():
+                agg[int(item_id)] = agg.get(int(item_id), 0.0) + w * float(sc)
+
+        recs[u] = _stable_rank(agg, top_k=k)
+
+    metrics = _evaluate_recs(recs, val_hist, k)
+
+    total_items = int(train_df["anime_id"].nunique())
+    metrics_extra = {
+        "item_coverage@k": item_coverage(recs, total_items),
+        "gini_index@k": gini_index(recs),
+    }
+
+    out: dict[str, Any] = {
+        "model": "hybrid_weighted",
+        "k": int(k),
+        "users_evaluated": int(len(recs)),
+        "weights": {"mf": float(w_mf), "knn": float(w_knn), "pop": float(w_pop)},
+        **metrics,
+        **metrics_extra,
+    }
+    return out
+
+
+@dataclass(frozen=True)
+class GoldenExpectations:
+    disallow_types: tuple[str, ...]
+    disallow_title_regex: str
+
+
+def _parse_genres(val: Any) -> set[str]:
+    if isinstance(val, str):
+        return {g.strip() for g in val.split("|") if g and g.strip()}
+    if hasattr(val, "__iter__") and not isinstance(val, str):
+        return {str(g).strip() for g in val if g and str(g).strip()}
+    return set()
+
+
+def _resolve_seed_titles(metadata: pd.DataFrame, seed_titles: list[str]) -> tuple[list[int], list[str], list[dict[str, Any]]]:
+    choices = [(str(t), int(a)) for t, a in zip(metadata["title_display"].astype(str).tolist(), metadata["anime_id"].astype(int).tolist())]
+
+    resolved_ids: list[int] = []
+    resolved_titles: list[str] = []
+    resolution_debug: list[dict[str, Any]] = []
+
+    title_to_id_exact = {
+        str(t): int(a)
+        for t, a in zip(metadata["title_display"].astype(str).tolist(), metadata["anime_id"].astype(int).tolist())
+    }
+
+    for q in seed_titles:
+        if q in title_to_id_exact:
+            aid = int(title_to_id_exact[q])
+            resolved_ids.append(aid)
+            resolved_titles.append(q)
+            resolution_debug.append({"query": q, "resolved_anime_id": aid, "matched_title": q, "method": "exact"})
+            continue
+
+        matches = fuzzy_search(q, choices, limit=5, min_score=70)
+        if not matches:
+            resolution_debug.append({"query": q, "resolved_anime_id": None, "matched_title": None, "method": "none"})
+            continue
+
+        aid, score, matched_title = matches[0]
+        resolved_ids.append(int(aid))
+        resolved_titles.append(str(matched_title))
+        resolution_debug.append({"query": q, "resolved_anime_id": int(aid), "matched_title": str(matched_title), "score": float(score), "method": "fuzzy"})
+
+    # de-dupe while preserving order
+    seen: set[int] = set()
+    uniq_ids: list[int] = []
+    uniq_titles: list[str] = []
+    for aid, title in zip(resolved_ids, resolved_titles):
+        if aid in seen:
+            continue
+        seen.add(aid)
+        uniq_ids.append(aid)
+        uniq_titles.append(title)
+
+    return uniq_ids, uniq_titles, resolution_debug
+
+
+def _build_app_like_recommender(bundle: dict[str, Any]) -> tuple[pd.DataFrame, HybridComponents, HybridRecommender, dict[int, float]]:
+    metadata: pd.DataFrame = bundle["metadata"]
+
+    mf_model = bundle.get("models", {}).get("mf")
+    if mf_model is None:
+        raise RuntimeError("MF model alias 'mf' not found in bundle['models']")
+
+    for attr in ("P", "Q", "global_mean", "index_to_item"):
+        if not hasattr(mf_model, attr):
+            raise RuntimeError(f"MF model missing required field '{attr}' for app-like inference")
+
+    index_to_item = mf_model.index_to_item
+    n_items = len(index_to_item)
+    item_ids = np.asarray([int(index_to_item[i]) for i in range(n_items)], dtype=np.int64)
+
+    p = mf_model.P
+    q = mf_model.Q
+    if p is None or q is None:
+        raise RuntimeError("MF model P/Q is None")
+    if p.shape[0] < 1:
+        raise RuntimeError("MF model has no users in P")
+
+    demo_user_index = 0
+    demo_scores = float(mf_model.global_mean) + (p[demo_user_index] @ q.T)
+    mf_scores = np.asarray(demo_scores, dtype=np.float32).reshape(1, -1)
+
+    components = HybridComponents(mf=mf_scores, knn=None, pop=None, item_ids=item_ids)
+
+    pop_percentile_by_anime_id: dict[int, float] = {}
+
+    # Optional: popularity prior from app-selected KNN artifact
+    knn_model = bundle.get("models", {}).get("knn")
+    try:
+        if (
+            knn_model is not None
+            and hasattr(knn_model, "item_pop")
+            and hasattr(knn_model, "item_to_index")
+            and knn_model.item_pop is not None
+            and knn_model.item_to_index is not None
+        ):
+            it2i = knn_model.item_to_index
+            pop_arr = np.asarray(knn_model.item_pop, dtype=np.float32)
+
+            pop_pct_arr = compute_popularity_percentiles(pop_arr)
+            pop_percentile_by_anime_id = {
+                int(aid): float(pop_pct_arr[int(idx)])
+                for aid, idx in it2i.items()
+                if idx is not None and 0 <= int(idx) < len(pop_pct_arr)
+            }
+
+            pop_vec = np.zeros(len(item_ids), dtype=np.float32)
+            for j, aid in enumerate(item_ids):
+                idx = it2i.get(int(aid))
+                if idx is not None and 0 <= int(idx) < len(pop_arr):
+                    pop_vec[j] = float(pop_arr[int(idx)])
+            components.pop = pop_vec
+    except Exception:
+        pop_percentile_by_anime_id = {}
+
+    recommender = HybridRecommender(components)
+    return metadata, components, recommender, pop_percentile_by_anime_id
+
+
+def _pop_pct(pop_pct_by_id: dict[int, float], anime_id: int) -> float:
+    try:
+        return float(pop_pct_by_id.get(int(anime_id), 0.5))
+    except Exception:
+        return 0.5
+
+
+def _seed_based_scores(
+    *,
+    metadata: pd.DataFrame,
+    components: HybridComponents,
+    recommender: HybridRecommender,
+    seed_ids: list[int],
+    seed_titles: list[str],
+    weights: dict[str, float],
+    pop_pct_by_id: dict[int, float],
+    top_n: int,
+) -> list[dict[str, Any]]:
+    if not seed_ids:
+        return []
+
+    # Stable iteration order
+    work = metadata.sort_values("anime_id", kind="mergesort")
+
+    seed_genre_map: dict[str, set[str]] = {}
+    all_seed_genres: set[str] = set()
+    genre_weights: dict[str, int] = {}
+
+    for sid, stitle in zip(seed_ids, seed_titles):
+        seed_row = work.loc[work["anime_id"].astype(int) == int(sid)].head(1)
+        if seed_row.empty:
+            continue
+        seed_genres = _parse_genres(seed_row.iloc[0].get("genres"))
+        seed_genre_map[stitle] = seed_genres
+        all_seed_genres.update(seed_genres)
+        for g in seed_genres:
+            genre_weights[g] = genre_weights.get(g, 0) + 1
+
+    num_seeds = max(1, len(seed_ids))
+
+    try:
+        blended_scores = recommender._blend(0, weights)  # pylint: disable=protected-access
+    except Exception:
+        blended_scores = None
+
+    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
+
+    scored: list[dict[str, Any]] = []
+
+    for _, row in work.iterrows():
+        aid = int(row["anime_id"])
+        if aid in seed_ids:
+            continue
+
+        item_genres = _parse_genres(row.get("genres"))
+
+        raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
+        max_possible_overlap = len(all_seed_genres) * num_seeds
+        weighted_overlap = (raw_overlap / max_possible_overlap) if max_possible_overlap > 0 else 0.0
+
+        overlap_per_seed = {
+            seed_title: int(len(seed_genres & item_genres))
+            for seed_title, seed_genres in seed_genre_map.items()
+        }
+        num_seeds_matched = sum(1 for c in overlap_per_seed.values() if c > 0)
+
+        pop_pct = _pop_pct(pop_pct_by_id, aid)
+        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)
+
+        if blended_scores is not None and aid in id_to_index:
+            hybrid_val = float(blended_scores[int(id_to_index[aid])])
+        else:
+            hybrid_val = 0.0
+
+        seed_coverage = num_seeds_matched / num_seeds
+
+        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost)
+        if score <= 0.0:
+            continue
+
+        scored.append(
+            {
+                "anime_id": aid,
+                "score": float(score),
+                "meta": {
+                    "title_display": str(row.get("title_display", "")),
+                    "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                    "mal_score": None if pd.isna(row.get("mal_score")) else float(row.get("mal_score")),
+                    "members_count": None if pd.isna(row.get("members_count")) else int(row.get("members_count")),
+                    "aired_from": None if pd.isna(row.get("aired_from")) else str(row.get("aired_from")),
+                },
+                "signals": {
+                    "weighted_overlap": float(weighted_overlap),
+                    "seed_coverage": float(seed_coverage),
+                    "hybrid_val": float(hybrid_val),
+                    "popularity_boost": float(popularity_boost),
+                    "overlap_per_seed": overlap_per_seed,
+                },
+            }
+        )
+
+    scored.sort(key=lambda x: (-float(x["score"]), int(x["anime_id"])))
+    return scored[:top_n]
+
+
+def _evaluate_golden_queries(
+    *,
+    golden_path: Path,
+    weight_mode: str,
+) -> dict[str, Any]:
+    cfg = json.loads(golden_path.read_text(encoding="utf-8"))
+    defaults = cfg.get("defaults", {})
+
+    bundle = build_artifacts()
+    metadata, components, recommender, pop_pct_by_id = _build_app_like_recommender(bundle)
+
+    weights = choose_weights(weight_mode)
+
+    default_expect = GoldenExpectations(
+        disallow_types=tuple(str(t) for t in defaults.get("disallow_types", [])),
+        disallow_title_regex=str(defaults.get("disallow_title_regex", "")),
+    )
+    default_top_n = int(defaults.get("top_n", 20))
+
+    out_queries: list[dict[str, Any]] = []
+
+    for q in cfg.get("queries", []):
+        qid = str(q.get("id"))
+        seed_titles = [str(x) for x in (q.get("seed_titles") or [])]
+        notes = q.get("notes")
+
+        top_n = int(q.get("top_n", default_top_n))
+        disallow_types = tuple(str(t) for t in q.get("disallow_types", default_expect.disallow_types))
+        disallow_title_regex = str(q.get("disallow_title_regex", default_expect.disallow_title_regex))
+        title_re = re.compile(disallow_title_regex) if disallow_title_regex else None
+
+        seed_ids, matched_titles, resolution_debug = _resolve_seed_titles(metadata, seed_titles)
+
+        recs = _seed_based_scores(
+            metadata=metadata,
+            components=components,
+            recommender=recommender,
+            seed_ids=seed_ids,
+            seed_titles=matched_titles,
+            weights=weights,
+            pop_pct_by_id=pop_pct_by_id,
+            top_n=top_n,
+        )
+
+        violations: list[dict[str, Any]] = []
+        for rank, rec in enumerate(recs, start=1):
+            meta = rec.get("meta") or {}
+            title = str(meta.get("title_display", ""))
+            typ = meta.get("type")
+
+            bad_type = bool(typ and typ in disallow_types)
+            bad_title = bool(title_re and title_re.search(title))
+
+            if bad_type or bad_title:
+                violations.append(
+                    {
+                        "rank": int(rank),
+                        "anime_id": int(rec.get("anime_id")),
+                        "title_display": title,
+                        "type": typ,
+                        "bad_type": bad_type,
+                        "bad_title": bad_title,
+                    }
+                )
+
+        out_queries.append(
+            {
+                "id": qid,
+                "seed_titles": seed_titles,
+                "resolved_seed_ids": seed_ids,
+                "resolved_seed_titles": matched_titles,
+                "notes": notes,
+                "weight_mode": weight_mode,
+                "top_n": top_n,
+                "expectations": {
+                    "disallow_types": list(disallow_types),
+                    "disallow_title_regex": disallow_title_regex,
+                },
+                "seed_resolution": resolution_debug,
+                "recommendations": recs,
+                "violation_count": int(len(violations)),
+                "violations": violations,
+            }
+        )
+
+    return {
+        "schema": "phase4_golden_queries",
+        "golden_file": str(golden_path.as_posix()),
+        "weight_mode": weight_mode,
+        "queries": out_queries,
+    }
+
+
+def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -> None:
+    lines: list[str] = []
+    lines.append("# Phase 4 — Golden Queries Report")
+    lines.append("")
+    lines.append(f"Generated: {datetime.now(timezone.utc).isoformat()}")
+    lines.append(f"Weight mode: {golden_results.get('weight_mode')}")
+    lines.append(f"Golden file: {golden_results.get('golden_file')}")
+    lines.append("")
+
+    for q in golden_results.get("queries", []):
+        lines.append("---")
+        lines.append("")
+        lines.append(f"## {q.get('id')}")
+        lines.append("")
+        lines.append(f"Seeds (requested): {', '.join(q.get('seed_titles') or [])}")
+        lines.append(f"Seeds (resolved): {', '.join(q.get('resolved_seed_titles') or [])}")
+        lines.append(f"Seed IDs: {q.get('resolved_seed_ids')}")
+        if q.get("notes"):
+            lines.append(f"Notes: {q.get('notes')}")
+        lines.append(f"Top-N: {q.get('top_n')}")
+        lines.append(f"Violations: {q.get('violation_count')}")
+        lines.append("")
+
+        # Table header
+        lines.append("| Rank | anime_id | Title | Type | MAL | Members | Flag |")
+        lines.append("|---:|---:|---|---|---:|---:|---|")
+
+        violations_by_id_rank = {(v.get("anime_id"), v.get("rank")): v for v in (q.get("violations") or [])}
+
+        for idx, rec in enumerate(q.get("recommendations") or [], start=1):
+            meta = rec.get("meta") or {}
+            aid = int(rec.get("anime_id"))
+            title = str(meta.get("title_display", "")).replace("|", "\\|")
+            typ = meta.get("type") or ""
+            mal = meta.get("mal_score")
+            members = meta.get("members_count")
+
+            flag = ""
+            v = violations_by_id_rank.get((aid, idx))
+            if v:
+                parts: list[str] = []
+                if v.get("bad_type"):
+                    parts.append("bad_type")
+                if v.get("bad_title"):
+                    parts.append("bad_title")
+                flag = ",".join(parts)
+
+            mal_s = f"{float(mal):.2f}" if mal is not None else ""
+            mem_s = f"{int(members):d}" if members is not None else ""
+
+            lines.append(f"| {idx} | {aid} | {title} | {typ} | {mal_s} | {mem_s} | {flag} |")
+
+        lines.append("")
+
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Phase 4 A1: offline metrics + golden queries")
+    parser.add_argument("--k", type=int, default=TOP_K_DEFAULT, help="K for offline ranking metrics")
+    parser.add_argument("--sample-users", type=int, default=DEFAULT_SAMPLE_USERS, help="Users sampled for offline metrics")
+    parser.add_argument("--w-mf", type=float, default=DEFAULT_HYBRID_WEIGHTS["mf"])
+    parser.add_argument("--w-knn", type=float, default=DEFAULT_HYBRID_WEIGHTS["knn"])
+    parser.add_argument("--w-pop", type=float, default=DEFAULT_HYBRID_WEIGHTS["pop"])
+    parser.add_argument(
+        "--golden",
+        type=str,
+        default="data/samples/golden_queries_phase4.json",
+        help="Path to golden queries config JSON",
+    )
+    parser.add_argument(
+        "--golden-weight-mode",
+        type=str,
+        default="Balanced",
+        choices=["Balanced", "Diversity"],
+        help="Use app weight preset for golden queries (seed-based scoring)",
+    )
+    args = parser.parse_args()
+
+    set_determinism(42)
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+
+    # 1) Headline offline metrics
+    headline = _run_headline_metrics(
+        k=int(args.k),
+        sample_users=int(args.sample_users),
+        w_mf=float(args.w_mf),
+        w_knn=float(args.w_knn),
+        w_pop=float(args.w_pop),
+    )
+
+    headline.update({"timestamp_utc": ts, "seed": 42})
+
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
+    out_metrics_json = METRICS_DIR / f"phase4_eval_{ts}.json"
+    out_metrics_json.write_text(json.dumps(headline, indent=2, default=_json_default), encoding="utf-8")
+
+    # Append to summary.csv (stable schema: one row)
+    out_summary = METRICS_DIR / "summary.csv"
+    pd.DataFrame([headline]).to_csv(out_summary, mode="a", header=not out_summary.exists(), index=False)
+
+    # 2) Golden queries report
+    golden_path = Path(args.golden)
+    golden_results = _evaluate_golden_queries(golden_path=golden_path, weight_mode=str(args.golden_weight_mode))
+    golden_results["timestamp_utc"] = ts
+
+    REPORTS_ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    out_golden_json = REPORTS_ARTIFACTS_DIR / f"phase4_golden_queries_{ts}.json"
+    out_golden_json.write_text(json.dumps(golden_results, indent=2, default=_json_default), encoding="utf-8")
+
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    out_md = REPORTS_DIR / f"phase4_golden_queries_{ts}.md"
+    _render_markdown_report(golden_results=golden_results, out_path=out_md)
+
+    print(json.dumps({
+        "metrics_json": str(out_metrics_json.as_posix()),
+        "golden_json": str(out_golden_json.as_posix()),
+        "golden_md": str(out_md.as_posix()),
+        "headline": headline,
+    }, indent=2, default=_json_default))
+
+
+if __name__ == "__main__":
+    main()

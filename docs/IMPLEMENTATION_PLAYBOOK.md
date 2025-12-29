@@ -13,9 +13,9 @@ How to use:
 
 **Project:** Anime Recommendation System (Streamlit portfolio app)
 
-**Primary goal right now:** Phase 3
+**Primary goal right now:** Phase 4
 
-**Current phase:** Phase 3
+**Current phase:** Phase 4
 
 **Last updated:** 2025-12-29
 
@@ -23,12 +23,10 @@ How to use:
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Implemented **Phase 3 / Chunk 3**: mode-aware first-load clarity + empty-state recovery prompts (Browse / Seed-based / Personalized).
-- Implemented **Phase 3 / Chunk 4**: consistent mode-specific copy + tooltips (Browse-safe wording; no scoring/model changes).
-- Fixed Streamlit startup warning by ensuring the `ui_mode` radio widget owns its session-state key.
+- Implemented **Phase 4 / Chunk A1**: added golden queries list + a single offline evaluation entrypoint that writes headline metrics and a golden-queries report.
 
 **Next action (single sentence):**
-- Phase 4: (candidate) centralize filtering utilities to reduce duplication (no UX change).
+- Phase 4 / Chunk A2: add candidate hygiene guardrails (recaps/specials/shorts) and validate against golden queries.
 
 ---
 
@@ -38,8 +36,8 @@ Set one phase to **IN PROGRESS**. Keep the rest **NOT STARTED** or **DONE**.
 
 - Phase 1 — Truthful Inference (Artifacts, Paths, Cold-Start): DONE
 - Phase 2 — Score Semantics + Explanations (Credibility): DONE
-- Phase 3 — UX Flow + Progressive Disclosure (Clarity): IN PROGRESS
-- Phase 4 — Refactor + Tests + Performance (Maintainability): NOT STARTED 
+- Phase 3 — UX Flow + Progressive Disclosure (Clarity): DONE
+- Phase 4 — Refactor + Tests + Performance (Maintainability): IN PROGRESS
 - Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal): NOT STARTED 
 
 ---
@@ -481,6 +479,34 @@ Record decisions that future sessions must not re-litigate.
 
 - Next session start here:
   - Phase 4: (candidate) centralize genre/type/year filtering utilities to reduce duplication (no UX change).
+
+### Session 2025-12-29 (Phase 4 / Chunk A1)
+
+- What I did:
+  - Created a small “golden queries / failure cases” set (includes Tokyo Ghoul) with lightweight expectations.
+  - Added a single offline evaluation entrypoint that produces:
+    - Headline ranking metrics (NDCG@K, MAP@K; plus coverage/Gini)
+    - A human-readable golden-queries report showing top-N outputs per query
+
+- What I changed:
+  - Added golden query config in [data/samples/golden_queries_phase4.json](data/samples/golden_queries_phase4.json)
+  - Added evaluation script in [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py)
+
+- Decisions made:
+  - Store headline metrics under `experiments/metrics/` (consistent with existing eval scripts).
+  - Store golden queries JSON under `reports/artifacts/` and a readable Markdown report under `reports/`.
+  - Keep evaluation deterministic where possible (fixed seed; stable sorting / tie-breaking in the harness).
+
+- Validation run:
+  - `python -m pytest -q` (52 passed, 3 warnings)
+  - `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50`
+    - Wrote: `experiments/metrics/phase4_eval_20251229165531.json`
+    - Wrote: `reports/phase4_golden_queries_20251229165531.md`
+    - Wrote: `reports/artifacts/phase4_golden_queries_20251229165531.json`
+  - Manual: completed A1 sanity checks on golden artifacts and determinism
+
+- Next session start here:
+  - Phase 4 / Chunk A2: implement candidate hygiene (type/title guardrails) and validate improvements against the golden queries report.
 
 ### Session 2025-12-26
 
