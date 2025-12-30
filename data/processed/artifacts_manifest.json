@@ -15,5 +15,30 @@
       "mf": "models\\mf_sgd_v2025.11.21_202756.joblib",
       "created_utc": "2025-11-21T20:52:44+00:00"
     }
+  ],
+  "synopsis_tfidf": [
+    {
+      "stem": "synopsis_tfidf_v2025.12.30_195311",
+      "path": "models/synopsis_tfidf_v2025.12.30_195311.joblib",
+      "created_utc": "2025-12-30T19:53:11+00:00",
+      "schema": "synopsis_tfidf_v1",
+      "vocab_size": 30000,
+      "vectorizer_params": {
+        "lowercase": true,
+        "strip_accents": "unicode",
+        "stop_words": "english",
+        "max_features": 30000,
+        "ngram_range": [
+          1,
+          2
+        ],
+        "min_df": 2,
+        "max_df": 0.9,
+        "token_pattern": "(?u)\\b[a-zA-Z][a-zA-Z]+\\b",
+        "sublinear_tf": true,
+        "norm": "l2"
+      },
+      "text_field": "synopsis|synopsis_snippet"
+    }
   ]
 }
