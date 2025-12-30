@@ -43,6 +43,13 @@ from src.app.metadata_features import (
     build_seed_metadata_profile,
     compute_metadata_affinity,
 )
+from src.app.synopsis_tfidf import (
+    compute_seed_similarity_map,
+    most_common_seed_type,
+    synopsis_gate_passes,
+    synopsis_tfidf_penalty_for_candidate,
+    synopsis_tfidf_bonus_for_candidate,
+)
 
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
@@ -317,6 +324,7 @@ def _seed_based_scores(
     pop_pct_by_id: dict[int, float],
     top_n: int,
     exclude_ids: set[int] | None = None,
+    synopsis_tfidf_artifact: Any | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not seed_ids:
         return [], {
@@ -325,12 +333,21 @@ def _seed_based_scores(
             "metadata_bonus_max": 0.0,
             "affinity_mean": 0.0,
             "affinity_max": 0.0,
+            "synopsis_tfidf_bonus_fired_count": 0,
+            "synopsis_tfidf_bonus_mean": 0.0,
+            "synopsis_tfidf_bonus_max": 0.0,
             "top20_overlap_with_without_meta": 1.0,
             "top50_overlap_with_without_meta": 1.0,
             "top20_mean_abs_rank_delta": 0.0,
             "top50_mean_abs_rank_delta": 0.0,
             "top20_moved_count": 0,
             "top50_moved_count": 0,
+            "top20_overlap_with_without_tfidf": 1.0,
+            "top50_overlap_with_without_tfidf": 1.0,
+            "top20_mean_abs_rank_delta_tfidf": 0.0,
+            "top50_mean_abs_rank_delta_tfidf": 0.0,
+            "top20_moved_count_tfidf": 0,
+            "top50_moved_count_tfidf": 0,
         }
 
     exclude_ids = set(exclude_ids or set())
@@ -340,6 +357,17 @@ def _seed_based_scores(
 
     # Phase 4 / Chunk A3: seed metadata affinity profile (used as a cold-start bonus only).
     seed_meta_profile = build_seed_metadata_profile(work, seed_ids=seed_ids)
+
+    # Phase 4 (A3 → early A4): optional synopsis TF-IDF similarity map for semantic rerank.
+    synopsis_sims_by_id: dict[int, float] = {}
+    seed_type_target: str | None = None
+    if synopsis_tfidf_artifact is not None:
+        try:
+            synopsis_sims_by_id = compute_seed_similarity_map(synopsis_tfidf_artifact, seed_ids=seed_ids)
+            seed_type_target = most_common_seed_type(work, seed_ids)
+        except Exception:
+            synopsis_sims_by_id = {}
+            seed_type_target = None
 
     seed_genre_map: dict[str, set[str]] = {}
     all_seed_genres: set[str] = set()
@@ -399,9 +427,44 @@ def _seed_based_scores(
             coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
             meta_bonus = coef * float(meta_affinity)
 
+        synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
+        cand_type = None if pd.isna(row.get("type")) else str(row.get("type")).strip()
+        cand_eps = row.get("episodes")
+        passes_gate = synopsis_gate_passes(
+            seed_type=seed_type_target,
+            candidate_type=cand_type,
+            candidate_episodes=cand_eps,
+        )
+
+        synopsis_tfidf_bonus = 0.0
+        if passes_gate:
+            synopsis_tfidf_bonus = float(
+                synopsis_tfidf_bonus_for_candidate(
+                    sim=synopsis_tfidf_sim,
+                    hybrid_val=hybrid_val,
+                )
+            )
+
+        synopsis_tfidf_penalty = float(
+            synopsis_tfidf_penalty_for_candidate(
+                passes_gate=passes_gate,
+                sim=synopsis_tfidf_sim,
+                candidate_episodes=cand_eps,
+            )
+        )
+
+        synopsis_tfidf_adjustment = float(synopsis_tfidf_bonus + synopsis_tfidf_penalty)
+
         seed_coverage = num_seeds_matched / num_seeds
 
-        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost) + meta_bonus
+        score = (
+            (0.5 * weighted_overlap)
+            + (0.2 * seed_coverage)
+            + (0.25 * hybrid_val)
+            + (0.05 * popularity_boost)
+            + meta_bonus
+            + synopsis_tfidf_adjustment
+        )
         if score <= 0.0:
             continue
 
@@ -424,6 +487,11 @@ def _seed_based_scores(
                     "metadata_affinity": float(meta_affinity),
                     "metadata_bonus": float(meta_bonus),
                     "score_without_metadata_bonus": float(score - meta_bonus),
+                    "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
+                    "synopsis_tfidf_bonus": float(synopsis_tfidf_bonus),
+                    "synopsis_tfidf_penalty": float(synopsis_tfidf_penalty),
+                    "synopsis_tfidf_adjustment": float(synopsis_tfidf_adjustment),
+                    "score_without_synopsis_tfidf_bonus": float(score - synopsis_tfidf_adjustment),
                     "overlap_per_seed": overlap_per_seed,
                 },
             }
@@ -436,6 +504,10 @@ def _seed_based_scores(
     scored_without_meta = sorted(
         scored,
         key=lambda x: (-float(x.get("signals", {}).get("score_without_metadata_bonus", 0.0)), int(x["anime_id"])),
+    )
+    scored_without_tfidf = sorted(
+        scored,
+        key=lambda x: (-float(x.get("signals", {}).get("score_without_synopsis_tfidf_bonus", 0.0)), int(x["anime_id"])),
     )
 
     def _top_ids(items: list[dict[str, Any]], k: int) -> list[int]:
@@ -467,8 +539,14 @@ def _seed_based_scores(
     with50 = _top_ids(scored_with_meta, 50)
     without50 = _top_ids(scored_without_meta, 50)
 
+    without_tfidf20 = _top_ids(scored_without_tfidf, 20)
+    without_tfidf50 = _top_ids(scored_without_tfidf, 50)
+
     top20_mean_abs_delta, top20_moved = _rank_diagnostics(with20, without20)
     top50_mean_abs_delta, top50_moved = _rank_diagnostics(with50, without50)
+
+    top20_mean_abs_delta_tfidf, top20_moved_tfidf = _rank_diagnostics(with20, without_tfidf20)
+    top50_mean_abs_delta_tfidf, top50_moved_tfidf = _rank_diagnostics(with50, without_tfidf50)
 
     recs_top_n = scored_with_meta[:top_n]
 
@@ -484,18 +562,34 @@ def _seed_based_scores(
     ]
     fired = [b for b in bonuses if float(b) > 0.0]
 
+    tfidf_bonuses = [
+        float((r.get("signals") or {}).get("synopsis_tfidf_bonus", 0.0))
+        for r in recs_top_n
+        if r.get("signals") is not None
+    ]
+    tfidf_fired = [b for b in tfidf_bonuses if float(b) > 0.0]
+
     diagnostics = {
         "metadata_bonus_fired_count": int(len(fired)),
         "metadata_bonus_mean": float(sum(bonuses) / max(1, len(bonuses))),
         "metadata_bonus_max": float(max(bonuses) if bonuses else 0.0),
         "affinity_mean": float(sum(affinities) / max(1, len(affinities))),
         "affinity_max": float(max(affinities) if affinities else 0.0),
+        "synopsis_tfidf_bonus_fired_count": int(len(tfidf_fired)),
+        "synopsis_tfidf_bonus_mean": float(sum(tfidf_bonuses) / max(1, len(tfidf_bonuses))),
+        "synopsis_tfidf_bonus_max": float(max(tfidf_bonuses) if tfidf_bonuses else 0.0),
         "top20_overlap_with_without_meta": _overlap_ratio(with20, without20),
         "top50_overlap_with_without_meta": _overlap_ratio(with50, without50),
         "top20_mean_abs_rank_delta": float(top20_mean_abs_delta),
         "top50_mean_abs_rank_delta": float(top50_mean_abs_delta),
         "top20_moved_count": int(top20_moved),
         "top50_moved_count": int(top50_moved),
+        "top20_overlap_with_without_tfidf": _overlap_ratio(with20, without_tfidf20),
+        "top50_overlap_with_without_tfidf": _overlap_ratio(with50, without_tfidf50),
+        "top20_mean_abs_rank_delta_tfidf": float(top20_mean_abs_delta_tfidf),
+        "top50_mean_abs_rank_delta_tfidf": float(top50_mean_abs_delta_tfidf),
+        "top20_moved_count_tfidf": int(top20_moved_tfidf),
+        "top50_moved_count_tfidf": int(top50_moved_tfidf),
     }
 
     return recs_top_n, diagnostics
@@ -511,6 +605,8 @@ def _evaluate_golden_queries(
 
     bundle = build_artifacts()
     metadata, components, recommender, pop_pct_by_id = _build_app_like_recommender(bundle)
+
+    synopsis_tfidf_artifact = bundle.get("models", {}).get("synopsis_tfidf")
 
     # Phase 4 / Chunk A2: apply app-like ranked candidate hygiene in golden harness.
     ranked_hygiene_exclude_ids = build_ranked_candidate_hygiene_exclude_ids(metadata)
@@ -547,6 +643,7 @@ def _evaluate_golden_queries(
             pop_pct_by_id=pop_pct_by_id,
             top_n=top_n,
             exclude_ids=ranked_hygiene_exclude_ids,
+            synopsis_tfidf_artifact=synopsis_tfidf_artifact,
         )
 
         violations: list[dict[str, Any]] = []
@@ -628,10 +725,16 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"bonus_fired={diag.get('metadata_bonus_fired_count')}, "
                 f"bonus_mean={float(diag.get('metadata_bonus_mean', 0.0)):.5f}, "
                 f"bonus_max={float(diag.get('metadata_bonus_max', 0.0)):.5f}, "
-                f"top20_overlap={float(diag.get('top20_overlap_with_without_meta', 1.0)):.3f}, "
-                f"top50_overlap={float(diag.get('top50_overlap_with_without_meta', 1.0)):.3f}, "
-                f"top20_moved={diag.get('top20_moved_count')}, "
-                f"top50_moved={diag.get('top50_moved_count')}"
+                f"tfidf_fired={diag.get('synopsis_tfidf_bonus_fired_count')}, "
+                f"tfidf_mean={float(diag.get('synopsis_tfidf_bonus_mean', 0.0)):.5f}, "
+                f"top20_overlap_meta={float(diag.get('top20_overlap_with_without_meta', 1.0)):.3f}, "
+                f"top50_overlap_meta={float(diag.get('top50_overlap_with_without_meta', 1.0)):.3f}, "
+                f"top20_moved_meta={diag.get('top20_moved_count')}, "
+                f"top50_moved_meta={diag.get('top50_moved_count')}, "
+                f"top20_overlap_tfidf={float(diag.get('top20_overlap_with_without_tfidf', 1.0)):.3f}, "
+                f"top50_overlap_tfidf={float(diag.get('top50_overlap_with_without_tfidf', 1.0)):.3f}, "
+                f"top20_moved_tfidf={diag.get('top20_moved_count_tfidf')}, "
+                f"top50_moved_tfidf={diag.get('top50_moved_count_tfidf')}"
             )
         lines.append("")
 

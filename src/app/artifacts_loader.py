@@ -314,6 +314,23 @@ def build_artifacts(
         # kNN is optional for Phase 1; do not block app startup.
         pass
 
+    # Optional: synopsis TF-IDF artifact (Phase 4 semantic rerank experiment).
+    # Only alias when unambiguous or explicitly chosen.
+    synopsis_tfidf_candidates = sorted([k for k in models.keys() if k.startswith("synopsis_tfidf")])
+    try:
+        synopsis_tfidf_stem = _select_model_stem(
+            models,
+            candidates=synopsis_tfidf_candidates,
+            env_var="APP_SYNOPSIS_TFIDF_STEM",
+            label="Synopsis TF-IDF",
+            preferred_stem=None,
+        )
+        models["synopsis_tfidf"] = models[synopsis_tfidf_stem]
+        models["_synopsis_tfidf_stem"] = synopsis_tfidf_stem
+    except ArtifactContractError:
+        # TF-IDF is optional; do not block app startup.
+        pass
+
     explanations = _load_json_glob(reports_dir_p, "**/*explanations*.json")
     diversity = _load_json_glob(reports_dir_p, "**/*diversity*.json")
 

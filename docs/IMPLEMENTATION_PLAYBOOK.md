@@ -86,6 +86,24 @@ If these are not available, the app must fail loudly with an actionable message 
 - Name: `mf_sgd_v2025.11.21_202756`
 - Rationale: Latest timestamped MF artifact in repo; selected deterministically by default and overrideable via `APP_MF_MODEL_STEM`.
 
+### 2.4 Synopsis TF-IDF artifact (optional; ranked rerank)
+
+If present, the app may load a synopsis TF-IDF artifact and use it as a **small additive rerank** in ranked modes.
+
+- File pattern: `models/synopsis_tfidf_v*.joblib`
+- Selected deterministically by default; override by setting `APP_SYNOPSIS_TFIDF_STEM=<stem>`
+- Loaded into bundle at: `bundle["models"]["synopsis_tfidf"]`
+- Expected object: `SynopsisTfidfArtifact` (see `src/app/synopsis_tfidf.py`)
+  - Must include an `anime_ids` alignment and an `anime_id_to_row` mapping for deterministic lookup
+  - Must include the fitted `TfidfVectorizer` and the aligned sparse `tfidf_matrix`
+  - Must include `schema` and `vectorizer_params` for traceability
+
+Build command:
+- `python scripts/build_synopsis_tfidf_artifact.py`
+
+Artifact metadata tracking:
+- Appends build info under `data/processed/artifacts_manifest.json` with key `synopsis_tfidf`
+
 ---
 
 ## 3) Scoring Path Definitions (Source of Truth)
@@ -303,12 +321,12 @@ Notes:
 #### Chunk A3 — Content features (parquet + new data)
 
 - [x] Use additional metadata columns from `data/processed/anime_metadata.parquet` as features for similarity/ranking (studios, themes, year proximity).
-- [ ] Optionally add new data/features for stronger semantic similarity and better cold-start behavior.
+- [x] Optionally add new data/features for stronger semantic similarity and better cold-start behavior.
 
 **Expanded next steps (keep deterministic + measurable):**
-- [ ] Add more sensitive offline reporting (rank movement, top-20 overlap, mean rank delta) so improvements show up even when top-10 membership doesn’t change.
-- [ ] Replace binary overlap with graded overlap (e.g., Jaccard on themes/studios) + thresholding so we can increase coefficients without “year-only” false positives.
-- [ ] Add a lightweight “new data” feature: TF-IDF synopsis similarity rerank (artifact + deterministic inference).
+- [x] Add more sensitive offline reporting (rank movement, top-20 overlap, mean rank delta) so improvements show up even when top-10 membership doesn’t change.
+- [x] Replace binary overlap with graded overlap (e.g., Jaccard on themes/studios) + thresholding so we can increase coefficients without “year-only” false positives.
+- [x] Add a lightweight “new data” feature: TF-IDF synopsis similarity rerank (artifact + deterministic inference).
 - [ ] If adding embeddings later: define the artifact contract in Section 2 (format, dims, dtype, ID alignment), add versioning, and wire via the same ranked scoring choke points + golden harness.
 
 **Done when:**
@@ -482,6 +500,25 @@ Notes:
 - **Rationale:** Increase sensitivity of the signal without reintroducing “single generic theme” false positives; make changes measurable even when top-10 membership is unchanged.
 - **Tradeoffs:** Diagnostics focus on set overlap + rank delta; they don’t directly measure semantic relevance and should be paired with human review of golden reports.
 
+### 2025-12-30 — Phase 4 / Chunk A3: Synopsis TF-IDF rerank (new artifact)
+
+- **Decision:** Add an optional synopsis TF-IDF semantic similarity signal as a small additive rerank term in ranked modes.
+- **Guardrails:**
+  - Deterministic artifact build (stable sort by `anime_id`, fixed TF-IDF params).
+  - Conservative gate: pass if same `type` OR `episodes >= MIN_EPISODES`.
+  - Off-gate short-form penalty bounded to never become positive.
+- **Where implemented:**
+  - Artifact contract + build + similarity utilities: `src/app/synopsis_tfidf.py`
+  - Artifact build script + manifest append: `scripts/build_synopsis_tfidf_artifact.py`
+  - Optional loader alias + env override: `src/app/artifacts_loader.py` (`APP_SYNOPSIS_TFIDF_STEM`)
+  - Ranked scoring wiring + explanation fields: `app/main.py`
+  - Golden harness wiring + TF-IDF diagnostics: `scripts/evaluate_phase4_golden.py`
+- **Rationale:** Metadata-only affinity did not reliably suppress “weird match” content for narrative-heavy seeds; synopsis text provides a cheap semantic signal without embeddings.
+- **Tradeoffs:**
+  - TF-IDF often matches franchise-adjacent text strongly (sequels/movies/specials) and may not generalize to “similar vibe” titles.
+  - Signal can be sparse if synopses are short/missing; bonus magnitudes remain intentionally small.
+  - Seed resolution can still be wrong (e.g., golden `my_hero_academia` resolves to Demon Slayer), which limits interpretation of some golden rows.
+
 
 Record decisions that future sessions must not re-litigate.
 
@@ -518,8 +555,23 @@ Record decisions that future sessions must not re-litigate.
     - Wrote: `reports/artifacts/phase4_golden_queries_20251230175115.json`
 
 - Next session start here:
-  - Decide whether to proceed with Phase 4 / Chunk A3 “new data” (TF-IDF synopsis rerank) based on golden diagnostics and reviewed failures.
-  - Qualitative inspection of One Piece recommendations showed that metadata-only affinity produced children’s folklore and short-form content, despite passing hygiene checks. This motivated the addition of a lightweight synopsis TF-IDF rerank to capture narrative similarity
+  - Proceeded with the Phase 4 / Chunk A3 “new data” experiment (synopsis TF-IDF rerank) and validated it through the golden harness.
+
+### Session 2025-12-30 (Phase 4 / Chunk A3 — Synopsis TF-IDF)
+
+- What I did:
+  - Built a versioned synopsis TF-IDF artifact.
+  - Wired it into ranked seed-based scoring (and personalized-with-seeds) as an additive bonus + bounded penalty.
+  - Extended golden reporting to include TF-IDF firing counts and rank movement vs “without TF-IDF”.
+
+- Observed effects (baseline `20251230193641` → latest `20251230214709`):
+  - `violation_count` remained 0 across golden queries.
+  - TF-IDF causes measurable within-top movement (e.g., Tokyo Ghoul `top20_overlap_tfidf=0.250`, `top20_moved_tfidf=5`).
+  - Qualitatively, results are still dominated by non-franchise short-form/catalog quirks for some seeds; TF-IDF did not reliably surface “similar long shounen” for One Piece.
+
+- Validation run:
+  - `python scripts/evaluate_phase4_golden.py --golden-weight-mode Balanced`
+    - Wrote: `reports/phase4_golden_queries_20251230214709.md`
 
 ### Session 2025-12-29
 
