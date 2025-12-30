@@ -37,6 +37,12 @@ from src.app.recommender import HybridComponents, HybridRecommender, choose_weig
 from src.app.search import fuzzy_search
 from src.app.diversity import compute_popularity_percentiles
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
+from src.app.metadata_features import (
+    METADATA_AFFINITY_COLD_START_COEF,
+    METADATA_AFFINITY_TRAINED_COEF,
+    build_seed_metadata_profile,
+    compute_metadata_affinity,
+)
 
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
@@ -320,6 +326,9 @@ def _seed_based_scores(
     # Stable iteration order
     work = metadata.sort_values("anime_id", kind="mergesort")
 
+    # Phase 4 / Chunk A3: seed metadata affinity profile (used as a cold-start bonus only).
+    seed_meta_profile = build_seed_metadata_profile(work, seed_ids=seed_ids)
+
     seed_genre_map: dict[str, set[str]] = {}
     all_seed_genres: set[str] = set()
     genre_weights: dict[str, int] = {}
@@ -372,9 +381,15 @@ def _seed_based_scores(
         else:
             hybrid_val = 0.0
 
+        meta_affinity = compute_metadata_affinity(seed_meta_profile, row)
+        meta_bonus = 0.0
+        if meta_affinity > 0.0:
+            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
+            meta_bonus = coef * float(meta_affinity)
+
         seed_coverage = num_seeds_matched / num_seeds
 
-        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost)
+        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost) + meta_bonus
         if score <= 0.0:
             continue
 
@@ -394,6 +409,8 @@ def _seed_based_scores(
                     "seed_coverage": float(seed_coverage),
                     "hybrid_val": float(hybrid_val),
                     "popularity_boost": float(popularity_boost),
+                    "metadata_affinity": float(meta_affinity),
+                    "metadata_bonus": float(meta_bonus),
                     "overlap_per_seed": overlap_per_seed,
                 },
             }

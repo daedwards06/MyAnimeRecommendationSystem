@@ -302,12 +302,19 @@ Notes:
 
 #### Chunk A3 — Content features (parquet + new data)
 
-- [ ] Use additional metadata columns from `data/processed/anime_metadata.parquet` as features for similarity/ranking (genres, type, studios, year/season, themes/tags if available).
-- [ ] Optionally add new data/features (e.g., synopsis embeddings) for stronger semantic similarity and better cold-start behavior.
+- [x] Use additional metadata columns from `data/processed/anime_metadata.parquet` as features for similarity/ranking (studios, themes, year proximity).
+- [ ] Optionally add new data/features for stronger semantic similarity and better cold-start behavior.
+
+**Expanded next steps (keep deterministic + measurable):**
+- [ ] Add more sensitive offline reporting (rank movement, top-20 overlap, mean rank delta) so improvements show up even when top-10 membership doesn’t change.
+- [ ] Replace binary overlap with graded overlap (e.g., Jaccard on themes/studios) + thresholding so we can increase coefficients without “year-only” false positives.
+- [ ] Add a lightweight “new data” feature: TF-IDF synopsis similarity rerank (artifact + deterministic inference).
+- [ ] If adding embeddings later: define the artifact contract in Section 2 (format, dims, dtype, ID alignment), add versioning, and wire via the same ranked scoring choke points + golden harness.
 
 **Done when:**
-- Cold-start quality improves vs baseline (define a simple metric and/or a qualitative golden-query checklist).
-- New feature artifacts are versioned and their load contract is documented.
+- Cold-start quality improves vs baseline and is detectable in offline outputs (even if top-10 membership is unchanged).
+- Golden query safety is preserved (no increases in `violation_count`).
+- Any new feature artifact(s) are versioned and their load contract is documented.
 
 #### Chunk A4 — Collaborative retrain / alternative CF model
 
@@ -449,6 +456,20 @@ Notes:
 - **Rationale:** Directly targets Phase 4 golden failures (e.g., Tokyo Ghoul showing specials/recaps) while minimizing over-filtering; rules match the golden expectations defaults.
 - **Tradeoffs:** Legitimate specials (or music entries) may be suppressed in ranked recommendations; Browse mode remains unchanged and can still surface them via metadata filters.
 
+### 2025-12-29 — Phase 4 / Chunk A3: Lightweight metadata affinity (ranked rerank)
+
+- **Decision:** Add a conservative, deterministic “metadata affinity” bonus term for ranked seed-based scoring using only existing parquet columns:
+  - `studios` (binary overlap)
+  - `themes` (binary overlap)
+  - `aired_from` year proximity (weak tie-breaker)
+- **Guardrail:** Require at least one categorical overlap (`studios` or `themes`) before year proximity can contribute (prevents year-only false positives).
+- **Where implemented:**
+  - Feature logic + weights/constants in `src/app/metadata_features.py`
+  - Wired into ranked choke points in `app/main.py` (multi-seed ranked) and `scripts/evaluate_phase4_golden.py` (seed-based golden scorer)
+  - Ensured `themes` is retained in pruned app metadata via `src/app/constants.py` (`MIN_METADATA_COLUMNS`)
+- **Rationale:** Provide a small, interpretable cold-start and “weird match” reduction signal without adding new heavy artifacts/dependencies.
+- **Tradeoffs:** Signal is intentionally weak and may not change top-N often; overlap definition is strict (binary), so gains depend on metadata completeness.
+
 
 Record decisions that future sessions must not re-litigate.
 
@@ -532,6 +553,23 @@ Record decisions that future sessions must not re-litigate.
     - Wrote: `reports/artifacts/phase4_golden_queries_20251229175855.json`
   - Golden delta (baseline `20251229165531` → `20251229175855`): Tokyo Ghoul violations `3 → 0`.
 - **Next:** If future golden updates include OVA/ONA as “bad formats”, prefer a *penalty* (downrank) over exclusion and re-validate.
+
+### Session 2025-12-29 (Phase 4 / Chunk A3)
+
+- **Goal:** Add a minimal, deterministic metadata-based rerank signal using the processed parquet (no new heavy artifacts).
+- **Changes:**
+  - Added `src/app/metadata_features.py` with a conservative metadata affinity score and centralized coefficients.
+  - Wired the bonus into ranked seed-based scoring in `app/main.py` and `scripts/evaluate_phase4_golden.py`.
+  - Updated the metadata pruning contract to keep `themes` (`src/app/constants.py`) so the affinity signal uses the intended columns.
+  - Tightened affinity gating to require a `studios` or `themes` overlap (prevents year-only false positives).
+- **Validation (run locally):**
+  - `python -m pytest -q` (pass)
+  - `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50`
+    - Wrote: `experiments/metrics/phase4_eval_20251229210520.json`
+    - Wrote: `reports/phase4_golden_queries_20251229210520.md`
+    - Wrote: `reports/artifacts/phase4_golden_queries_20251229210520.json`
+  - Golden delta (baseline `20251229175855` → `20251229210520`): no `violation_count` increases; top-10 stable across queries.
+- **Next:** If we want measurable top-N gains, consider adding a stronger content signal (e.g., synopsis embeddings) with an explicit artifact contract and offline eval.
 
 ### Session 2025-12-26
 
