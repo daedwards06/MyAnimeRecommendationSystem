@@ -317,9 +317,21 @@ def _seed_based_scores(
     pop_pct_by_id: dict[int, float],
     top_n: int,
     exclude_ids: set[int] | None = None,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not seed_ids:
-        return []
+        return [], {
+            "metadata_bonus_fired_count": 0,
+            "metadata_bonus_mean": 0.0,
+            "metadata_bonus_max": 0.0,
+            "affinity_mean": 0.0,
+            "affinity_max": 0.0,
+            "top20_overlap_with_without_meta": 1.0,
+            "top50_overlap_with_without_meta": 1.0,
+            "top20_mean_abs_rank_delta": 0.0,
+            "top50_mean_abs_rank_delta": 0.0,
+            "top20_moved_count": 0,
+            "top50_moved_count": 0,
+        }
 
     exclude_ids = set(exclude_ids or set())
 
@@ -411,13 +423,82 @@ def _seed_based_scores(
                     "popularity_boost": float(popularity_boost),
                     "metadata_affinity": float(meta_affinity),
                     "metadata_bonus": float(meta_bonus),
+                    "score_without_metadata_bonus": float(score - meta_bonus),
                     "overlap_per_seed": overlap_per_seed,
                 },
             }
         )
 
-    scored.sort(key=lambda x: (-float(x["score"]), int(x["anime_id"])))
-    return scored[:top_n]
+    # Compute rank movement diagnostics by comparing:
+    # - with_meta: score includes metadata_bonus
+    # - without_meta: score excludes metadata_bonus
+    scored_with_meta = sorted(scored, key=lambda x: (-float(x["score"]), int(x["anime_id"])))
+    scored_without_meta = sorted(
+        scored,
+        key=lambda x: (-float(x.get("signals", {}).get("score_without_metadata_bonus", 0.0)), int(x["anime_id"])),
+    )
+
+    def _top_ids(items: list[dict[str, Any]], k: int) -> list[int]:
+        return [int(x.get("anime_id")) for x in items[: max(0, int(k))]]
+
+    def _rank_map(ids: list[int]) -> dict[int, int]:
+        return {int(aid): int(r) for r, aid in enumerate(ids, start=1)}
+
+    def _overlap_ratio(a: list[int], b: list[int]) -> float:
+        if not a or not b:
+            return 0.0
+        k = min(len(a), len(b))
+        if k <= 0:
+            return 0.0
+        return float(len(set(a[:k]).intersection(set(b[:k]))) / float(k))
+
+    def _rank_diagnostics(with_ids: list[int], without_ids: list[int]) -> tuple[float, int]:
+        with_rank = _rank_map(with_ids)
+        without_rank = _rank_map(without_ids)
+        common = [aid for aid in with_ids if aid in without_rank]
+        if not common:
+            return 0.0, 0
+        deltas = [abs(int(with_rank[aid]) - int(without_rank[aid])) for aid in common]
+        moved = sum(1 for d in deltas if int(d) != 0)
+        return float(sum(deltas) / float(len(deltas))), int(moved)
+
+    with20 = _top_ids(scored_with_meta, 20)
+    without20 = _top_ids(scored_without_meta, 20)
+    with50 = _top_ids(scored_with_meta, 50)
+    without50 = _top_ids(scored_without_meta, 50)
+
+    top20_mean_abs_delta, top20_moved = _rank_diagnostics(with20, without20)
+    top50_mean_abs_delta, top50_moved = _rank_diagnostics(with50, without50)
+
+    recs_top_n = scored_with_meta[:top_n]
+
+    bonuses = [
+        float((r.get("signals") or {}).get("metadata_bonus", 0.0))
+        for r in recs_top_n
+        if r.get("signals") is not None
+    ]
+    affinities = [
+        float((r.get("signals") or {}).get("metadata_affinity", 0.0))
+        for r in recs_top_n
+        if r.get("signals") is not None
+    ]
+    fired = [b for b in bonuses if float(b) > 0.0]
+
+    diagnostics = {
+        "metadata_bonus_fired_count": int(len(fired)),
+        "metadata_bonus_mean": float(sum(bonuses) / max(1, len(bonuses))),
+        "metadata_bonus_max": float(max(bonuses) if bonuses else 0.0),
+        "affinity_mean": float(sum(affinities) / max(1, len(affinities))),
+        "affinity_max": float(max(affinities) if affinities else 0.0),
+        "top20_overlap_with_without_meta": _overlap_ratio(with20, without20),
+        "top50_overlap_with_without_meta": _overlap_ratio(with50, without50),
+        "top20_mean_abs_rank_delta": float(top20_mean_abs_delta),
+        "top50_mean_abs_rank_delta": float(top50_mean_abs_delta),
+        "top20_moved_count": int(top20_moved),
+        "top50_moved_count": int(top50_moved),
+    }
+
+    return recs_top_n, diagnostics
 
 
 def _evaluate_golden_queries(
@@ -456,7 +537,7 @@ def _evaluate_golden_queries(
 
         seed_ids, matched_titles, resolution_debug = _resolve_seed_titles(metadata, seed_titles)
 
-        recs = _seed_based_scores(
+        recs, recs_diag = _seed_based_scores(
             metadata=metadata,
             components=components,
             recommender=recommender,
@@ -498,6 +579,7 @@ def _evaluate_golden_queries(
                 "notes": notes,
                 "weight_mode": weight_mode,
                 "top_n": top_n,
+                "diagnostics": recs_diag,
                 "expectations": {
                     "disallow_types": list(disallow_types),
                     "disallow_title_regex": disallow_title_regex,
@@ -538,6 +620,19 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
             lines.append(f"Notes: {q.get('notes')}")
         lines.append(f"Top-N: {q.get('top_n')}")
         lines.append(f"Violations: {q.get('violation_count')}")
+
+        diag = q.get("diagnostics") or {}
+        if diag:
+            lines.append(
+                "Diagnostics: "
+                f"bonus_fired={diag.get('metadata_bonus_fired_count')}, "
+                f"bonus_mean={float(diag.get('metadata_bonus_mean', 0.0)):.5f}, "
+                f"bonus_max={float(diag.get('metadata_bonus_max', 0.0)):.5f}, "
+                f"top20_overlap={float(diag.get('top20_overlap_with_without_meta', 1.0)):.3f}, "
+                f"top50_overlap={float(diag.get('top50_overlap_with_without_meta', 1.0)):.3f}, "
+                f"top20_moved={diag.get('top20_moved_count')}, "
+                f"top50_moved={diag.get('top50_moved_count')}"
+            )
         lines.append("")
 
         # Table header

@@ -17,16 +17,16 @@ How to use:
 
 **Current phase:** Phase 4
 
-**Last updated:** 2025-12-29
+**Last updated:** 2025-12-30
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Implemented **Phase 4 / Chunk A1**: added golden queries list + a single offline evaluation entrypoint that writes headline metrics and a golden-queries report.
+- Iterated on **Phase 4 / Chunk A3**: refined metadata affinity to use graded, thresholded theme similarity with categorical gating, and added eval diagnostics for bonus firing + rank movement.
 
 **Next action (single sentence):**
-- Phase 4 / Chunk A2: add candidate hygiene guardrails (recaps/specials/shorts) and validate against golden queries.
+- Phase 4 / Chunk A3: (optional) add deterministic TF-IDF synopsis rerank (new artifact) if golden diagnostics suggest it will reduce “weird match” cases.
 
 ---
 
@@ -460,7 +460,7 @@ Notes:
 
 - **Decision:** Add a conservative, deterministic “metadata affinity” bonus term for ranked seed-based scoring using only existing parquet columns:
   - `studios` (binary overlap)
-  - `themes` (binary overlap)
+  - `themes` (graded overlap ratio with minimum overlap + minimum similarity threshold)
   - `aired_from` year proximity (weak tie-breaker)
 - **Guardrail:** Require at least one categorical overlap (`studios` or `themes`) before year proximity can contribute (prevents year-only false positives).
 - **Where implemented:**
@@ -468,7 +468,19 @@ Notes:
   - Wired into ranked choke points in `app/main.py` (multi-seed ranked) and `scripts/evaluate_phase4_golden.py` (seed-based golden scorer)
   - Ensured `themes` is retained in pruned app metadata via `src/app/constants.py` (`MIN_METADATA_COLUMNS`)
 - **Rationale:** Provide a small, interpretable cold-start and “weird match” reduction signal without adding new heavy artifacts/dependencies.
-- **Tradeoffs:** Signal is intentionally weak and may not change top-N often; overlap definition is strict (binary), so gains depend on metadata completeness.
+- **Tradeoffs:** Signal is intentionally weak and may not change top-N often; thresholding means sparse/underspecified themes will not contribute.
+
+### 2025-12-30 — Phase 4 / Chunk A3: Graded themes + observability
+
+- **Decision:** Replace binary theme overlap with a graded similarity (overlap ratio) with conservative guardrails:
+  - require minimum overlap count
+  - require minimum overlap ratio
+  - keep studios as a strong binary gate
+  - allow year proximity only if a categorical gate passes
+- **Decision:** Add eval-only diagnostics to make metadata bonus firing and rank movement observable per golden query.
+- **Where implemented:** `src/app/metadata_features.py` (graded/thresholded themes; categorical gate) and `scripts/evaluate_phase4_golden.py` (per-query diagnostics; rank-movement summaries).
+- **Rationale:** Increase sensitivity of the signal without reintroducing “single generic theme” false positives; make changes measurable even when top-10 membership is unchanged.
+- **Tradeoffs:** Diagnostics focus on set overlap + rank delta; they don’t directly measure semantic relevance and should be paired with human review of golden reports.
 
 
 Record decisions that future sessions must not re-litigate.
@@ -482,6 +494,32 @@ Record decisions that future sessions must not re-litigate.
 ---
 
 ## 7) Session Log (Tiny, but consistent)
+
+### Session 2025-12-30 (Phase 4 / Chunk A3)
+
+- What I did:
+  - Refined metadata affinity by using graded theme overlap (ratio) with conservative thresholds and a categorical gate (studios/themes) before year proximity can contribute.
+  - Added eval diagnostics to make `metadata_bonus` firing and rank movement observable per golden query.
+
+- What I changed:
+  - Refined `themes` affinity to be graded + thresholded in [src/app/metadata_features.py](src/app/metadata_features.py)
+  - Added/extended per-query diagnostics + rank-movement reporting in [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py)
+
+- Observed effects (golden run 20251230175115):
+  - Tokyo Ghoul: `bonus_fired=0`, `top20_moved=0`, `violation_count=0`
+  - One Piece: `bonus_fired=1`, `top20_moved=2` (e.g., `anime_id=30028` received `metadata_bonus=0.00846` and moved ahead of `anime_id=31201`)
+  - Haikyuu!!: `bonus_fired=5`, `top20_moved=6`, `top50_moved=20` (same set; mild within-top reordering)
+
+- Validation run:
+  - `python -m pytest -q` (57 passed, 3 warnings)
+  - `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50`
+    - Wrote: `experiments/metrics/phase4_eval_20251230175115.json`
+    - Wrote: `reports/phase4_golden_queries_20251230175115.md`
+    - Wrote: `reports/artifacts/phase4_golden_queries_20251230175115.json`
+
+- Next session start here:
+  - Decide whether to proceed with Phase 4 / Chunk A3 “new data” (TF-IDF synopsis rerank) based on golden diagnostics and reviewed failures.
+  - Qualitative inspection of One Piece recommendations showed that metadata-only affinity produced children’s folklore and short-form content, despite passing hygiene checks. This motivated the addition of a lightweight synopsis TF-IDF rerank to capture narrative similarity
 
 ### Session 2025-12-29
 

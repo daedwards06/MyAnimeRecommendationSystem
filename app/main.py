@@ -1534,7 +1534,8 @@ else:
                             },
                         })
                     
-                    scored.sort(key=lambda x: x["score"], reverse=True)
+                    # Deterministic ordering: score desc, then anime_id asc.
+                    scored.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
                     recs = scored[:n_requested]
                 else:
                     # Default: seed-based recommendations
@@ -1620,7 +1621,8 @@ else:
                                     used = rec.get("_used_components")
                                     if isinstance(used, list) and "knn" not in used:
                                         used.append("knn")
-                                personalized_recs.sort(key=lambda x: float(x.get("score", 0.0)), reverse=True)
+                                # Deterministic ordering: score desc, then anime_id asc.
+                                personalized_recs.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
                                 personalized_recs = personalized_recs[:n_requested]
                             recs = personalized_recs
                             personalization_applied = True

@@ -50,6 +50,20 @@ METADATA_AFFINITY_WEIGHTS: dict[str, float] = {
     "year": 0.10,
 }
 
+# Themes graded similarity guardrails.
+#
+# Rationale: themes can be noisy/generic; we require *both* a minimum overlap count
+# and a minimum graded similarity before themes contribute any positive affinity.
+# This prevents a single generic theme from triggering a full bonus.
+#
+# Similarity definition: overlap ratio = |A∩B| / min(|A|, |B|)
+METADATA_AFFINITY_THEMES_MIN_OVERLAP_COUNT: int = 2
+METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO: float = 0.34
+
+# Back-compat export: older sessions referenced a Jaccard threshold.
+# Keep the constant name to avoid churn; it now mirrors the overlap-ratio threshold.
+METADATA_AFFINITY_THEMES_MIN_JACCARD: float = METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO
+
 # Year proximity window: similarity = max(0, 1 - |year-seed_year|/window).
 METADATA_AFFINITY_YEAR_WINDOW: int = 10
 
@@ -226,6 +240,24 @@ def _weak_overlap_ratio(a: frozenset[str], b: set[str]) -> Optional[float]:
     return float(len(a.intersection(b)) / denom)
 
 
+def _jaccard(a: frozenset[str], b: set[str]) -> tuple[Optional[float], int]:
+    """Jaccard similarity and raw overlap count.
+
+    Returns:
+      (similarity, overlap_count)
+    """
+    if not a or not b:
+        return None, 0
+    inter = a.intersection(b)
+    overlap = int(len(inter))
+    if overlap <= 0:
+        return 0.0, 0
+    union = len(a.union(b))
+    if union <= 0:
+        return None, overlap
+    return float(overlap / union), overlap
+
+
 def _year_similarity(seed_year_mean: Optional[float], candidate_year: Optional[int]) -> Optional[float]:
     if seed_year_mean is None or candidate_year is None:
         return None
@@ -245,15 +277,36 @@ def compute_metadata_affinity(profile: SeedMetadataProfile, candidate_row: Mappi
     cand_themes = _coerce_str_set(candidate_row.get("themes"))
     cand_year = _coerce_year(candidate_row.get("aired_from"))
 
+    studios_sim = _binary_overlap(profile.studios, cand_studios)
+
+    # Themes: graded similarity with conservative thresholding.
+    themes_sim_raw = _weak_overlap_ratio(profile.themes, cand_themes)
+    themes_overlap = int(len(profile.themes.intersection(cand_themes))) if profile.themes and cand_themes else 0
+    themes_sim: Optional[float]
+    if themes_sim_raw is None:
+        themes_sim = None
+    else:
+        # Conservative: themes only contribute when similarity is meaningful.
+        if themes_overlap < int(METADATA_AFFINITY_THEMES_MIN_OVERLAP_COUNT):
+            themes_sim = 0.0
+        elif float(themes_sim_raw) < float(METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO):
+            themes_sim = 0.0
+        else:
+            themes_sim = float(themes_sim_raw)
+
     sims: dict[str, Optional[float]] = {
-        "studios": _binary_overlap(profile.studios, cand_studios),
-        "themes": _binary_overlap(profile.themes, cand_themes),
+        "studios": studios_sim,
+        "themes": themes_sim,
         "year": _year_similarity(profile.seed_year_mean, cand_year),
     }
 
-    # Conservative gating: require at least one categorical overlap signal.
-    # This prevents year-only proximity from introducing unrelated items.
-    if sims.get("studios") != 1.0 and sims.get("themes") != 1.0:
+    # Conservative categorical gate.
+    # - Studios is the strong binary gate.
+    # - Themes can also pass the gate, but only when they clear the min-overlap + min-sim thresholds.
+    # - Year proximity may contribute only after a categorical gate passes.
+    studios_pass = sims.get("studios") == 1.0
+    themes_pass = (themes_sim is not None) and (float(themes_sim) > 0.0)
+    if not (studios_pass or themes_pass):
         return 0.0
 
     total_w = 0.0
@@ -283,6 +336,9 @@ __all__ = [
     "SeedMetadataProfile",
     "METADATA_AFFINITY_WEIGHTS",
     "METADATA_AFFINITY_YEAR_WINDOW",
+    "METADATA_AFFINITY_THEMES_MIN_OVERLAP_COUNT",
+    "METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO",
+    "METADATA_AFFINITY_THEMES_MIN_JACCARD",
     "METADATA_AFFINITY_COLD_START_COEF",
     "METADATA_AFFINITY_TRAINED_COEF",
     "METADATA_AFFINITY_PERSONALIZED_COEF",
