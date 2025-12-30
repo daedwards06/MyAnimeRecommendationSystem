@@ -1,0 +1,5700 @@
+{
+  "schema": "phase4_golden_queries",
+  "golden_file": "data/samples/golden_queries_phase4.json",
+  "weight_mode": "Balanced",
+  "queries": [
+    {
+      "id": "tokyo_ghoul",
+      "seed_titles": [
+        "Tokyo Ghoul"
+      ],
+      "resolved_seed_ids": [
+        22319
+      ],
+      "resolved_seed_titles": [
+        "Tokyo Ghoul"
+      ],
+      "notes": "Failure case: avoid recap/special/short content surfacing in top-N.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Tokyo Ghoul",
+          "resolved_anime_id": 22319,
+          "matched_title": "Tokyo Ghoul",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 31912,
+          "score": 2.0835430145263674,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 2.041016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33144,
+          "score": 1.9269102592468261,
+          "meta": {
+            "title_display": "The Hell (Two Kinds of Life)",
+            "type": "Movie",
+            "mal_score": 5.73,
+            "members_count": null,
+            "aired_from": "2006-07-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.899641036987305,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.19999999999999996,
+            "metadata_bonus": 0.0019999999999999996,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30463,
+          "score": 1.9235642204284666,
+          "meta": {
+            "title_display": "Horror News",
+            "type": "ONA",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2014-04-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890256881713867,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.1,
+            "metadata_bonus": 0.001,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 34048,
+          "score": 1.9188668776292066,
+          "meta": {
+            "title_display": "Seoul Station",
+            "type": "Movie",
+            "mal_score": 5.68,
+            "members_count": null,
+            "aired_from": "2016-08-18T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.87054443359375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.1230769230769231,
+            "metadata_bonus": 0.001230769230769231,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33674,
+          "score": 1.901764109802246,
+          "meta": {
+            "title_display": "No Game, No Life: Zero",
+            "type": "Movie",
+            "mal_score": 8.16,
+            "members_count": null,
+            "aired_from": "2017-07-15T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.304256439208984,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06999999999999999,
+            "metadata_bonus": 0.0007,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33914,
+          "score": 1.8994701488494872,
+          "meta": {
+            "title_display": "Runnin' Away Gel\u00e9e",
+            "type": "ONA",
+            "mal_score": 5.09,
+            "members_count": null,
+            "aired_from": "2016-10-25T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.794680595397949,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08000000000000002,
+            "metadata_bonus": 0.0008000000000000001,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31339,
+          "score": 1.887001826095581,
+          "meta": {
+            "title_display": "Drifters",
+            "type": "TV",
+            "mal_score": 7.88,
+            "members_count": null,
+            "aired_from": "2016-10-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.730807304382324,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.43,
+            "metadata_bonus": 0.0043,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 1.86204212474823,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8000000000000002,
+            "metadata_bonus": 0.008000000000000002,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31236,
+          "score": 1.8556397009629468,
+          "meta": {
+            "title_display": "Chieri and Cherry",
+            "type": "Movie",
+            "mal_score": 6.48,
+            "members_count": null,
+            "aired_from": "2016-02-20T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.117635726928711,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.1230769230769231,
+            "metadata_bonus": 0.001230769230769231,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33712,
+          "score": 1.8499130590438841,
+          "meta": {
+            "title_display": "Bikini Warriors OVA",
+            "type": "OVA",
+            "mal_score": 5.54,
+            "members_count": null,
+            "aired_from": "2016-12-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.096452236175537,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08000000000000002,
+            "metadata_bonus": 0.0008000000000000001,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28673,
+          "score": 1.8345924795590913,
+          "meta": {
+            "title_display": "Die Now",
+            "type": "ONA",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2014-11-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0322160720825195,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.15384615384615385,
+            "metadata_bonus": 0.0015384615384615387,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.8342828667714046,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0923076923076923,
+            "metadata_bonus": 0.0009230769230769231,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29135,
+          "score": 1.831408224105835,
+          "meta": {
+            "title_display": "The Small Garden",
+            "type": "Movie",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2014-12-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.98563289642334,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 1.0,
+            "metadata_bonus": 0.01,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31014,
+          "score": 1.8244147853851318,
+          "meta": {
+            "title_display": "Aru Zombie Shoujo no Sainan PV",
+            "type": "PV",
+            "mal_score": 4.87,
+            "members_count": null,
+            "aired_from": "2012-07-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.465659141540527,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8000000000000002,
+            "metadata_bonus": 0.008000000000000002,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.815263487815857,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.20000000000000004,
+            "metadata_bonus": 0.0020000000000000005,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30916,
+          "score": 1.8112868386782133,
+          "meta": {
+            "title_display": "The Five Killers",
+            "type": "ONA",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2007-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.943301200866699,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28951,
+          "score": 1.8096567220687865,
+          "meta": {
+            "title_display": "Beluga",
+            "type": "Movie",
+            "mal_score": 4.5,
+            "members_count": null,
+            "aired_from": "2011-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.9106268882751465,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.6999999999999998,
+            "metadata_bonus": 0.006999999999999998,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 1.808431634902954,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 1.0,
+            "metadata_bonus": 0.01,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 0
+            }
+          }
+        },
+        {
+          "anime_id": 30095,
+          "score": 1.807000708580017,
+          "meta": {
+            "title_display": "Color Old Master Q",
+            "type": "Movie",
+            "mal_score": 5.8,
+            "members_count": null,
+            "aired_from": "1981-07-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.928002834320068,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Tokyo Ghoul": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "attack_on_titan",
+      "seed_titles": [
+        "Shingeki no Kyojin"
+      ],
+      "resolved_seed_ids": [
+        47778
+      ],
+      "resolved_seed_titles": [
+        "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc"
+      ],
+      "notes": "Should mostly surface TV seasons/movies, not recap specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Shingeki no Kyojin",
+          "resolved_anime_id": 47778,
+          "matched_title": "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc",
+          "score": 85.5,
+          "method": "fuzzy"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 31966,
+          "score": 2.1180928600017843,
+          "meta": {
+            "title_display": "Sword Gai",
+            "type": "ONA",
+            "mal_score": 5.61,
+            "members_count": null,
+            "aired_from": "2013-10-04T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.671140670776367,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 2.10904212474823,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.091320792304145,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32143,
+          "score": 2.0623036408791178,
+          "meta": {
+            "title_display": "Peeping Life x Kaijuu Sakaba Kaiji: Kaijuu-tachi ga Iru Tokoro",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-07-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.446753025054932,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06153846153846155,
+            "metadata_bonus": 0.0006153846153846155,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 2.041016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30278,
+          "score": 1.9982103425539457,
+          "meta": {
+            "title_display": "Ghost Messenger Movie",
+            "type": "Movie",
+            "mal_score": 5.9,
+            "members_count": null,
+            "aired_from": "2014-05-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.190995216369629,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30921,
+          "score": 1.9950886850357055,
+          "meta": {
+            "title_display": "Kacchikenee!",
+            "type": "Movie",
+            "mal_score": 6.29,
+            "members_count": null,
+            "aired_from": "2016-03-19T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.178354740142822,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.05,
+            "metadata_bonus": 0.0005,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.9583597898483276,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.9391523767047458,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30916,
+          "score": 1.9358253002166748,
+          "meta": {
+            "title_display": "The Five Killers",
+            "type": "ONA",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2007-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.943301200866699,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30173,
+          "score": 1.9327101051330566,
+          "meta": {
+            "title_display": "Fruity Samurai",
+            "type": "TV",
+            "mal_score": 5.46,
+            "members_count": null,
+            "aired_from": "2013-08-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.916040420532227,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.37,
+            "metadata_bonus": 0.0037,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30095,
+          "score": 1.932000708580017,
+          "meta": {
+            "title_display": "Color Old Master Q",
+            "type": "Movie",
+            "mal_score": 5.8,
+            "members_count": null,
+            "aired_from": "1981-07-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.928002834320068,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 1.9285580787658692,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 1.923598425441318,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 1.923503828048706,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30463,
+          "score": 1.9228642204284667,
+          "meta": {
+            "title_display": "Horror News",
+            "type": "ONA",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2014-04-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890256881713867,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030000000000000006,
+            "metadata_bonus": 0.0003000000000000001,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30070,
+          "score": 1.9217269812689888,
+          "meta": {
+            "title_display": "Shiroi Zou (1981)",
+            "type": "Movie",
+            "mal_score": 5.65,
+            "members_count": null,
+            "aired_from": "1981-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.855796813964844,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32059,
+          "score": 1.9210248440962572,
+          "meta": {
+            "title_display": "Master of Torque 3",
+            "type": "ONA",
+            "mal_score": 4.84,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.8810224533081055,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 9488,
+          "score": 1.908711727142334,
+          "meta": {
+            "title_display": "Cencoroll Connect",
+            "type": "Movie",
+            "mal_score": 7.19,
+            "members_count": null,
+            "aired_from": "2019-06-29T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.802846908569336,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8000000000000002,
+            "metadata_bonus": 0.008000000000000002,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31170,
+          "score": 1.903257731437683,
+          "meta": {
+            "title_display": "Youkai Ninpouchou Jiraiya!",
+            "type": "PV",
+            "mal_score": 5.19,
+            "members_count": null,
+            "aired_from": "2015-04-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.797030925750732,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.4000000000000001,
+            "metadata_bonus": 0.004000000000000001,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "death_note",
+      "seed_titles": [
+        "Death Note"
+      ],
+      "resolved_seed_ids": [
+        1535
+      ],
+      "resolved_seed_titles": [
+        "Death Note"
+      ],
+      "notes": "Sanity: similar psychological/thriller TV shows.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Death Note",
+          "resolved_anime_id": 1535,
+          "matched_title": "Death Note",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 32143,
+          "score": 2.0618421024175793,
+          "meta": {
+            "title_display": "Peeping Life x Kaijuu Sakaba Kaiji: Kaijuu-tachi ga Iru Tokoro",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-07-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.446753025054932,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.015384615384615382,
+            "metadata_bonus": 0.00015384615384615382,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30921,
+          "score": 1.9945886850357055,
+          "meta": {
+            "title_display": "Kacchikenee!",
+            "type": "Movie",
+            "mal_score": 6.29,
+            "members_count": null,
+            "aired_from": "2016-03-19T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.178354740142822,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28673,
+          "score": 1.9583617103283222,
+          "meta": {
+            "title_display": "Die Now",
+            "type": "ONA",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2014-11-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0322160720825195,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 1.925058078765869,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30463,
+          "score": 1.9227642204284667,
+          "meta": {
+            "title_display": "Horror News",
+            "type": "ONA",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2014-04-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890256881713867,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.019999999999999997,
+            "metadata_bonus": 0.00019999999999999998,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 34048,
+          "score": 1.9176361083984375,
+          "meta": {
+            "title_display": "Seoul Station",
+            "type": "Movie",
+            "mal_score": 5.68,
+            "members_count": null,
+            "aired_from": "2016-08-18T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.87054443359375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33154,
+          "score": 1.9132912874221801,
+          "meta": {
+            "title_display": "Osiris no Tenbin: Season 2",
+            "type": "ONA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2016-04-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 4.853165149688721,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31966,
+          "score": 1.8682467061556303,
+          "meta": {
+            "title_display": "Sword Gai",
+            "type": "ONA",
+            "mal_score": 5.61,
+            "members_count": null,
+            "aired_from": "2013-10-04T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.671140670776367,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30217,
+          "score": 1.8578013687133788,
+          "meta": {
+            "title_display": "Neo Faust",
+            "type": "TV Special",
+            "mal_score": 5.53,
+            "members_count": null,
+            "aired_from": "1999-01-15T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.619205474853516,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.30000000000000004,
+            "metadata_bonus": 0.0030000000000000005,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 1.85404212474823,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 1.800431634902954,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.19999999999999996,
+            "metadata_bonus": 0.0019999999999999996,
+            "overlap_per_seed": {
+              "Death Note": 0
+            }
+          }
+        },
+        {
+          "anime_id": 30278,
+          "score": 1.7480564964000995,
+          "meta": {
+            "title_display": "Ghost Messenger Movie",
+            "type": "Movie",
+            "mal_score": 5.9,
+            "members_count": null,
+            "aired_from": "2014-05-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.190995216369629,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30484,
+          "score": 1.7051273107528686,
+          "meta": {
+            "title_display": "Steins;Gate 0",
+            "type": "TV",
+            "mal_score": 8.55,
+            "members_count": null,
+            "aired_from": "2018-04-12T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.020509243011475,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28347,
+          "score": 1.681166534423828,
+          "meta": {
+            "title_display": "Guitar Shoujo!",
+            "type": "CM",
+            "mal_score": 4.72,
+            "members_count": null,
+            "aired_from": "2011-12-14T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 6.7046661376953125,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Death Note": 0
+            }
+          }
+        },
+        {
+          "anime_id": 30967,
+          "score": 1.6610246419906616,
+          "meta": {
+            "title_display": "Chuumon no Ooi Ryouriten (1993)",
+            "type": "Movie",
+            "mal_score": 5.42,
+            "members_count": null,
+            "aired_from": "1993-08-03T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 4.8440985679626465,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33446,
+          "score": 1.6571404457092285,
+          "meta": {
+            "title_display": "Huyao Xiao Hongniang: Yue Hong",
+            "type": "ONA",
+            "mal_score": 7.61,
+            "members_count": null,
+            "aired_from": "2016-06-24T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 4.828561782836914,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31377,
+          "score": 1.6546034997793344,
+          "meta": {
+            "title_display": "Kataribe Shoujo Honoka",
+            "type": "ONA",
+            "mal_score": 5.09,
+            "members_count": null,
+            "aired_from": "2015-07-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 4.817798614501953,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.015384615384615382,
+            "metadata_bonus": 0.00015384615384615382,
+            "overlap_per_seed": {
+              "Death Note": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 1.6335430145263672,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 0
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 1.591016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Death Note": 0
+            }
+          }
+        },
+        {
+          "anime_id": 29861,
+          "score": 1.5857409370128925,
+          "meta": {
+            "title_display": "Channel 5.5 3rd Season Prologue",
+            "type": "ONA",
+            "mal_score": 5.15,
+            "members_count": null,
+            "aired_from": "2014-07-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 6.341732978820801,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Death Note": 0
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "steins_gate",
+      "seed_titles": [
+        "Steins;Gate"
+      ],
+      "resolved_seed_ids": [
+        9253
+      ],
+      "resolved_seed_titles": [
+        "Steins;Gate"
+      ],
+      "notes": "Sanity: time-travel sci-fi; avoid short specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Steins;Gate",
+          "resolved_anime_id": 9253,
+          "matched_title": "Steins;Gate",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 28673,
+          "score": 2.0424642744308863,
+          "meta": {
+            "title_display": "Die Now",
+            "type": "ONA",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2014-11-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0322160720825195,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.10769230769230768,
+            "metadata_bonus": 0.0010769230769230769,
+            "overlap_per_seed": {
+              "Steins;Gate": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30484,
+          "score": 1.9644273107528687,
+          "meta": {
+            "title_display": "Steins;Gate 0",
+            "type": "TV",
+            "mal_score": 8.55,
+            "members_count": null,
+            "aired_from": "2018-04-12T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.020509243011475,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.93,
+            "metadata_bonus": 0.009300000000000001,
+            "overlap_per_seed": {
+              "Steins;Gate": 3
+            }
+          }
+        },
+        {
+          "anime_id": 33674,
+          "score": 1.9431307764689127,
+          "meta": {
+            "title_display": "No Game, No Life: Zero",
+            "type": "Movie",
+            "mal_score": 8.16,
+            "members_count": null,
+            "aired_from": "2017-07-15T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.304256439208984,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04000000000000001,
+            "metadata_bonus": 0.0004000000000000001,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32461,
+          "score": 1.8507781343215552,
+          "meta": {
+            "title_display": "Pigtails",
+            "type": "Movie",
+            "mal_score": 6.72,
+            "members_count": null,
+            "aired_from": "2015-10-24T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.932753562927246,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0923076923076923,
+            "metadata_bonus": 0.0009230769230769231,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33144,
+          "score": 1.8465769259134928,
+          "meta": {
+            "title_display": "The Hell (Two Kinds of Life)",
+            "type": "Movie",
+            "mal_score": 5.73,
+            "members_count": null,
+            "aired_from": "2006-07-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.899641036987305,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29099,
+          "score": 1.8419773695627848,
+          "meta": {
+            "title_display": "Washimo 2nd Season",
+            "type": "TV",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-01-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.898842811584473,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06,
+            "metadata_bonus": 0.0006,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30760,
+          "score": 1.8394436489007413,
+          "meta": {
+            "title_display": "Momoiro no Crayon",
+            "type": "OVA",
+            "mal_score": 6.15,
+            "members_count": null,
+            "aired_from": "2006-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.888031005859375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32059,
+          "score": 1.837691510762924,
+          "meta": {
+            "title_display": "Master of Torque 3",
+            "type": "ONA",
+            "mal_score": 4.84,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.8810224533081055,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 34048,
+          "score": 1.835072005834335,
+          "meta": {
+            "title_display": "Seoul Station",
+            "type": "Movie",
+            "mal_score": 5.68,
+            "members_count": null,
+            "aired_from": "2016-08-18T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.87054443359375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30764,
+          "score": 1.8334081188837688,
+          "meta": {
+            "title_display": "Jibun no Mune ni te wo Atete",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2011-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.826965808868408,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 1.0,
+            "metadata_bonus": 0.01,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31575,
+          "score": 1.827021352450053,
+          "meta": {
+            "title_display": "Offside",
+            "type": "OVA",
+            "mal_score": 5.72,
+            "members_count": null,
+            "aired_from": "1993-01-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.841418743133545,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30059,
+          "score": 1.8212684313456218,
+          "meta": {
+            "title_display": "Saru Kani Gassen",
+            "type": "Movie",
+            "mal_score": 5.02,
+            "members_count": null,
+            "aired_from": null
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.81840705871582,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 9488,
+          "score": 1.8193783938090007,
+          "meta": {
+            "title_display": "Cencoroll Connect",
+            "type": "Movie",
+            "mal_score": 7.19,
+            "members_count": null,
+            "aired_from": "2019-06-29T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.802846908569336,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.19999999999999996,
+            "metadata_bonus": 0.0019999999999999996,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30981,
+          "score": 1.8183200279871623,
+          "meta": {
+            "title_display": "Hotaru no Mau Machi de",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1998-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.806613445281982,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31866,
+          "score": 1.8166471372506559,
+          "meta": {
+            "title_display": "Last Exile: Fam, the Silver Wing - Over the Wishes",
+            "type": "Movie",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2016-02-06T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.796844959259033,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33862,
+          "score": 1.8104671932856242,
+          "meta": {
+            "title_display": "Chichi Kaeru",
+            "type": "ONA",
+            "mal_score": 5.42,
+            "members_count": null,
+            "aired_from": "2015-06-12T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.75120210647583,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.6,
+            "metadata_bonus": 0.006,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28955,
+          "score": 1.809598344484965,
+          "meta": {
+            "title_display": "Columbos",
+            "type": "Movie",
+            "mal_score": 4.76,
+            "members_count": null,
+            "aired_from": "2012-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.763726711273193,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.20000000000000004,
+            "metadata_bonus": 0.0020000000000000005,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 1.805431634902954,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.6999999999999998,
+            "metadata_bonus": 0.006999999999999998,
+            "overlap_per_seed": {
+              "Steins;Gate": 0
+            }
+          }
+        },
+        {
+          "anime_id": 31238,
+          "score": 1.7959618882888404,
+          "meta": {
+            "title_display": "Stitch! Perfect Memory",
+            "type": "TV Special",
+            "mal_score": 5.74,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.713488578796387,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0923076923076923,
+            "metadata_bonus": 0.0009230769230769231,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32728,
+          "score": 1.792384298300132,
+          "meta": {
+            "title_display": "What Happens Before War?",
+            "type": "Movie",
+            "mal_score": 6.34,
+            "members_count": null,
+            "aired_from": "2015-10-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.699178218841553,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0923076923076923,
+            "metadata_bonus": 0.0009230769230769231,
+            "overlap_per_seed": {
+              "Steins;Gate": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "cowboy_bebop",
+      "seed_titles": [
+        "Cowboy Bebop"
+      ],
+      "resolved_seed_ids": [
+        1
+      ],
+      "resolved_seed_titles": [
+        "Cowboy Bebop"
+      ],
+      "notes": "Sanity: classic sci-fi/action; avoid music videos/specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Cowboy Bebop",
+          "resolved_anime_id": 1,
+          "matched_title": "Cowboy Bebop",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 32059,
+          "score": 2.0035889466603596,
+          "meta": {
+            "title_display": "Master of Torque 3",
+            "type": "ONA",
+            "mal_score": 4.84,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.8810224533081055,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.000209681193034,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 9488,
+          "score": 1.9840450604756672,
+          "meta": {
+            "title_display": "Cencoroll Connect",
+            "type": "Movie",
+            "mal_score": 7.19,
+            "members_count": null,
+            "aired_from": "2019-06-29T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.802846908569336,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31866,
+          "score": 1.9825445731480915,
+          "meta": {
+            "title_display": "Last Exile: Fam, the Silver Wing - Over the Wishes",
+            "type": "Movie",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2016-02-06T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.796844959259033,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 1.9576828400293986,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32289,
+          "score": 1.9365996440251667,
+          "meta": {
+            "title_display": "Anison Nippon",
+            "type": "PV",
+            "mal_score": 5.28,
+            "members_count": null,
+            "aired_from": "2014-02-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.613065242767334,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 2
+            }
+          }
+        },
+        {
+          "anime_id": 28685,
+          "score": 1.9011688340504962,
+          "meta": {
+            "title_display": "Tough Guy!",
+            "type": "Movie",
+            "mal_score": 5.21,
+            "members_count": null,
+            "aired_from": "2005-06-03T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.459342002868652,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.30000000000000004,
+            "metadata_bonus": 0.0030000000000000005,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.8750264565149943,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28673,
+          "score": 1.8747206846872966,
+          "meta": {
+            "title_display": "Die Now",
+            "type": "ONA",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2014-11-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0322160720825195,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.8549301544825236,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30916,
+          "score": 1.8526458130371877,
+          "meta": {
+            "title_display": "The Five Killers",
+            "type": "ONA",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2007-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.943301200866699,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.015384615384615382,
+            "metadata_bonus": 0.00015384615384615382,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30095,
+          "score": 1.8486673752466838,
+          "meta": {
+            "title_display": "Color Old Master Q",
+            "type": "Movie",
+            "mal_score": 5.8,
+            "members_count": null,
+            "aired_from": "1981-07-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.928002834320068,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30173,
+          "score": 1.8456767717997233,
+          "meta": {
+            "title_display": "Fruity Samurai",
+            "type": "TV",
+            "mal_score": 5.46,
+            "members_count": null,
+            "aired_from": "2013-08-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.916040420532227,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29587,
+          "score": 1.8441482702891032,
+          "meta": {
+            "title_display": "Home My Home",
+            "type": "Movie",
+            "mal_score": 5.21,
+            "members_count": null,
+            "aired_from": "1970-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.909926414489746,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29099,
+          "score": 1.8413773695627849,
+          "meta": {
+            "title_display": "Washimo 2nd Season",
+            "type": "TV",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-01-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.898842811584473,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 1.8401704947153728,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 1.839376203219096,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30070,
+          "score": 1.8306158701578776,
+          "meta": {
+            "title_display": "Shiroi Zou (1981)",
+            "type": "Movie",
+            "mal_score": 5.65,
+            "members_count": null,
+            "aired_from": "1981-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.855796813964844,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31170,
+          "score": 1.8159243981043498,
+          "meta": {
+            "title_display": "Youkai Ninpouchou Jiraiya!",
+            "type": "PV",
+            "mal_score": 5.19,
+            "members_count": null,
+            "aired_from": "2015-04-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.797030925750732,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31116,
+          "score": 1.8155406795077853,
+          "meta": {
+            "title_display": "Momotaros no Natsuyasumi",
+            "type": "Movie",
+            "mal_score": 5.26,
+            "members_count": null,
+            "aired_from": "2007-08-04T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.794607162475586,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.02222222222222222,
+            "metadata_bonus": 0.0002222222222222222,
+            "overlap_per_seed": {
+              "Cowboy Bebop": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "fmab",
+      "seed_titles": [
+        "Fullmetal Alchemist: Brotherhood"
+      ],
+      "resolved_seed_ids": [
+        5114
+      ],
+      "resolved_seed_titles": [
+        "Fullmetal Alchemist: Brotherhood"
+      ],
+      "notes": "Sanity: shounen/adventure; avoid recap/summary content.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Fullmetal Alchemist: Brotherhood",
+          "resolved_anime_id": 5114,
+          "matched_title": "Fullmetal Alchemist: Brotherhood",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 32269,
+          "score": 2.166016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.75,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 3
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 2.128431634902954,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.0835430145263674,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33674,
+          "score": 2.0262641098022462,
+          "meta": {
+            "title_display": "No Game, No Life: Zero",
+            "type": "Movie",
+            "mal_score": 8.16,
+            "members_count": null,
+            "aired_from": "2017-07-15T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.304256439208984,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.019999999999999997,
+            "metadata_bonus": 0.00019999999999999998,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31339,
+          "score": 2.0115018260955813,
+          "meta": {
+            "title_display": "Drifters",
+            "type": "TV",
+            "mal_score": 7.88,
+            "members_count": null,
+            "aired_from": "2016-10-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.75,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.730807304382324,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.38,
+            "metadata_bonus": 0.0038,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 3
+            }
+          }
+        },
+        {
+          "anime_id": 31236,
+          "score": 1.9798704701937162,
+          "meta": {
+            "title_display": "Chieri and Cherry",
+            "type": "Movie",
+            "mal_score": 6.48,
+            "members_count": null,
+            "aired_from": "2016-02-20T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.117635726928711,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29135,
+          "score": 1.9514082241058348,
+          "meta": {
+            "title_display": "The Small Garden",
+            "type": "Movie",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2014-12-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.98563289642334,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33144,
+          "score": 1.931910259246826,
+          "meta": {
+            "title_display": "The Hell (Two Kinds of Life)",
+            "type": "Movie",
+            "mal_score": 5.73,
+            "members_count": null,
+            "aired_from": "2006-07-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.899641036987305,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.6999999999999998,
+            "metadata_bonus": 0.006999999999999998,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31201,
+          "score": 1.9261369922637939,
+          "meta": {
+            "title_display": "Doraemon the Movie: Nobita and the Birth of Japan 2016",
+            "type": "Movie",
+            "mal_score": 7.46,
+            "members_count": null,
+            "aired_from": "2016-03-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.903347969055176,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030000000000000006,
+            "metadata_bonus": 0.0003000000000000001,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 1.9252816058264839,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.17777777777777784,
+            "metadata_bonus": 0.0017777777777777785,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 1.925058078765869,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 1.923598425441318,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31866,
+          "score": 1.8996727782762968,
+          "meta": {
+            "title_display": "Last Exile: Fam, the Silver Wing - Over the Wishes",
+            "type": "Movie",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2016-02-06T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.796844959259033,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29429,
+          "score": 1.8964635219573973,
+          "meta": {
+            "title_display": "Straw Byururu",
+            "type": "TV Special",
+            "mal_score": 5.79,
+            "members_count": null,
+            "aired_from": "2010-03-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.74985408782959,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.9,
+            "metadata_bonus": 0.009000000000000001,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31911,
+          "score": 1.8951366526530338,
+          "meta": {
+            "title_display": "Pok\u00e9mon Mystery Dungeon: Gates to Infinity",
+            "type": "ONA",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "2012-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.776238918304443,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.10769230769230768,
+            "metadata_bonus": 0.0010769230769230769,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32732,
+          "score": 1.8664886474609375,
+          "meta": {
+            "title_display": "Teo the Magic Planet Pilot",
+            "type": "TV Special",
+            "mal_score": 5.5,
+            "members_count": null,
+            "aired_from": "1997-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.66595458984375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 1.8570421247482298,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.30000000000000004,
+            "metadata_bonus": 0.0030000000000000005,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30473,
+          "score": 1.8558183794021605,
+          "meta": {
+            "title_display": "Sleep tight my baby, cradled in the sky",
+            "type": "Movie",
+            "mal_score": 5.38,
+            "members_count": null,
+            "aired_from": "2014-04-12T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.621273517608643,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.05,
+            "metadata_bonus": 0.0005,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32543,
+          "score": 1.849474299430847,
+          "meta": {
+            "title_display": "Lu Shidai 2nd Season",
+            "type": "ONA",
+            "mal_score": 6.69,
+            "members_count": null,
+            "aired_from": "2014-11-26T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.595897197723389,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.05,
+            "metadata_bonus": 0.0005,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33712,
+          "score": 1.8494130590438842,
+          "meta": {
+            "title_display": "Bikini Warriors OVA",
+            "type": "OVA",
+            "mal_score": 5.54,
+            "members_count": null,
+            "aired_from": "2016-12-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.25,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.096452236175537,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030000000000000006,
+            "metadata_bonus": 0.0003000000000000001,
+            "overlap_per_seed": {
+              "Fullmetal Alchemist: Brotherhood": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "naruto",
+      "seed_titles": [
+        "Naruto"
+      ],
+      "resolved_seed_ids": [
+        20
+      ],
+      "resolved_seed_titles": [
+        "Naruto"
+      ],
+      "notes": "Sanity: long-running shounen; watch for many specials/recaps.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Naruto",
+          "resolved_anime_id": 20,
+          "matched_title": "Naruto",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 32269,
+          "score": 2.291016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 3
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.1668763478597004,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 2.165098301569621,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31339,
+          "score": 2.1327018260955812,
+          "meta": {
+            "title_display": "Drifters",
+            "type": "TV",
+            "mal_score": 7.88,
+            "members_count": null,
+            "aired_from": "2016-10-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.730807304382324,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 3
+            }
+          }
+        },
+        {
+          "anime_id": 31236,
+          "score": 2.062742265065511,
+          "meta": {
+            "title_display": "Chieri and Cherry",
+            "type": "Movie",
+            "mal_score": 6.48,
+            "members_count": null,
+            "aired_from": "2016-02-20T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.117635726928711,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29135,
+          "score": 2.029741557439168,
+          "meta": {
+            "title_display": "The Small Garden",
+            "type": "Movie",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2014-12-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.98563289642334,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 2.0148371613820393,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8,
+            "metadata_bonus": 0.008,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 2.01382064766354,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31201,
+          "score": 2.009170325597127,
+          "meta": {
+            "title_display": "Doraemon the Movie: Nobita and the Birth of Japan 2016",
+            "type": "Movie",
+            "mal_score": 7.46,
+            "members_count": null,
+            "aired_from": "2016-03-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.903347969055176,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 2.0083914120992024,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31866,
+          "score": 1.9825445731480915,
+          "meta": {
+            "title_display": "Last Exile: Fam, the Silver Wing - Over the Wishes",
+            "type": "Movie",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2016-02-06T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.796844959259033,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31911,
+          "score": 1.977393062909444,
+          "meta": {
+            "title_display": "Pok\u00e9mon Mystery Dungeon: Gates to Infinity",
+            "type": "ONA",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "2012-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.776238918304443,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29429,
+          "score": 1.9727968552907307,
+          "meta": {
+            "title_display": "Straw Byururu",
+            "type": "TV Special",
+            "mal_score": 5.79,
+            "members_count": null,
+            "aired_from": "2010-03-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.74985408782959,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.19999999999999996,
+            "metadata_bonus": 0.0019999999999999996,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32732,
+          "score": 1.9548219807942706,
+          "meta": {
+            "title_display": "Teo the Magic Planet Pilot",
+            "type": "TV Special",
+            "mal_score": 5.5,
+            "members_count": null,
+            "aired_from": "1997-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.66595458984375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33674,
+          "score": 1.9427307764689128,
+          "meta": {
+            "title_display": "No Game, No Life: Zero",
+            "type": "Movie",
+            "mal_score": 8.16,
+            "members_count": null,
+            "aired_from": "2017-07-15T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.304256439208984,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 1.9373754580815632,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32543,
+          "score": 1.9323076327641804,
+          "meta": {
+            "title_display": "Lu Shidai 2nd Season",
+            "type": "ONA",
+            "mal_score": 6.69,
+            "members_count": null,
+            "aired_from": "2014-11-26T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.595897197723389,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33712,
+          "score": 1.890779725710551,
+          "meta": {
+            "title_display": "Bikini Warriors OVA",
+            "type": "OVA",
+            "mal_score": 5.54,
+            "members_count": null,
+            "aired_from": "2016-12-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.096452236175537,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.8753341488226867,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Naruto": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.8549301544825236,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Naruto": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "one_piece",
+      "seed_titles": [
+        "One Piece"
+      ],
+      "resolved_seed_ids": [
+        21
+      ],
+      "resolved_seed_titles": [
+        "One Piece"
+      ],
+      "notes": "Sanity: long-running shounen; watch for specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "One Piece",
+          "resolved_anime_id": 21,
+          "matched_title": "One Piece",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 32269,
+          "score": 2.291016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 3
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.1668763478597004,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 2.165098301569621,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31339,
+          "score": 2.1327018260955812,
+          "meta": {
+            "title_display": "Drifters",
+            "type": "TV",
+            "mal_score": 7.88,
+            "members_count": null,
+            "aired_from": "2016-10-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.730807304382324,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 3
+            }
+          }
+        },
+        {
+          "anime_id": 31236,
+          "score": 2.062742265065511,
+          "meta": {
+            "title_display": "Chieri and Cherry",
+            "type": "Movie",
+            "mal_score": 6.48,
+            "members_count": null,
+            "aired_from": "2016-02-20T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.117635726928711,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29135,
+          "score": 2.029741557439168,
+          "meta": {
+            "title_display": "The Small Garden",
+            "type": "Movie",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2014-12-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.98563289642334,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 2.016852950560741,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8461538461538461,
+            "metadata_bonus": 0.008461538461538461,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31201,
+          "score": 2.009170325597127,
+          "meta": {
+            "title_display": "Doraemon the Movie: Nobita and the Birth of Japan 2016",
+            "type": "Movie",
+            "mal_score": 7.46,
+            "members_count": null,
+            "aired_from": "2016-03-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.903347969055176,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 2.0068371613820393,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 2.0060428698857624,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31866,
+          "score": 1.9825445731480915,
+          "meta": {
+            "title_display": "Last Exile: Fam, the Silver Wing - Over the Wishes",
+            "type": "Movie",
+            "mal_score": 6.37,
+            "members_count": null,
+            "aired_from": "2016-02-06T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.796844959259033,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31911,
+          "score": 1.977393062909444,
+          "meta": {
+            "title_display": "Pok\u00e9mon Mystery Dungeon: Gates to Infinity",
+            "type": "ONA",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "2012-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.776238918304443,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29429,
+          "score": 1.9707968552907307,
+          "meta": {
+            "title_display": "Straw Byururu",
+            "type": "TV Special",
+            "mal_score": 5.79,
+            "members_count": null,
+            "aired_from": "2010-03-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.74985408782959,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32732,
+          "score": 1.9578219807942707,
+          "meta": {
+            "title_display": "Teo the Magic Planet Pilot",
+            "type": "TV Special",
+            "mal_score": 5.5,
+            "members_count": null,
+            "aired_from": "1997-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.66595458984375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8000000000000002,
+            "metadata_bonus": 0.008000000000000002,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33674,
+          "score": 1.9427307764689128,
+          "meta": {
+            "title_display": "No Game, No Life: Zero",
+            "type": "Movie",
+            "mal_score": 8.16,
+            "members_count": null,
+            "aired_from": "2017-07-15T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.304256439208984,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 1
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 1.9373754580815632,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 32543,
+          "score": 1.9323076327641804,
+          "meta": {
+            "title_display": "Lu Shidai 2nd Season",
+            "type": "ONA",
+            "mal_score": 6.69,
+            "members_count": null,
+            "aired_from": "2014-11-26T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.595897197723389,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33712,
+          "score": 1.890779725710551,
+          "meta": {
+            "title_display": "Bikini Warriors OVA",
+            "type": "OVA",
+            "mal_score": 5.54,
+            "members_count": null,
+            "aired_from": "2016-12-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.096452236175537,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.8750264565149943,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.8549301544825236,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "One Piece": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "demon_slayer",
+      "seed_titles": [
+        "Kimetsu no Yaiba"
+      ],
+      "resolved_seed_ids": [
+        47778
+      ],
+      "resolved_seed_titles": [
+        "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc"
+      ],
+      "notes": "Sanity: modern action; avoid recap edits.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Kimetsu no Yaiba",
+          "resolved_anime_id": 47778,
+          "matched_title": "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc",
+          "score": 85.5,
+          "method": "fuzzy"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 31966,
+          "score": 2.1180928600017843,
+          "meta": {
+            "title_display": "Sword Gai",
+            "type": "ONA",
+            "mal_score": 5.61,
+            "members_count": null,
+            "aired_from": "2013-10-04T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.671140670776367,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 2.10904212474823,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.091320792304145,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32143,
+          "score": 2.0623036408791178,
+          "meta": {
+            "title_display": "Peeping Life x Kaijuu Sakaba Kaiji: Kaijuu-tachi ga Iru Tokoro",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-07-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.446753025054932,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06153846153846155,
+            "metadata_bonus": 0.0006153846153846155,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 2.041016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30278,
+          "score": 1.9982103425539457,
+          "meta": {
+            "title_display": "Ghost Messenger Movie",
+            "type": "Movie",
+            "mal_score": 5.9,
+            "members_count": null,
+            "aired_from": "2014-05-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.190995216369629,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30921,
+          "score": 1.9950886850357055,
+          "meta": {
+            "title_display": "Kacchikenee!",
+            "type": "Movie",
+            "mal_score": 6.29,
+            "members_count": null,
+            "aired_from": "2016-03-19T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.178354740142822,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.05,
+            "metadata_bonus": 0.0005,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.9583597898483276,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.9391523767047458,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30916,
+          "score": 1.9358253002166748,
+          "meta": {
+            "title_display": "The Five Killers",
+            "type": "ONA",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2007-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.943301200866699,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30173,
+          "score": 1.9327101051330566,
+          "meta": {
+            "title_display": "Fruity Samurai",
+            "type": "TV",
+            "mal_score": 5.46,
+            "members_count": null,
+            "aired_from": "2013-08-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.916040420532227,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.37,
+            "metadata_bonus": 0.0037,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30095,
+          "score": 1.932000708580017,
+          "meta": {
+            "title_display": "Color Old Master Q",
+            "type": "Movie",
+            "mal_score": 5.8,
+            "members_count": null,
+            "aired_from": "1981-07-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.928002834320068,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 1.9285580787658692,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 1.923598425441318,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 1.923503828048706,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30463,
+          "score": 1.9228642204284667,
+          "meta": {
+            "title_display": "Horror News",
+            "type": "ONA",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2014-04-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890256881713867,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030000000000000006,
+            "metadata_bonus": 0.0003000000000000001,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30070,
+          "score": 1.9217269812689888,
+          "meta": {
+            "title_display": "Shiroi Zou (1981)",
+            "type": "Movie",
+            "mal_score": 5.65,
+            "members_count": null,
+            "aired_from": "1981-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.855796813964844,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32059,
+          "score": 1.9210248440962572,
+          "meta": {
+            "title_display": "Master of Torque 3",
+            "type": "ONA",
+            "mal_score": 4.84,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.8810224533081055,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 9488,
+          "score": 1.908711727142334,
+          "meta": {
+            "title_display": "Cencoroll Connect",
+            "type": "Movie",
+            "mal_score": 7.19,
+            "members_count": null,
+            "aired_from": "2019-06-29T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.802846908569336,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8000000000000002,
+            "metadata_bonus": 0.008000000000000002,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31170,
+          "score": 1.903257731437683,
+          "meta": {
+            "title_display": "Youkai Ninpouchou Jiraiya!",
+            "type": "PV",
+            "mal_score": 5.19,
+            "members_count": null,
+            "aired_from": "2015-04-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.797030925750732,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.4000000000000001,
+            "metadata_bonus": 0.004000000000000001,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "jujutsu_kaisen",
+      "seed_titles": [
+        "Jujutsu Kaisen"
+      ],
+      "resolved_seed_ids": [
+        40748
+      ],
+      "resolved_seed_titles": [
+        "Jujutsu Kaisen"
+      ],
+      "notes": "Sanity: modern action; avoid specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Jujutsu Kaisen",
+          "resolved_anime_id": 40748,
+          "matched_title": "Jujutsu Kaisen",
+          "method": "exact"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 31912,
+          "score": 2.000209681193034,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32143,
+          "score": 1.9791241536996305,
+          "meta": {
+            "title_display": "Peeping Life x Kaijuu Sakaba Kaiji: Kaijuu-tachi ga Iru Tokoro",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-07-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.446753025054932,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 1.9576828400293986,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31966,
+          "score": 1.9515800394889635,
+          "meta": {
+            "title_display": "Sword Gai",
+            "type": "ONA",
+            "mal_score": 5.61,
+            "members_count": null,
+            "aired_from": "2013-10-04T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.671140670776367,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 1.9433754580815632,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.6,
+            "metadata_bonus": 0.006,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30921,
+          "score": 1.9118553517023722,
+          "meta": {
+            "title_display": "Kacchikenee!",
+            "type": "Movie",
+            "mal_score": 6.29,
+            "members_count": null,
+            "aired_from": "2016-03-19T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.178354740142822,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06,
+            "metadata_bonus": 0.0006,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28685,
+          "score": 1.8981688340504963,
+          "meta": {
+            "title_display": "Tough Guy!",
+            "type": "Movie",
+            "mal_score": 5.21,
+            "members_count": null,
+            "aired_from": "2005-06-03T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.459342002868652,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 2
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.8750264565149943,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.8560412655936347,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.11111111111111113,
+            "metadata_bonus": 0.0011111111111111113,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30916,
+          "score": 1.8524919668833415,
+          "meta": {
+            "title_display": "The Five Killers",
+            "type": "ONA",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2007-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.943301200866699,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30095,
+          "score": 1.8486673752466838,
+          "meta": {
+            "title_display": "Color Old Master Q",
+            "type": "Movie",
+            "mal_score": 5.8,
+            "members_count": null,
+            "aired_from": "1981-07-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.928002834320068,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30173,
+          "score": 1.8459767717997233,
+          "meta": {
+            "title_display": "Fruity Samurai",
+            "type": "TV",
+            "mal_score": 5.46,
+            "members_count": null,
+            "aired_from": "2013-08-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.916040420532227,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030000000000000006,
+            "metadata_bonus": 0.0003000000000000001,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29587,
+          "score": 1.8441482702891032,
+          "meta": {
+            "title_display": "Home My Home",
+            "type": "Movie",
+            "mal_score": 5.21,
+            "members_count": null,
+            "aired_from": "1970-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.909926414489746,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 1.8417247454325358,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 1.840487314330207,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.11111111111111113,
+            "metadata_bonus": 0.0011111111111111113,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 1.8403927169375949,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.02222222222222222,
+            "metadata_bonus": 0.0002222222222222222,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30463,
+          "score": 1.8396308870951334,
+          "meta": {
+            "title_display": "Horror News",
+            "type": "ONA",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2014-04-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890256881713867,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04000000000000001,
+            "metadata_bonus": 0.0004000000000000001,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32059,
+          "score": 1.83784535691677,
+          "meta": {
+            "title_display": "Master of Torque 3",
+            "type": "ONA",
+            "mal_score": 4.84,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.8810224533081055,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0923076923076923,
+            "metadata_bonus": 0.0009230769230769231,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30278,
+          "score": 1.8316975220411251,
+          "meta": {
+            "title_display": "Ghost Messenger Movie",
+            "type": "Movie",
+            "mal_score": 5.9,
+            "members_count": null,
+            "aired_from": "2014-05-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.6666666666666666,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.190995216369629,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06153846153846155,
+            "metadata_bonus": 0.0006153846153846155,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30070,
+          "score": 1.8306158701578776,
+          "meta": {
+            "title_display": "Shiroi Zou (1981)",
+            "type": "Movie",
+            "mal_score": 5.65,
+            "members_count": null,
+            "aired_from": "1981-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.3333333333333333,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.855796813964844,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Jujutsu Kaisen": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "my_hero_academia",
+      "seed_titles": [
+        "Boku no Hero Academia"
+      ],
+      "resolved_seed_ids": [
+        47778
+      ],
+      "resolved_seed_titles": [
+        "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc"
+      ],
+      "notes": "Sanity: modern shounen; avoid recap specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Boku no Hero Academia",
+          "resolved_anime_id": 47778,
+          "matched_title": "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc",
+          "score": 85.5,
+          "method": "fuzzy"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 31966,
+          "score": 2.1180928600017843,
+          "meta": {
+            "title_display": "Sword Gai",
+            "type": "ONA",
+            "mal_score": 5.61,
+            "members_count": null,
+            "aired_from": "2013-10-04T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.671140670776367,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030769230769230764,
+            "metadata_bonus": 0.00030769230769230765,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 33309,
+          "score": 2.10904212474823,
+          "meta": {
+            "title_display": "The Devil Ring",
+            "type": "ONA",
+            "mal_score": 6.02,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.61616849899292,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.5,
+            "metadata_bonus": 0.005,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 31912,
+          "score": 2.091320792304145,
+          "meta": {
+            "title_display": "Shinsetsu Kachikachi Yama",
+            "type": "Movie",
+            "mal_score": 4.92,
+            "members_count": null,
+            "aired_from": "1936-11-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.534172058105469,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32143,
+          "score": 2.0623036408791178,
+          "meta": {
+            "title_display": "Peeping Life x Kaijuu Sakaba Kaiji: Kaijuu-tachi ga Iru Tokoro",
+            "type": "OVA",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-07-10T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.446753025054932,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.06153846153846155,
+            "metadata_bonus": 0.0006153846153846155,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32269,
+          "score": 2.041016173362732,
+          "meta": {
+            "title_display": "Saving Mother",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1984-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.364064693450928,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30278,
+          "score": 1.9982103425539457,
+          "meta": {
+            "title_display": "Ghost Messenger Movie",
+            "type": "Movie",
+            "mal_score": 5.9,
+            "members_count": null,
+            "aired_from": "2014-05-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.190995216369629,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.04615384615384616,
+            "metadata_bonus": 0.00046153846153846164,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 2
+            }
+          }
+        },
+        {
+          "anime_id": 30921,
+          "score": 1.9950886850357055,
+          "meta": {
+            "title_display": "Kacchikenee!",
+            "type": "Movie",
+            "mal_score": 6.29,
+            "members_count": null,
+            "aired_from": "2016-03-19T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.178354740142822,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.05,
+            "metadata_bonus": 0.0005,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 29609,
+          "score": 1.9583597898483276,
+          "meta": {
+            "title_display": "Chinka",
+            "type": "PV",
+            "mal_score": 4.97,
+            "members_count": null,
+            "aired_from": "2010-03-31T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 6.0334391593933105,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31505,
+          "score": 1.9391523767047458,
+          "meta": {
+            "title_display": "Go! Samurai",
+            "type": "ONA",
+            "mal_score": 5.64,
+            "members_count": null,
+            "aired_from": "2015-08-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.953053951263428,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30916,
+          "score": 1.9358253002166748,
+          "meta": {
+            "title_display": "The Five Killers",
+            "type": "ONA",
+            "mal_score": 5.95,
+            "members_count": null,
+            "aired_from": "2007-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.943301200866699,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30173,
+          "score": 1.9327101051330566,
+          "meta": {
+            "title_display": "Fruity Samurai",
+            "type": "TV",
+            "mal_score": 5.46,
+            "members_count": null,
+            "aired_from": "2013-08-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.916040420532227,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.37,
+            "metadata_bonus": 0.0037,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30095,
+          "score": 1.932000708580017,
+          "meta": {
+            "title_display": "Color Old Master Q",
+            "type": "Movie",
+            "mal_score": 5.8,
+            "members_count": null,
+            "aired_from": "1981-07-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.928002834320068,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30028,
+          "score": 1.9285580787658692,
+          "meta": {
+            "title_display": "Sekai Meisaku Douwa Series",
+            "type": "TV",
+            "mal_score": 6.28,
+            "members_count": null,
+            "aired_from": "1988-04-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.900232315063477,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32890,
+          "score": 1.923598425441318,
+          "meta": {
+            "title_display": "Legend of a Rabbit: The Martial of Fire",
+            "type": "Movie",
+            "mal_score": 6.08,
+            "members_count": null,
+            "aired_from": "2015-02-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890838146209717,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.08888888888888892,
+            "metadata_bonus": 0.0008888888888888893,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32889,
+          "score": 1.923503828048706,
+          "meta": {
+            "title_display": "Legend of Kung Fu Rabbit",
+            "type": "Movie",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2011-07-11T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.894015312194824,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30463,
+          "score": 1.9228642204284667,
+          "meta": {
+            "title_display": "Horror News",
+            "type": "ONA",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "2014-04-28T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.890256881713867,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.030000000000000006,
+            "metadata_bonus": 0.0003000000000000001,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 30070,
+          "score": 1.9217269812689888,
+          "meta": {
+            "title_display": "Shiroi Zou (1981)",
+            "type": "Movie",
+            "mal_score": 5.65,
+            "members_count": null,
+            "aired_from": "1981-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.855796813964844,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32059,
+          "score": 1.9210248440962572,
+          "meta": {
+            "title_display": "Master of Torque 3",
+            "type": "ONA",
+            "mal_score": 4.84,
+            "members_count": null,
+            "aired_from": "2016-04-27T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.8810224533081055,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.07692307692307693,
+            "metadata_bonus": 0.0007692307692307693,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 9488,
+          "score": 1.908711727142334,
+          "meta": {
+            "title_display": "Cencoroll Connect",
+            "type": "Movie",
+            "mal_score": 7.19,
+            "members_count": null,
+            "aired_from": "2019-06-29T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.802846908569336,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.8000000000000002,
+            "metadata_bonus": 0.008000000000000002,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31170,
+          "score": 1.903257731437683,
+          "meta": {
+            "title_display": "Youkai Ninpouchou Jiraiya!",
+            "type": "PV",
+            "mal_score": 5.19,
+            "members_count": null,
+            "aired_from": "2015-04-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.5,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.797030925750732,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.4000000000000001,
+            "metadata_bonus": 0.004000000000000001,
+            "overlap_per_seed": {
+              "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    {
+      "id": "haikyuu",
+      "seed_titles": [
+        "Haikyuu!!"
+      ],
+      "resolved_seed_ids": [
+        20583
+      ],
+      "resolved_seed_titles": [
+        "Haikyu!!"
+      ],
+      "notes": "Sanity: sports; avoid shorts/specials.",
+      "weight_mode": "Balanced",
+      "top_n": 20,
+      "expectations": {
+        "disallow_types": [
+          "Special",
+          "Music"
+        ],
+        "disallow_title_regex": "(?i)\\b(recap|recaps|summary|digest|compilation|episode\\s*0)\\b"
+      },
+      "seed_resolution": [
+        {
+          "query": "Haikyuu!!",
+          "resolved_anime_id": 20583,
+          "matched_title": "Haikyu!!",
+          "score": 82.35294117647058,
+          "method": "fuzzy"
+        }
+      ],
+      "recommendations": [
+        {
+          "anime_id": 32870,
+          "score": 2.1804863164901733,
+          "meta": {
+            "title_display": "Winter Cup Highlights Episode 2 \u2013 Winter Cup Highlights -Beyond the Tears-",
+            "type": "Movie",
+            "mal_score": 7.77,
+            "members_count": null,
+            "aired_from": "2016-10-08T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.882745265960693,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.98,
+            "metadata_bonus": 0.0098,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31575,
+          "score": 2.168132463561164,
+          "meta": {
+            "title_display": "Offside",
+            "type": "OVA",
+            "mal_score": 5.72,
+            "members_count": null,
+            "aired_from": "1993-01-22T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.841418743133545,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.7777777777777778,
+            "metadata_bonus": 0.007777777777777778,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31237,
+          "score": 2.1618809218039883,
+          "meta": {
+            "title_display": "Ganbare-bu Next!",
+            "type": "TV",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-06-08T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.84198522567749,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.13846153846153847,
+            "metadata_bonus": 0.0013846153846153847,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31177,
+          "score": 2.134270971404182,
+          "meta": {
+            "title_display": "Yakyuubu Aruaru",
+            "type": "TV Special",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2015-07-09T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.697972774505615,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.9777777777777779,
+            "metadata_bonus": 0.00977777777777778,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 31464,
+          "score": 2.1330176464080814,
+          "meta": {
+            "title_display": "Pichiko Dakyuubu",
+            "type": "TV",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "2010-02-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.715670585632324,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.41,
+            "metadata_bonus": 0.0040999999999999995,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32831,
+          "score": 2.097599468231201,
+          "meta": {
+            "title_display": "Hungry to Win",
+            "type": "CM",
+            "mal_score": 5.19,
+            "members_count": null,
+            "aired_from": "2014-11-08T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.550397872924805,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 1.0,
+            "metadata_bonus": 0.01,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 32871,
+          "score": 2.094526643562317,
+          "meta": {
+            "title_display": "Winter Cup Highlights Episode 3 \u2013 Winter Cup Highlights -Crossing the Door-",
+            "type": "Movie",
+            "mal_score": 7.83,
+            "members_count": null,
+            "aired_from": "2016-12-03T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 5.538906574249268,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.98,
+            "metadata_bonus": 0.0098,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 10323,
+          "score": 1.8719864219029745,
+          "meta": {
+            "title_display": "Golden\u2605Kids",
+            "type": "ONA",
+            "mal_score": 5.25,
+            "members_count": null,
+            "aired_from": "2011-01-21T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 4.6506123542785645,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.9333333333333333,
+            "metadata_bonus": 0.009333333333333334,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28717,
+          "score": 1.808431634902954,
+          "meta": {
+            "title_display": "Luigi's Toy Adventure",
+            "type": "CM",
+            "mal_score": 5.67,
+            "members_count": null,
+            "aired_from": "2014-12-02T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 7.193726539611816,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 1.0,
+            "metadata_bonus": 0.01,
+            "overlap_per_seed": {
+              "Haikyu!!": 0
+            }
+          }
+        },
+        {
+          "anime_id": 33325,
+          "score": 1.7935523662567139,
+          "meta": {
+            "title_display": "Ganbare!! Tabuchi-kun!! Aa Tsuppari Jinsei",
+            "type": "Movie",
+            "mal_score": 5.82,
+            "members_count": null,
+            "aired_from": "1980-12-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 4.3602094650268555,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 3273,
+          "score": 1.6971580505371093,
+          "meta": {
+            "title_display": "Kinnikuman (Movie)",
+            "type": "Movie",
+            "mal_score": 6.21,
+            "members_count": null,
+            "aired_from": "1984-07-14T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.9886322021484375,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 11919,
+          "score": 1.684112926864624,
+          "meta": {
+            "title_display": "Zoku Attacker You! Kin Medal e no Michi",
+            "type": "TV",
+            "mal_score": 6.25,
+            "members_count": null,
+            "aired_from": "2008-01-01T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.920851707458496,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.39,
+            "metadata_bonus": 0.0039000000000000003,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 28347,
+          "score": 1.683166534423828,
+          "meta": {
+            "title_display": "Guitar Shoujo!",
+            "type": "CM",
+            "mal_score": 4.72,
+            "members_count": null,
+            "aired_from": "2011-12-14T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 0.0,
+            "seed_coverage": 0.0,
+            "hybrid_val": 6.7046661376953125,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.6999999999999998,
+            "metadata_bonus": 0.006999999999999998,
+            "overlap_per_seed": {
+              "Haikyu!!": 0
+            }
+          }
+        },
+        {
+          "anime_id": 13947,
+          "score": 1.659406316280365,
+          "meta": {
+            "title_display": "Ashita no Eleven-tachi",
+            "type": "TV Special",
+            "mal_score": 5.43,
+            "members_count": null,
+            "aired_from": "1979-01-07T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.83762526512146,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 21707,
+          "score": 1.657302762031555,
+          "meta": {
+            "title_display": "Pretty Rhythm Movie: All Star Selection - Prism Show\u2606Best Ten",
+            "type": "Movie",
+            "mal_score": 6.69,
+            "members_count": null,
+            "aired_from": "2014-03-08T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.8252110481262207,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.1,
+            "metadata_bonus": 0.001,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 9242,
+          "score": 1.6533732686042786,
+          "meta": {
+            "title_display": "Nine: Original-ban",
+            "type": "Movie",
+            "mal_score": 6.05,
+            "members_count": null,
+            "aired_from": "1983-09-16T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.7994930744171143,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 8522,
+          "score": 1.6520108256340027,
+          "meta": {
+            "title_display": "Midoriyama Koukou Koushien-hen (Movie)",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1990-06-30T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.7940433025360107,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 19515,
+          "score": 1.651164722442627,
+          "meta": {
+            "title_display": "Kentoushi",
+            "type": "OVA",
+            "mal_score": 5.26,
+            "members_count": null,
+            "aired_from": "1990-03-05T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.804658889770508,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 19943,
+          "score": 1.649600338935852,
+          "meta": {
+            "title_display": "Eikou e no Spur: Igaya Chiharu Monogatari",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1997-09-13T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.798401355743408,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.0,
+            "metadata_bonus": 0.0,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        },
+        {
+          "anime_id": 19887,
+          "score": 1.647352722644806,
+          "meta": {
+            "title_display": "Shouri Toushu",
+            "type": "Movie",
+            "mal_score": null,
+            "members_count": null,
+            "aired_from": "1987-10-24T00:00:00+00:00"
+          },
+          "signals": {
+            "weighted_overlap": 1.0,
+            "seed_coverage": 1.0,
+            "hybrid_val": 3.7754108905792236,
+            "popularity_boost": 0.0,
+            "metadata_affinity": 0.35,
+            "metadata_bonus": 0.0034999999999999996,
+            "overlap_per_seed": {
+              "Haikyu!!": 1
+            }
+          }
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    }
+  ],
+  "timestamp_utc": "20251229205008"
+}

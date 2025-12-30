@@ -30,6 +30,7 @@ MIN_METADATA_COLUMNS = [
     "title",
     "title_japanese",
     "genres",
+    "themes",
     "synopsis",
     "synopsis_snippet",
     "poster_thumb_url",

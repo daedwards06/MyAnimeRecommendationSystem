@@ -34,6 +34,13 @@ from src.app.components.help import render_help_panel
 from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
+from src.app.metadata_features import (
+    METADATA_AFFINITY_COLD_START_COEF,
+    METADATA_AFFINITY_TRAINED_COEF,
+    METADATA_AFFINITY_PERSONALIZED_COEF,
+    build_seed_metadata_profile,
+    compute_metadata_affinity,
+)
 from src.app.theme import get_theme
 from src.app.constants import (
     DEFAULT_TOP_N,
@@ -1393,6 +1400,10 @@ else:
                             # Weight genres by how many seeds have them
                             for genre in seed_genres:
                                 genre_weights[genre] = genre_weights.get(genre, 0) + 1
+
+                    # Phase 4 / Chunk A3: lightweight metadata affinity profile.
+                    # This is used as a *small* bonus for cold-start candidates.
+                    seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
                     
                     num_seeds = len(selected_seed_ids)
                     
@@ -1453,13 +1464,21 @@ else:
                             hybrid_val = float(blended_scores[id_to_index[aid]])
                         else:
                             hybrid_val = 0.0
+
+                        # Phase 4 / Chunk A3: metadata affinity bonus.
+                        # Stronger for cold-start candidates; weak rerank for trained candidates.
+                        meta_affinity = compute_metadata_affinity(seed_meta_profile, mrow)
+                        meta_bonus = 0.0
+                        if meta_affinity > 0.0:
+                            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
+                            meta_bonus = coef * float(meta_affinity)
                         
                         # Weighted average scoring: emphasize matches across multiple seeds
                         # (matches/num_seeds) gives proportion of seeds matched
                         seed_coverage = num_seeds_matched / num_seeds
                         
                         # Final score: weighted overlap + seed coverage bonus + hybrid signal + popularity
-                        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost)
+                        score = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + (0.25 * hybrid_val) + (0.05 * popularity_boost) + meta_bonus
                         
                         if score <= 0:
                             continue
@@ -1467,7 +1486,7 @@ else:
                         # Track per-item raw contributions for truthful shares.
                         # We map seed overlap/coverage into the kNN/content bucket.
                         raw_mf = 0.0
-                        raw_knn = (0.5 * weighted_overlap) + (0.2 * seed_coverage)
+                        raw_knn = (0.5 * weighted_overlap) + (0.2 * seed_coverage) + meta_bonus
                         raw_pop = (0.05 * popularity_boost)
                         used_components: list[str] = ["knn", "pop"]
                         if aid in id_to_index:
@@ -1497,6 +1516,8 @@ else:
                             "seeds_matched": num_seeds_matched,
                             "seed_coverage": seed_coverage,
                             "common_genres": list(all_seed_genres & item_genres),
+                            "metadata_affinity": float(meta_affinity),
+                            "metadata_bonus": float(meta_bonus),
                         }
                         # Append truthful per-item shares.
                         explanation.update(shares)
@@ -1577,6 +1598,30 @@ else:
                                 "MF personalization returned no results (likely no overlap with MF items)."
                             )
                         else:
+                            # Phase 4 / Chunk A3: when seeds are selected, apply a tiny deterministic
+                            # metadata affinity nudge to reduce occasional "weird match" outputs.
+                            if selected_seed_ids:
+                                seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
+                                for rec in personalized_recs:
+                                    aid = int(rec.get("anime_id"))
+                                    row_df = metadata.loc[metadata["anime_id"] == aid].head(1)
+                                    if row_df.empty:
+                                        continue
+                                    affinity = compute_metadata_affinity(seed_meta_profile, row_df.iloc[0])
+                                    bonus = float(METADATA_AFFINITY_PERSONALIZED_COEF) * float(affinity)
+                                    if bonus <= 0.0:
+                                        continue
+                                    rec["score"] = float(rec.get("score", 0.0)) + bonus
+                                    raw = rec.get("_raw_components")
+                                    if isinstance(raw, dict):
+                                        raw["knn"] = float(raw.get("knn", 0.0)) + bonus
+                                    else:
+                                        rec["_raw_components"] = {"mf": 0.0, "knn": bonus, "pop": 0.0}
+                                    used = rec.get("_used_components")
+                                    if isinstance(used, list) and "knn" not in used:
+                                        used.append("knn")
+                                personalized_recs.sort(key=lambda x: float(x.get("score", 0.0)), reverse=True)
+                                personalized_recs = personalized_recs[:n_requested]
                             recs = personalized_recs
                             personalization_applied = True
                     elif personalization_strength > 0.01:
