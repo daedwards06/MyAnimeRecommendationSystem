@@ -199,7 +199,12 @@ def _parse_genres(val: Any) -> set[str]:
     return set()
 
 
-def _resolve_seed_titles(metadata: pd.DataFrame, seed_titles: list[str]) -> tuple[list[int], list[str], list[dict[str, Any]]]:
+def _resolve_seed_titles(
+    metadata: pd.DataFrame,
+    seed_titles: list[str],
+    *,
+    allow_fuzzy: bool = False,
+) -> tuple[list[int], list[str], list[dict[str, Any]]]:
     choices = [(str(t), int(a)) for t, a in zip(metadata["title_display"].astype(str).tolist(), metadata["anime_id"].astype(int).tolist())]
 
     resolved_ids: list[int] = []
@@ -219,7 +224,24 @@ def _resolve_seed_titles(metadata: pd.DataFrame, seed_titles: list[str]) -> tupl
             resolution_debug.append({"query": q, "resolved_anime_id": aid, "matched_title": q, "method": "exact"})
             continue
 
+        # Strict-by-default: do NOT fuzzy-resolve seeds unless explicitly allowed.
+        # We may compute fuzzy suggestions for diagnostics, but we won't pick one.
         matches = fuzzy_search(q, choices, limit=5, min_score=70)
+        if not allow_fuzzy:
+            resolution_debug.append(
+                {
+                    "query": q,
+                    "resolved_anime_id": None,
+                    "matched_title": None,
+                    "method": "blocked_fuzzy",
+                    "suggestions": [
+                        {"anime_id": int(aid), "matched_title": str(t), "score": float(score)}
+                        for aid, score, t in matches
+                    ],
+                }
+            )
+            continue
+
         if not matches:
             resolution_debug.append({"query": q, "resolved_anime_id": None, "matched_title": None, "method": "none"})
             continue
@@ -626,12 +648,24 @@ def _evaluate_golden_queries(
         seed_titles = [str(x) for x in (q.get("seed_titles") or [])]
         notes = q.get("notes")
 
+        allow_fuzzy_seeds = bool(q.get("allow_fuzzy_seeds", defaults.get("allow_fuzzy_seeds", False)))
+
         top_n = int(q.get("top_n", default_top_n))
         disallow_types = tuple(str(t) for t in q.get("disallow_types", default_expect.disallow_types))
         disallow_title_regex = str(q.get("disallow_title_regex", default_expect.disallow_title_regex))
         title_re = re.compile(disallow_title_regex) if disallow_title_regex else None
 
-        seed_ids, matched_titles, resolution_debug = _resolve_seed_titles(metadata, seed_titles)
+        seed_ids, matched_titles, resolution_debug = _resolve_seed_titles(metadata, seed_titles, allow_fuzzy=allow_fuzzy_seeds)
+
+        # Fail loudly if any seed wasn't deterministically resolved.
+        unresolved = [d for d in resolution_debug if d.get("resolved_anime_id") is None]
+        if unresolved:
+            unresolved_str = "; ".join([f"{d.get('query')}({d.get('method')})" for d in unresolved])
+            raise RuntimeError(
+                "Seed resolution failed (strict mode). "
+                "Update the golden query to use an exact title_display, or set allow_fuzzy_seeds=true for that query. "
+                f"Unresolved: {unresolved_str}"
+            )
 
         recs, recs_diag = _seed_based_scores(
             metadata=metadata,
@@ -713,6 +747,26 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
         lines.append(f"Seeds (requested): {', '.join(q.get('seed_titles') or [])}")
         lines.append(f"Seeds (resolved): {', '.join(q.get('resolved_seed_titles') or [])}")
         lines.append(f"Seed IDs: {q.get('resolved_seed_ids')}")
+
+        # Seed resolution diagnostics table (title -> id alignment)
+        seed_res = q.get("seed_resolution") or []
+        if seed_res:
+            lines.append("")
+            lines.append("Seed resolution details:")
+            lines.append("")
+            lines.append("| Query | Method | Resolved anime_id | Matched title | Score |")
+            lines.append("|---|---|---:|---|---:|")
+            for r in seed_res:
+                query = str(r.get("query", ""))
+                method = str(r.get("method", ""))
+                rid = r.get("resolved_anime_id")
+                rid_s = "" if rid is None else str(int(rid))
+                mt = "" if r.get("matched_title") is None else str(r.get("matched_title"))
+                score = r.get("score")
+                score_s = "" if score is None else f"{float(score):.1f}"
+                query = query.replace("|", "\\|")
+                mt = mt.replace("|", "\\|")
+                lines.append(f"| {query} | {method} | {rid_s} | {mt} | {score_s} |")
         if q.get("notes"):
             lines.append(f"Notes: {q.get('notes')}")
         lines.append(f"Top-N: {q.get('top_n')}")
