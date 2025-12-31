@@ -347,6 +347,7 @@ def _seed_based_scores(
     top_n: int,
     exclude_ids: set[int] | None = None,
     synopsis_tfidf_artifact: Any | None = None,
+    shortlist_size: int = 600,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not seed_ids:
         return [], {
@@ -407,14 +408,19 @@ def _seed_based_scores(
 
     num_seeds = max(1, len(seed_ids))
 
-    try:
-        blended_scores = recommender._blend(0, weights)  # pylint: disable=protected-access
-    except Exception:
-        blended_scores = None
+    # ------------------------------------------------------------------
+    # Option A (Phase 4): Two-stage seed-conditioned ranking
+    #   Stage 1: shortlist candidates using seed-conditioned signals ONLY
+    #            (genre overlap, metadata affinity, synopsis TF-IDF)
+    #   Stage 2: rerank only that shortlist using the existing final logic
+    #            (hybrid + pop + seed-conditioned bonuses)
+    # ------------------------------------------------------------------
 
-    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
-
-    scored: list[dict[str, Any]] = []
+    # --- Stage 1: shortlist -------------------------------------------------
+    # Prefer TF-IDF neighbors first (when available) to keep the shortlist
+    # seed-conditioned before allowing hybrid/MF priors in Stage 2.
+    stage1_tfidf_pool: list[dict[str, Any]] = []
+    stage1_fallback_pool: list[dict[str, Any]] = []
 
     for _, row in work.iterrows():
         aid = int(row["anime_id"])
@@ -424,7 +430,6 @@ def _seed_based_scores(
             continue
 
         item_genres = _parse_genres(row.get("genres"))
-
         raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
         max_possible_overlap = len(all_seed_genres) * num_seeds
         weighted_overlap = (raw_overlap / max_possible_overlap) if max_possible_overlap > 0 else 0.0
@@ -434,20 +439,13 @@ def _seed_based_scores(
             for seed_title, seed_genres in seed_genre_map.items()
         }
         num_seeds_matched = sum(1 for c in overlap_per_seed.values() if c > 0)
+        seed_coverage = num_seeds_matched / num_seeds
 
-        pop_pct = _pop_pct(pop_pct_by_id, aid)
-        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)
-
-        if blended_scores is not None and aid in id_to_index:
-            hybrid_val = float(blended_scores[int(id_to_index[aid])])
-        else:
-            hybrid_val = 0.0
-
+        # Seed-conditioned metadata affinity (stage 1: treat as cold-start; no hybrid/MF).
         meta_affinity = compute_metadata_affinity(seed_meta_profile, row)
-        meta_bonus = 0.0
+        meta_bonus_s1 = 0.0
         if meta_affinity > 0.0:
-            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
-            meta_bonus = coef * float(meta_affinity)
+            meta_bonus_s1 = float(METADATA_AFFINITY_COLD_START_COEF) * float(meta_affinity)
 
         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
         cand_type = None if pd.isna(row.get("type")) else str(row.get("type")).strip()
@@ -458,6 +456,119 @@ def _seed_based_scores(
             candidate_episodes=cand_eps,
         )
 
+        base = {
+            "anime_id": aid,
+            "meta": {
+                "title_display": str(row.get("title_display", "")),
+                "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                "mal_score": None if pd.isna(row.get("mal_score")) else float(row.get("mal_score")),
+                "members_count": None if pd.isna(row.get("members_count")) else int(row.get("members_count")),
+                "aired_from": None if pd.isna(row.get("aired_from")) else str(row.get("aired_from")),
+            },
+            "_stage1": {
+                "weighted_overlap": float(weighted_overlap),
+                "seed_coverage": float(seed_coverage),
+                "metadata_affinity": float(meta_affinity),
+                "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
+                "overlap_per_seed": overlap_per_seed,
+            },
+        }
+
+        # Pool A: TF-IDF neighbors (gated) – use similarity as the primary Stage 1 rank.
+        if bool(passes_gate) and float(synopsis_tfidf_sim) >= 0.02:
+            item = dict(base)
+            item["stage1_score"] = float(synopsis_tfidf_sim)
+            stage1_tfidf_pool.append(item)
+            continue
+
+        # Pool B: backfill candidates when TF-IDF is absent/insufficient.
+        fallback_score = (
+            (0.5 * float(weighted_overlap))
+            + (0.2 * float(seed_coverage))
+            + float(meta_bonus_s1)
+        )
+        if float(fallback_score) > 0.0:
+            item = dict(base)
+            item["stage1_score"] = float(fallback_score)
+            stage1_fallback_pool.append(item)
+
+    stage1_tfidf_pool.sort(
+        key=lambda x: (
+            -float((x.get("_stage1") or {}).get("synopsis_tfidf_sim", 0.0)),
+            -float((x.get("_stage1") or {}).get("weighted_overlap", 0.0)),
+            -float((x.get("_stage1") or {}).get("metadata_affinity", 0.0)),
+            int(x.get("anime_id", 0)),
+        )
+    )
+    stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
+
+    shortlist_k = max(0, int(shortlist_size))
+    stage1_total_candidates = int(len(stage1_tfidf_pool) + len(stage1_fallback_pool))
+    if shortlist_k <= 0:
+        shortlist = stage1_tfidf_pool + stage1_fallback_pool
+    else:
+        shortlist: list[dict[str, Any]] = []
+        seen_ids: set[int] = set()
+        for it in stage1_tfidf_pool:
+            if len(shortlist) >= shortlist_k:
+                break
+            aid = int(it.get("anime_id", 0))
+            if aid in seen_ids:
+                continue
+            shortlist.append(it)
+            seen_ids.add(aid)
+        for it in stage1_fallback_pool:
+            if len(shortlist) >= shortlist_k:
+                break
+            aid = int(it.get("anime_id", 0))
+            if aid in seen_ids:
+                continue
+            shortlist.append(it)
+            seen_ids.add(aid)
+
+    # --- Stage 2: rerank shortlist using existing final scoring --------------
+    try:
+        blended_scores = recommender._blend(0, weights)  # pylint: disable=protected-access
+    except Exception:
+        blended_scores = None
+
+    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
+
+    scored: list[dict[str, Any]] = []
+
+    for c in shortlist:
+        aid = int(c["anime_id"])
+        s1 = float(c.get("stage1_score", 0.0))
+
+        weighted_overlap = float((c.get("_stage1") or {}).get("weighted_overlap", 0.0))
+        seed_coverage = float((c.get("_stage1") or {}).get("seed_coverage", 0.0))
+        meta_affinity = float((c.get("_stage1") or {}).get("metadata_affinity", 0.0))
+        synopsis_tfidf_sim = float((c.get("_stage1") or {}).get("synopsis_tfidf_sim", 0.0))
+        overlap_per_seed = (c.get("_stage1") or {}).get("overlap_per_seed") or {}
+
+        pop_pct = _pop_pct(pop_pct_by_id, aid)
+        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)
+
+        if blended_scores is not None and aid in id_to_index:
+            hybrid_val = float(blended_scores[int(id_to_index[aid])])
+        else:
+            hybrid_val = 0.0
+
+        meta_bonus = 0.0
+        if meta_affinity > 0.0:
+            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
+            meta_bonus = float(coef) * float(meta_affinity)
+
+        # Recompute TF-IDF bonus with the existing hybrid-conditioned coefficient.
+        cand_type = (c.get("meta") or {}).get("type")
+        cand_eps = work.loc[work["anime_id"].astype(int) == aid, "episodes"].head(1)
+        cand_eps_val = None if cand_eps.empty else cand_eps.iloc[0]
+
+        passes_gate = synopsis_gate_passes(
+            seed_type=seed_type_target,
+            candidate_type=cand_type,
+            candidate_episodes=cand_eps_val,
+        )
         synopsis_tfidf_bonus = 0.0
         if passes_gate:
             synopsis_tfidf_bonus = float(
@@ -466,18 +577,14 @@ def _seed_based_scores(
                     hybrid_val=hybrid_val,
                 )
             )
-
         synopsis_tfidf_penalty = float(
             synopsis_tfidf_penalty_for_candidate(
                 passes_gate=passes_gate,
                 sim=synopsis_tfidf_sim,
-                candidate_episodes=cand_eps,
+                candidate_episodes=cand_eps_val,
             )
         )
-
         synopsis_tfidf_adjustment = float(synopsis_tfidf_bonus + synopsis_tfidf_penalty)
-
-        seed_coverage = num_seeds_matched / num_seeds
 
         score = (
             (0.5 * weighted_overlap)
@@ -494,14 +601,9 @@ def _seed_based_scores(
             {
                 "anime_id": aid,
                 "score": float(score),
-                "meta": {
-                    "title_display": str(row.get("title_display", "")),
-                    "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
-                    "mal_score": None if pd.isna(row.get("mal_score")) else float(row.get("mal_score")),
-                    "members_count": None if pd.isna(row.get("members_count")) else int(row.get("members_count")),
-                    "aired_from": None if pd.isna(row.get("aired_from")) else str(row.get("aired_from")),
-                },
+                "meta": c.get("meta") or {},
                 "signals": {
+                    "stage1_score": float(s1),
                     "weighted_overlap": float(weighted_overlap),
                     "seed_coverage": float(seed_coverage),
                     "hybrid_val": float(hybrid_val),
@@ -591,7 +693,19 @@ def _seed_based_scores(
     ]
     tfidf_fired = [b for b in tfidf_bonuses if float(b) > 0.0]
 
+    # Seed-conditioning diagnostics for Option A shortlist
+    top20 = recs_top_n[:20]
+    top20_tfidf_nonzero = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_tfidf_sim", 0.0)) > 0.0)
+    top20_tfidf_ge_min = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_tfidf_sim", 0.0)) >= 0.02)
+
+    shortlist_from_tfidf = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_tfidf_sim", 0.0)) >= 0.02)
+
     diagnostics = {
+        "stage1_shortlist_target": int(shortlist_k) if shortlist_k > 0 else int(stage1_total_candidates),
+        "stage1_shortlist_size": int(len(shortlist)),
+        "stage1_shortlist_from_tfidf_count": int(shortlist_from_tfidf),
+        "top20_tfidf_nonzero_count": int(top20_tfidf_nonzero),
+        "top20_tfidf_ge_min_sim_count": int(top20_tfidf_ge_min),
         "metadata_bonus_fired_count": int(len(fired)),
         "metadata_bonus_mean": float(sum(bonuses) / max(1, len(bonuses))),
         "metadata_bonus_max": float(max(bonuses) if bonuses else 0.0),
@@ -776,6 +890,8 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
         if diag:
             lines.append(
                 "Diagnostics: "
+                f"shortlist={diag.get('stage1_shortlist_size')}/{diag.get('stage1_shortlist_target')}, "
+                f"top20_tfidf_nonzero={diag.get('top20_tfidf_nonzero_count')}, "
                 f"bonus_fired={diag.get('metadata_bonus_fired_count')}, "
                 f"bonus_mean={float(diag.get('metadata_bonus_mean', 0.0)):.5f}, "
                 f"bonus_max={float(diag.get('metadata_bonus_max', 0.0)):.5f}, "

@@ -1428,74 +1428,52 @@ else:
                             seed_type_target = None
                     
                     num_seeds = len(selected_seed_ids)
-                    
-                    # Get blended hybrid scores for user to incorporate global preference signal.
-                    try:
-                        blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
-                    except Exception:
-                        blended_scores = None
-                    
-                    # Map anime_id -> index for quick lookup.
-                    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
-                    scored: list[dict] = []
-                    
+
+                    # Option A (Phase 4): Two-stage seed-conditioned ranking.
+                    # Stage 1: shortlist using seed-conditioned signals ONLY (no MF/demo-user/hybrid).
+                    # Stage 2: rerank that shortlist using existing final scoring logic.
+                    seed_shortlist_size = 600
+
+                    watched_ids_set: set[int] = set()
+                    if st.session_state["active_profile"]:
+                        watched_ids_set = {int(x) for x in (st.session_state["active_profile"].get("watched_ids", []) or [])}
+
+                    stage1_tfidf_pool: list[dict] = []
+                    stage1_fallback_pool: list[dict] = []
+
                     for _, mrow in metadata.iterrows():
                         aid = int(mrow["anime_id"])
                         if aid in selected_seed_ids:
                             continue
-
-                        # Candidate hygiene: exclude obvious recap/special artifacts in ranked modes.
                         if aid in ranked_hygiene_exclude_ids:
                             continue
-                        
-                        # Exclude watched anime (profile filter)
-                        if st.session_state["active_profile"]:
-                            watched_ids = st.session_state["active_profile"].get("watched_ids", [])
-                            if aid in watched_ids:
-                                continue
-                        
-                        # Parse genres - handle both string and array formats
+                        if aid in watched_ids_set:
+                            continue
+
                         row_genres = mrow.get("genres")
                         if isinstance(row_genres, str):
-                            item_genres = set([g.strip() for g in row_genres.split("|") if g.strip()])
+                            item_genres = {g.strip() for g in row_genres.split("|") if g.strip()}
                         elif hasattr(row_genres, '__iter__') and not isinstance(row_genres, str):
-                            item_genres = set([str(g).strip() for g in row_genres if g])
+                            item_genres = {str(g).strip() for g in row_genres if g}
                         else:
                             item_genres = set()
-                        
-                        # Weighted overlap: sum of genre weights for matching genres, normalized to 0-1
-                        # Maximum possible overlap would be if item has all seed genres
+
                         raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
-                        max_possible_overlap = len(all_seed_genres) * num_seeds  # Each genre could appear in all seeds
+                        max_possible_overlap = len(all_seed_genres) * num_seeds
                         weighted_overlap = raw_overlap / max_possible_overlap if max_possible_overlap > 0 else 0.0
-                        
-                        # Track which seeds this item matches
+
                         overlap_per_seed = {
                             seed_title: len(seed_genres & item_genres)
                             for seed_title, seed_genres in seed_genre_map.items()
                         }
                         num_seeds_matched = sum(1 for count in overlap_per_seed.values() if count > 0)
-                        
-                        # Popularity boost is independent of MF index membership (cold-start items still have popularity).
-                        pop_pct = _pop_pct_for_anime_id(aid)
-                        # pop_pct is 0..1 where 0 is most popular. Boost favors popular titles.
-                        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)  # scale 0..1
+                        seed_coverage = num_seeds_matched / num_seeds
 
-                        # Hybrid signal requires the item to be present in the MF-aligned component index.
-                        if blended_scores is not None and aid in id_to_index:
-                            hybrid_val = float(blended_scores[id_to_index[aid]])
-                        else:
-                            hybrid_val = 0.0
-
-                        # Phase 4 / Chunk A3: metadata affinity bonus.
-                        # Stronger for cold-start candidates; weak rerank for trained candidates.
                         meta_affinity = compute_metadata_affinity(seed_meta_profile, mrow)
-                        meta_bonus = 0.0
+                        meta_bonus_s1 = 0.0
                         if meta_affinity > 0.0:
-                            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
-                            meta_bonus = coef * float(meta_affinity)
+                            meta_bonus_s1 = float(METADATA_AFFINITY_COLD_START_COEF) * float(meta_affinity)
 
-                        # Phase 4 (A3 → early A4): synopsis TF-IDF semantic bonus (gated).
                         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
                         cand_type = None if pd.isna(mrow.get("type")) else str(mrow.get("type")).strip()
                         cand_eps = mrow.get("episodes")
@@ -1505,6 +1483,104 @@ else:
                             candidate_episodes=cand_eps,
                         )
 
+                        base = {
+                            "anime_id": aid,
+                            "mrow": mrow,
+                            "item_genres": item_genres,
+                            "weighted_overlap": float(weighted_overlap),
+                            "seed_coverage": float(seed_coverage),
+                            "overlap_per_seed": overlap_per_seed,
+                            "seeds_matched": int(num_seeds_matched),
+                            "metadata_affinity": float(meta_affinity),
+                            "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
+                            "passes_gate": bool(passes_gate),
+                            "cand_type": cand_type,
+                            "cand_eps": cand_eps,
+                        }
+
+                        # TF-IDF-first pool (gated): keep shortlist seed-like.
+                        if bool(passes_gate) and float(synopsis_tfidf_sim) >= 0.02:
+                            item = dict(base)
+                            item["stage1_score"] = float(synopsis_tfidf_sim)
+                            stage1_tfidf_pool.append(item)
+                            continue
+
+                        # Backfill pool when TF-IDF is absent/insufficient.
+                        fallback_score = (
+                            (0.5 * float(weighted_overlap))
+                            + (0.2 * float(seed_coverage))
+                            + float(meta_bonus_s1)
+                        )
+                        if float(fallback_score) > 0.0:
+                            item = dict(base)
+                            item["stage1_score"] = float(fallback_score)
+                            stage1_fallback_pool.append(item)
+
+                    stage1_tfidf_pool.sort(
+                        key=lambda x: (
+                            -float(x.get("synopsis_tfidf_sim", 0.0)),
+                            -float(x.get("weighted_overlap", 0.0)),
+                            -float(x.get("metadata_affinity", 0.0)),
+                            int(x.get("anime_id", 0)),
+                        )
+                    )
+                    stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
+
+                    shortlist: list[dict] = []
+                    seen_ids: set[int] = set()
+                    for it in stage1_tfidf_pool:
+                        if len(shortlist) >= seed_shortlist_size:
+                            break
+                        aid = int(it.get("anime_id", 0))
+                        if aid in seen_ids:
+                            continue
+                        shortlist.append(it)
+                        seen_ids.add(aid)
+                    for it in stage1_fallback_pool:
+                        if len(shortlist) >= seed_shortlist_size:
+                            break
+                        aid = int(it.get("anime_id", 0))
+                        if aid in seen_ids:
+                            continue
+                        shortlist.append(it)
+                        seen_ids.add(aid)
+
+                    # Stage 2: rerank shortlist using existing hybrid + pop + bonuses.
+                    try:
+                        blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
+                    except Exception:
+                        blended_scores = None
+
+                    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
+                    scored: list[dict] = []
+
+                    for c in shortlist:
+                        aid = int(c["anime_id"])
+                        mrow = c["mrow"]
+                        item_genres = c["item_genres"]
+                        weighted_overlap = float(c["weighted_overlap"])
+                        seed_coverage = float(c["seed_coverage"])
+                        overlap_per_seed = c["overlap_per_seed"]
+                        num_seeds_matched = int(c["seeds_matched"])
+
+                        pop_pct = _pop_pct_for_anime_id(aid)
+                        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)
+
+                        if blended_scores is not None and aid in id_to_index:
+                            hybrid_val = float(blended_scores[id_to_index[aid]])
+                        else:
+                            hybrid_val = 0.0
+
+                        meta_affinity = float(c.get("metadata_affinity", 0.0))
+                        meta_bonus = 0.0
+                        if meta_affinity > 0.0:
+                            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
+                            meta_bonus = float(coef) * float(meta_affinity)
+
+                        synopsis_tfidf_sim = float(c.get("synopsis_tfidf_sim", 0.0))
+                        passes_gate = bool(c.get("passes_gate", False))
+                        cand_eps = c.get("cand_eps")
+
                         synopsis_tfidf_bonus = 0.0
                         if passes_gate:
                             synopsis_tfidf_bonus = float(
@@ -1513,7 +1589,6 @@ else:
                                     hybrid_val=hybrid_val,
                                 )
                             )
-
                         synopsis_tfidf_penalty = float(
                             synopsis_tfidf_penalty_for_candidate(
                                 passes_gate=passes_gate,
@@ -1521,12 +1596,7 @@ else:
                                 candidate_episodes=cand_eps,
                             )
                         )
-                        
-                        # Weighted average scoring: emphasize matches across multiple seeds
-                        # (matches/num_seeds) gives proportion of seeds matched
-                        seed_coverage = num_seeds_matched / num_seeds
-                        
-                        # Final score: weighted overlap + seed coverage bonus + hybrid signal + popularity
+
                         score = (
                             (0.5 * weighted_overlap)
                             + (0.2 * seed_coverage)
@@ -1536,12 +1606,9 @@ else:
                             + synopsis_tfidf_bonus
                             + synopsis_tfidf_penalty
                         )
-                        
                         if score <= 0:
                             continue
-                        
-                        # Track per-item raw contributions for truthful shares.
-                        # We map seed overlap/coverage into the kNN/content bucket.
+
                         raw_mf = 0.0
                         raw_knn = (
                             (0.5 * weighted_overlap)
@@ -1554,7 +1621,6 @@ else:
                         used_components: list[str] = ["knn", "pop"]
                         if aid in id_to_index:
                             idx = id_to_index[aid]
-                            # Pull the underlying hybrid raw components and scale by the 0.25 hybrid coefficient.
                             try:
                                 raw_hybrid = recommender.raw_components_for_item(user_index, idx, weights)
                             except Exception:
@@ -1563,7 +1629,6 @@ else:
                             raw_knn += 0.25 * float(raw_hybrid.get("knn", 0.0))
                             raw_pop += 0.25 * float(raw_hybrid.get("pop", 0.0))
 
-                            # Determine which components were actually used.
                             used_components = sorted(
                                 set(used_components) | set(recommender.used_components_for_weights(weights)),
                                 key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
@@ -1585,10 +1650,11 @@ else:
                             "synopsis_tfidf_bonus": float(synopsis_tfidf_bonus),
                             "synopsis_tfidf_penalty": float(synopsis_tfidf_penalty),
                             "synopsis_tfidf_adjustment": float(synopsis_tfidf_bonus + synopsis_tfidf_penalty),
+                            "stage1_score": float(c.get("stage1_score", 0.0)),
+                            "shortlist_size": int(len(shortlist)),
                         }
-                        # Append truthful per-item shares.
                         explanation.update(shares)
-                        
+
                         scored.append({
                             "anime_id": aid,
                             "score": score,
@@ -1600,8 +1666,7 @@ else:
                                 "seeds_matched": num_seeds_matched,
                             },
                         })
-                    
-                    # Deterministic ordering: score desc, then anime_id asc.
+
                     scored.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
                     recs = scored[:n_requested]
                 else:
