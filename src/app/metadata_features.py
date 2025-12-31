@@ -78,6 +78,19 @@ METADATA_AFFINITY_TRAINED_COEF: float = 0.01
 # Optional: if used to nudge MF-personalized rankings toward selected seeds.
 METADATA_AFFINITY_PERSONALIZED_COEF: float = 0.02
 
+# Phase 4 Option A refinement (2025-12-31): tiny demographics overlap tie-break.
+#
+# Constraints:
+# - Never use demographics for filtering/shortlisting (missingness is high).
+# - Never penalize missing demographics.
+# - Apply only when BOTH seed and candidate have non-empty demographics.
+#
+# Rationale:
+# - Demographics are often missing, especially for non-TV types.
+# - When present for both items, overlap (e.g., "Shounen") can be a safe, tiny
+#   deterministic tie-breaker in Stage 2 rerank.
+METADATA_DEMOGRAPHICS_OVERLAP_TIEBREAK_BONUS: float = 0.002
+
 
 @dataclass(frozen=True)
 class SeedMetadataProfile:
@@ -224,6 +237,25 @@ def build_seed_metadata_profile(metadata: pd.DataFrame, *, seed_ids: list[int]) 
     )
 
 
+def demographics_overlap_tiebreak_bonus(
+    seed_demographics: Any,
+    candidate_demographics: Any,
+    *,
+    bonus: float = METADATA_DEMOGRAPHICS_OVERLAP_TIEBREAK_BONUS,
+) -> float:
+    """Return a tiny bonus if demographics overlap and BOTH sides are non-empty.
+
+    This is a tie-breaker only. Missing demographics never incur a penalty.
+    """
+    seed_set = _coerce_str_set(seed_demographics)
+    cand_set = _coerce_str_set(candidate_demographics)
+    if not seed_set or not cand_set:
+        return 0.0
+    if seed_set.isdisjoint(cand_set):
+        return 0.0
+    return float(bonus)
+
+
 def _binary_overlap(a: frozenset[str], b: set[str]) -> Optional[float]:
     if not a or not b:
         return None
@@ -342,6 +374,8 @@ __all__ = [
     "METADATA_AFFINITY_COLD_START_COEF",
     "METADATA_AFFINITY_TRAINED_COEF",
     "METADATA_AFFINITY_PERSONALIZED_COEF",
+    "METADATA_DEMOGRAPHICS_OVERLAP_TIEBREAK_BONUS",
     "build_seed_metadata_profile",
+    "demographics_overlap_tiebreak_bonus",
     "compute_metadata_affinity",
 ]

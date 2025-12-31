@@ -41,6 +41,26 @@ SYNOPSIS_TFIDF_TOKEN_PATTERN: str = r"(?u)\b[a-zA-Z][a-zA-Z]+\b"
 SYNOPSIS_TFIDF_MIN_SIM: float = 0.02
 SYNOPSIS_TFIDF_MIN_EPISODES: int = 12
 
+# Phase 4 Option A refinement (2025-12-31):
+# High-similarity override for Stage 1 TF-IDF candidate gating.
+#
+# Rationale:
+# - Some long-running franchises (e.g., One Piece) have their strongest synopsis
+#   TF-IDF neighbors in Movies / TV Specials / OVAs (often with episodes=1).
+# - A strict same-type / min-episodes gate can exclude these, forcing generic
+#   TV matches.
+#
+# We keep the existing conservative gate for most candidates, but allow an
+# override only at very high cosine similarity. This threshold is intentionally
+# conservative (near the extreme tail of the similarity distribution) to avoid
+# admitting short-form noise.
+SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD: float = 0.12
+
+# If a candidate is admitted via the HIGH_SIM_THRESHOLD override (i.e., it fails
+# the base gate), apply a small deterministic penalty so same-type TV remains
+# preferred unless similarity is genuinely strong.
+SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY: float = 0.001
+
 SYNOPSIS_TFIDF_COLD_START_COEF: float = 2.00
 SYNOPSIS_TFIDF_TRAINED_COEF: float = 0.50
 SYNOPSIS_TFIDF_PERSONALIZED_COEF: float = 0.50
@@ -381,6 +401,8 @@ __all__ = [
     "SYNOPSIS_TFIDF_TOKEN_PATTERN",
     "SYNOPSIS_TFIDF_MIN_SIM",
     "SYNOPSIS_TFIDF_MIN_EPISODES",
+    "SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD",
+    "SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY",
     "SYNOPSIS_TFIDF_COLD_START_COEF",
     "SYNOPSIS_TFIDF_TRAINED_COEF",
     "SYNOPSIS_TFIDF_PERSONALIZED_COEF",

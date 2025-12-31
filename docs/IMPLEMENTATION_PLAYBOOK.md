@@ -521,6 +521,22 @@ Notes:
   - Signal can be sparse if synopses are short/missing; bonus magnitudes remain intentionally small.
   - Seed resolution can still be wrong (e.g., golden `my_hero_academia` resolves to Demon Slayer), which limits interpretation of some golden rows.
 
+  ### 2025-12-31 — Phase 4 / Option A refinement: Dual-threshold TF-IDF gate (shortlist → rerank)
+
+  - **Problem:** For some long-running franchises (notably One Piece), the strongest synopsis TF-IDF neighbors are Movies / TV Specials / OVAs with `episodes=1`. A strict same-type/min-episodes gate in **Stage 1** excluded these, which forced generic TV matches into top-N.
+  - **Decision (Stage 1):** Use a **dual-threshold policy** for TF-IDF shortlist gating:
+    - Keep the existing conservative gate (same `type` OR `episodes >= 12`) for the vast majority of candidates.
+    - Add a **high-similarity override**: if `tfidf_sim >= 0.12`, allow a candidate into the TF-IDF pool even if it fails the base type/episode gate.
+  - **Decision (Stage 2):** Prefer a **small deterministic penalty** over hard exclusion for override-admitted candidates:
+    - If a candidate fails the base gate but is admitted via `tfidf_sim >= 0.12`, apply a small penalty (`0.001`) so same-type TV remains preferred unless similarity is genuinely strong.
+    - Keep the existing conservative short-form penalty for other off-gate candidates.
+  - **Why `HIGH_SIM_THRESHOLD = 0.12`:** In observed distributions for One Piece, off-gate franchise items were in the ~0.14–0.25 similarity range, while the global similarity tail sits around ~0.13 at the 99.9th percentile. `0.12` is intentionally conservative so the override triggers rarely and primarily for true franchise neighbors.
+  - **Observability:** Golden harness now reports:
+    - `stage1_off_type_allowed_count`
+    - `top20_off_type_count`
+    - `min/mean/max tfidf_sim among off-type allowed`
+  - **Optional tie-breaker (not gating):** If metadata contains a non-empty `demographics` field for both seed and candidate, apply a tiny overlap bonus in **Stage 2 only**. In the current processed metadata, `demographics` is not present, so this bonus is effectively inactive and never used for filtering/shortlisting.
+
 
 Record decisions that future sessions must not re-litigate.
 
