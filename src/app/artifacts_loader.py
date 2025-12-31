@@ -331,6 +331,23 @@ def build_artifacts(
         # TF-IDF is optional; do not block app startup.
         pass
 
+    # Optional: synopsis embeddings artifact (Phase 4 semantic rerank experiment; successor to TF-IDF).
+    # Only alias when unambiguous or explicitly chosen.
+    synopsis_embeddings_candidates = sorted([k for k in models.keys() if k.startswith("synopsis_embeddings")])
+    try:
+        synopsis_embeddings_stem = _select_model_stem(
+            models,
+            candidates=synopsis_embeddings_candidates,
+            env_var="APP_SYNOPSIS_EMBEDDINGS_STEM",
+            label="Synopsis embeddings",
+            preferred_stem=None,
+        )
+        models["synopsis_embeddings"] = models[synopsis_embeddings_stem]
+        models["_synopsis_embeddings_stem"] = synopsis_embeddings_stem
+    except ArtifactContractError:
+        # Embeddings are optional; do not block app startup.
+        pass
+
     explanations = _load_json_glob(reports_dir_p, "**/*explanations*.json")
     diversity = _load_json_glob(reports_dir_p, "**/*diversity*.json")
 
