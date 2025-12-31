@@ -40,6 +40,7 @@ from src.app.metadata_features import (
     METADATA_AFFINITY_PERSONALIZED_COEF,
     build_seed_metadata_profile,
     compute_metadata_affinity,
+    demographics_overlap_tiebreak_bonus,
 )
 from src.app.synopsis_tfidf import (
     compute_seed_similarity_map,
@@ -48,6 +49,9 @@ from src.app.synopsis_tfidf import (
     synopsis_tfidf_penalty_for_candidate,
     synopsis_tfidf_bonus_for_candidate,
     personalized_synopsis_tfidf_bonus_for_candidate,
+    SYNOPSIS_TFIDF_MIN_SIM,
+    SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD,
+    SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY,
 )
 from src.app.theme import get_theme
 from src.app.constants import (
@@ -1477,11 +1481,16 @@ else:
                         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
                         cand_type = None if pd.isna(mrow.get("type")) else str(mrow.get("type")).strip()
                         cand_eps = mrow.get("episodes")
-                        passes_gate = synopsis_gate_passes(
+                        base_passes_gate = synopsis_gate_passes(
                             seed_type=seed_type_target,
                             candidate_type=cand_type,
                             candidate_episodes=cand_eps,
                         )
+
+                        high_sim_override = (not bool(base_passes_gate)) and (
+                            float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD)
+                        )
+                        passes_gate_effective = bool(base_passes_gate) or bool(high_sim_override)
 
                         base = {
                             "anime_id": aid,
@@ -1493,13 +1502,14 @@ else:
                             "seeds_matched": int(num_seeds_matched),
                             "metadata_affinity": float(meta_affinity),
                             "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
-                            "passes_gate": bool(passes_gate),
+                            "passes_gate": bool(base_passes_gate),
+                            "synopsis_tfidf_high_sim_override": bool(high_sim_override),
                             "cand_type": cand_type,
                             "cand_eps": cand_eps,
                         }
 
                         # TF-IDF-first pool (gated): keep shortlist seed-like.
-                        if bool(passes_gate) and float(synopsis_tfidf_sim) >= 0.02:
+                        if bool(passes_gate_effective) and float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_MIN_SIM):
                             item = dict(base)
                             item["stage1_score"] = float(synopsis_tfidf_sim)
                             stage1_tfidf_pool.append(item)
@@ -1579,32 +1589,65 @@ else:
 
                         synopsis_tfidf_sim = float(c.get("synopsis_tfidf_sim", 0.0))
                         passes_gate = bool(c.get("passes_gate", False))
+                        high_sim_override = (not bool(passes_gate)) and (
+                            float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD)
+                        )
+                        passes_gate_effective = bool(passes_gate) or bool(high_sim_override)
                         cand_eps = c.get("cand_eps")
 
+                        # If we admitted a candidate via the high-sim override, treat it as a
+                        # cold-start-ish semantic neighbor for TF-IDF coefficient selection and
+                        # do not let a negative hybrid value effectively veto it.
+                        hybrid_val_for_scoring = float(hybrid_val)
+                        hybrid_val_for_tfidf = float(hybrid_val)
+                        if bool(high_sim_override):
+                            hybrid_val_for_scoring = max(0.0, float(hybrid_val))
+                            hybrid_val_for_tfidf = 0.0
+
                         synopsis_tfidf_bonus = 0.0
-                        if passes_gate:
+                        if bool(passes_gate_effective):
                             synopsis_tfidf_bonus = float(
                                 synopsis_tfidf_bonus_for_candidate(
                                     sim=synopsis_tfidf_sim,
-                                    hybrid_val=hybrid_val,
+                                    hybrid_val=hybrid_val_for_tfidf,
                                 )
                             )
-                        synopsis_tfidf_penalty = float(
-                            synopsis_tfidf_penalty_for_candidate(
-                                passes_gate=passes_gate,
-                                sim=synopsis_tfidf_sim,
-                                candidate_episodes=cand_eps,
+
+                        # Prefer a small penalty (not exclusion) for very-high-sim off-type items.
+                        # Keep the existing conservative short-form penalty for all other off-gate cases.
+                        if bool(high_sim_override):
+                            synopsis_tfidf_penalty = -float(SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY)
+                        else:
+                            synopsis_tfidf_penalty = float(
+                                synopsis_tfidf_penalty_for_candidate(
+                                    passes_gate=passes_gate,
+                                    sim=synopsis_tfidf_sim,
+                                    candidate_episodes=cand_eps,
+                                )
                             )
-                        )
+
+                        synopsis_tfidf_adjustment = float(synopsis_tfidf_bonus + synopsis_tfidf_penalty)
+
+                        # Optional tiny tie-breaker: demographics overlap (Stage 2 only; never gates).
+                        if "demographics" in metadata.columns:
+                            demo_bonus = demographics_overlap_tiebreak_bonus(
+                                seed_meta_profile.demographics,
+                                mrow.get("demographics"),
+                            )
+                        else:
+                            demo_bonus = 0.0
+
+                        s1 = float(c.get("stage1_score", 0.0))
 
                         score = (
                             (0.5 * weighted_overlap)
                             + (0.2 * seed_coverage)
-                            + (0.25 * hybrid_val)
+                            + (0.25 * float(hybrid_val_for_scoring))
                             + (0.05 * popularity_boost)
+                            + (0.10 * float(s1))
                             + meta_bonus
-                            + synopsis_tfidf_bonus
-                            + synopsis_tfidf_penalty
+                            + synopsis_tfidf_adjustment
+                            + float(demo_bonus)
                         )
                         if score <= 0:
                             continue
@@ -1613,9 +1656,10 @@ else:
                         raw_knn = (
                             (0.5 * weighted_overlap)
                             + (0.2 * seed_coverage)
+                            + (0.10 * float(s1))
                             + meta_bonus
-                            + synopsis_tfidf_bonus
-                            + synopsis_tfidf_penalty
+                            + synopsis_tfidf_adjustment
+                            + float(demo_bonus)
                         )
                         raw_pop = (0.05 * popularity_boost)
                         used_components: list[str] = ["knn", "pop"]
@@ -1649,8 +1693,11 @@ else:
                             "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
                             "synopsis_tfidf_bonus": float(synopsis_tfidf_bonus),
                             "synopsis_tfidf_penalty": float(synopsis_tfidf_penalty),
-                            "synopsis_tfidf_adjustment": float(synopsis_tfidf_bonus + synopsis_tfidf_penalty),
-                            "stage1_score": float(c.get("stage1_score", 0.0)),
+                            "synopsis_tfidf_adjustment": float(synopsis_tfidf_adjustment),
+                            "synopsis_tfidf_base_gate_passed": bool(passes_gate),
+                            "synopsis_tfidf_high_sim_override": bool(high_sim_override),
+                            "demographics_overlap_bonus": float(demo_bonus),
+                            "stage1_score": float(s1),
                             "shortlist_size": int(len(shortlist)),
                         }
                         explanation.update(shares)
