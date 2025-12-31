@@ -14,7 +14,7 @@
     },
     {
       "id": "attack_on_titan",
-      "seed_titles": ["Shingeki no Kyojin"],
+      "seed_titles": ["Attack on Titan"],
       "notes": "Should mostly surface TV seasons/movies, not recap specials."
     },
     {
@@ -49,7 +49,7 @@
     },
     {
       "id": "demon_slayer",
-      "seed_titles": ["Kimetsu no Yaiba"],
+      "seed_titles": ["Demon Slayer: Kimetsu no Yaiba"],
       "notes": "Sanity: modern action; avoid recap edits."
     },
     {
@@ -59,12 +59,12 @@
     },
     {
       "id": "my_hero_academia",
-      "seed_titles": ["Boku no Hero Academia"],
+      "seed_titles": ["My Hero Academia"],
       "notes": "Sanity: modern shounen; avoid recap specials."
     },
     {
       "id": "haikyuu",
-      "seed_titles": ["Haikyuu!!"],
+      "seed_titles": ["Haikyu!!"],
       "notes": "Sanity: sports; avoid shorts/specials."
     }
   ]

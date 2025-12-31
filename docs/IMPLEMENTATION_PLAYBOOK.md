@@ -23,10 +23,12 @@ How to use:
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Iterated on **Phase 4 / Chunk A3**: refined metadata affinity to use graded, thresholded theme similarity with categorical gating, and added eval diagnostics for bonus firing + rank movement.
+- Phase 4 TF-IDF triage: made golden-query seed resolution **strict-by-default** (no fuzzy match unless `allow_fuzzy_seeds=true`), and added seed-resolution details table to golden report.
+- Fixed a concrete seed mismatch: golden used `Haikyuu!!` but metadata `title_display` is `Haikyu!!` (anime_id=20583).
+- Validated synopsis TF-IDF artifact alignment (row index -> `anime_id` mapping exists) and ran neighbor sanity checks (MHA/AoT/FMAB neighbors were semantically correct).
 
 **Next action (single sentence):**
-- Phase 4 / Chunk A3: (optional) add deterministic TF-IDF synopsis rerank (new artifact) if golden diagnostics suggest it will reduce “weird match” cases.
+- Phase 4: address seed-based ranking quality (currently dominated by MF demo-user scores; TF-IDF is an additive nudge) by making seed-based scoring more seed-conditioned (evaluation-first), then re-check golden qualitative output.
 
 ---
 
