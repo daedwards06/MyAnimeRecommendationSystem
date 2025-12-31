@@ -550,6 +550,41 @@ Record decisions that future sessions must not re-litigate.
 
 ## 7) Session Log (Tiny, but consistent)
 
+### Session 2025-12-31 (Phase 4 / Option A — Synopsis embeddings successor)
+
+- What I did:
+  - Implemented an **embeddings-style** semantic rerank successor to synopsis TF-IDF, including a deterministic, versioned artifact build + loader.
+  - Wired the embeddings signal into ranked seed-based scoring (Stage 1 shortlist + Stage 2 rerank) and added per-query diagnostics to the golden harness.
+
+- Key decision (pragmatic backend choice on Windows):
+  - Initially targeted `sentence-transformers` on CPU, but Windows builds hit OpenMP runtime collisions and a `sentence_transformers`/`transformers` API mismatch.
+  - Switched the artifact builder to a fully local, deterministic backend: **TF-IDF → TruncatedSVD (256-d) → L2 normalize**.
+  - The artifact is still dense “embeddings” (float32 matrix) and supports cosine similarity, but avoids torch/transformers entirely.
+
+- What I changed:
+  - Added embeddings artifact contract + builder + cosine utilities in [src/app/synopsis_embeddings.py](src/app/synopsis_embeddings.py)
+  - Added loader support + env override `APP_SYNOPSIS_EMBEDDINGS_STEM` in [src/app/artifacts_loader.py](src/app/artifacts_loader.py)
+  - Integrated semantic mode switch `PHASE4_SEMANTIC_MODE` into:
+    - [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py)
+    - [app/main.py](app/main.py)
+  - Default semantic behavior: when both TF-IDF and embeddings artifacts exist, default to `semantic_mode=both`.
+
+- Build + validation runs:
+  - Built artifact:
+    - `python scripts/build_synopsis_embeddings_artifact.py`
+    - Wrote: `models/synopsis_embeddings_v2025.12.31_161712.joblib`
+    - Updated: `data/processed/artifacts_manifest.json`
+  - Golden eval:
+    - `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50`
+    - Wrote: `reports/artifacts/phase4_golden_queries_20251231170653.json`
+  - Tests:
+    - `python -m pytest -q` (57 passed, 3 warnings)
+
+- Observed effects (baseline `20251231152909` → latest `20251231170653`):
+  - One Piece: top-20 surfaced multiple One Piece movies/specials (e.g., Strong World, Stampede, Film: Z/Red).
+  - Tokyo Ghoul: `violation_count` remained 0; sequel `Tokyo Ghoul √A` remains present in top-20.
+  - Golden JSON includes embeddings diagnostics per query (bonus fired counts, similarity stats, and rank-movement deltas).
+
 ### Session 2025-12-30 (Phase 4 / Chunk A3)
 
 - What I did:
