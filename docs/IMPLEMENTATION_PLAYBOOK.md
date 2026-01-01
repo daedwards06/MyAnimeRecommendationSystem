@@ -17,18 +17,19 @@ How to use:
 
 **Current phase:** Phase 4
 
-**Last updated:** 2025-12-30
+**Last updated:** 2026-01-01
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Phase 4 TF-IDF triage: made golden-query seed resolution **strict-by-default** (no fuzzy match unless `allow_fuzzy_seeds=true`), and added seed-resolution details table to golden report.
-- Fixed a concrete seed mismatch: golden used `Haikyuu!!` but metadata `title_display` is `Haikyu!!` (anime_id=20583).
-- Validated synopsis TF-IDF artifact alignment (row index -> `anime_id` mapping exists) and ran neighbor sanity checks (MHA/AoT/FMAB neighbors were semantically correct).
+- Phase 4: **Stabilized Stage 1 shortlist** by tightening semantic pool admission to require meaningful seed-genre overlap (`weighted_overlap >= 0.50` or strong title overlap `>= 0.50`). This prevents semantic neighbors with only 1-in-4 genre match from dominating the shortlist for semantically-driven searches like Tokyo Ghoul, preventing off-theme kids/catalog content from surfacing in top-20.
+- Tokyo Ghoul regression resolved: before (artifact `20251231222355`) top-20 was mostly kids/shorts; after (artifact `20251231235313`) top-20 includes dark anime with matching themes (Parasyte, Claymore, High School of the Dead, Future Diary, Soul Eater, Kabaneri, Attack on Titan, Dororo, Mononoke).
+- One Piece franchise items (movies/specials) preserved in top-20 before/after.
+- All tests pass; `violation_count` remains 0; determinism maintained.
 
 **Next action (single sentence):**
-- Phase 4: address seed-based ranking quality (currently dominated by MF demo-user scores; TF-IDF is an additive nudge) by making seed-based scoring more seed-conditioned (evaluation-first), then re-check golden qualitative output.
+- Phase 4: Optionally refine further or proceed to Phase 5 (portfolio polish + docs + QA).
 
 ---
 
@@ -549,6 +550,45 @@ Record decisions that future sessions must not re-litigate.
 ---
 
 ## 7) Session Log (Tiny, but consistent)
+
+### Session 2026-01-01 (Phase 4 — Stabilized Stage 1 mixture shortlist gating)
+
+- **What I did:**
+  - Identified that Stage 1 semantic pool admission was too permissive: accepted neighbors with only `weighted_overlap > 0.0` (as low as 1-in-4 genre match), allowing off-theme kids/catalog items to dominate shortlists for dark-anime seeds like Tokyo Ghoul.
+  - Tightened semantic pool admission across both golden harness and Streamlit app to require **meaningful** seed-conditioning: `weighted_overlap >= 0.50` (at least half the seed genres matched) **or** `title_overlap >= 0.50` (strong title-token overlap indicating franchise relation).
+  - Added `seed_title_overlap` field to Stage 2 signals in golden JSON for easier debugging.
+
+- **Why this matters:**
+  - Previous behavior: embeddings similarity alone could rank items based on low-coherence features (e.g., "dark" color palette) even when genre overlap was minimal, leading to Tokyo Ghoul recommending Vampire Kids, Hello Kitty specials, etc.
+  - New behavior: semantic neighbors must also be **conditionally relevant** via explicit seed-genre/title signals, preventing the semantic pool from drowning out metadata-grounded candidates.
+  - No new models; purely deterministic thresholds + existing overlap computations.
+
+- **Key files changed:**
+  - [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py):
+    - Line ~630, 644: Changed `(float(weighted_overlap) > 0.0 or ...)` to `(float(weighted_overlap) >= 0.50 or ...)` for both embeddings and TF-IDF pool admission.
+    - Line ~1001: Added `seed_title_overlap` to signals for Stage 2 scoring diagnostics.
+  - [app/main.py](app/main.py):
+    - Line ~1588, 1601: Mirrored the same stricter admission thresholds for embeddings and TF-IDF pools in Streamlit inference.
+
+- **Observed impact:**
+  - Baseline → Latest (artifact `20251231222355` → `20251231235313`):
+    - **One Piece:** `violation_count` stayed 0; top-20 still includes multiple One Piece films/specials (e.g., Strong World, Clockwork Island, Stampede, Film: Z/Red); some non-franchise TV items reshuffled but set remained stable.
+    - **Tokyo Ghoul:** `violation_count` stayed 0; **top-20 dramatically improved**: now includes dark/psychological anime with thematic overlap (Parasyte, Claymore, High School of the Dead, Future Diary, Soul Eater, Kabaneri of the Iron Fortress, Attack on Titan, Dororo, Mononoke) instead of the prior mostly off-theme kids/shorts content.
+  - Headline metrics unchanged (same test set, same MF weights): NDCG@10 = 0.0724, MAP@10 = 0.0633.
+
+- **Validation:**
+  - `python -m pytest -q` ✓ (57 passed, 3 warnings)
+  - `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50`
+    - Produced: [reports/artifacts/phase4_golden_queries_20251231235313.json](reports/artifacts/phase4_golden_queries_20251231235313.json)
+    - Produced: [reports/phase4_golden_queries_20251231235313.md](reports/phase4_golden_queries_20251231235313.md)
+    - Produced: [experiments/metrics/phase4_eval_20251231235313.json](experiments/metrics/phase4_eval_20251231235313.json)
+  - Comparison: `python scripts/compare_phase4_golden_topk.py --before reports/artifacts/phase4_golden_queries_20251231222355.json --after reports/artifacts/phase4_golden_queries_20251231235313.json --k 20 --query tokyo_ghoul --query one_piece`
+    - One Piece: stable top-20 with franchise items; no new violations.
+    - Tokyo Ghoul: dramatically improved; relevant anime now present.
+
+- **Next session start here:**
+  - Phase 4 is now sufficiently stable for golden queries (Tokyo Ghoul fixed without harming One Piece or baseline metrics).
+  - Optional next steps: refine further for edge cases, or move to Phase 5 (portfolio polish, docs, final QA).
 
 ### Session 2025-12-31 (Phase 4 / Option A — Synopsis embeddings successor)
 

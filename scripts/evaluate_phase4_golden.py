@@ -144,41 +144,94 @@ def _run_headline_metrics(*, k: int, sample_users: int, w_mf: float, w_knn: floa
     pop_series = popularity_scores(train_df)  # item_id -> score
     pop_scores_global = {int(i): float(s) for i, s in pop_series.items()}
 
-    recs: dict[int, list[int]] = {}
+    # ------------------------------------------------------------------
+    # Performance note:
+    # The previous implementation materialized full dicts for knn/mf/pop
+    # for each user and sorted them. That is very slow for large catalogs.
+    # Here we compute the blended score in a single aligned array and
+    # select top-k via argpartition (deterministic tie-breaking applied).
+    # ------------------------------------------------------------------
 
     weights = {"mf": float(w_mf), "knn": float(w_knn), "pop": float(w_pop)}
 
+    # Build a stable global item index for all sources.
+    mf_items = [int(mf_model.index_to_item[i]) for i in range(len(mf_model.index_to_item))] if mf_model.index_to_item is not None else []
+    knn_items = [int(knn_model.index_to_item[i]) for i in range(len(knn_model.index_to_item))] if knn_model.index_to_item is not None else []
+    global_items_sorted = sorted(set(mf_items).union(set(knn_items)).union(set(pop_scores_global.keys())))
+    global_id_to_pos = {int(aid): int(idx) for idx, aid in enumerate(global_items_sorted)}
+
+    mf_pos = np.asarray([global_id_to_pos[int(aid)] for aid in mf_items], dtype=np.int32) if mf_items else np.asarray([], dtype=np.int32)
+    knn_pos = np.asarray([global_id_to_pos[int(aid)] for aid in knn_items], dtype=np.int32) if knn_items else np.asarray([], dtype=np.int32)
+
+    pop_vec_global = np.zeros(len(global_items_sorted), dtype=np.float32)
+    for aid, sc in pop_scores_global.items():
+        pos = global_id_to_pos.get(int(aid))
+        if pos is not None:
+            pop_vec_global[int(pos)] = float(sc)
+
+    def _knn_scores_array(user_id: int) -> np.ndarray:
+        if knn_model.user_to_index is None or knn_model.item_user_matrix is None:
+            return np.asarray([], dtype=np.float32)
+        if user_id not in knn_model.user_to_index:
+            return np.asarray([], dtype=np.float32)
+
+        profile = knn_model._user_profile(int(user_id))
+        if np.allclose(profile, 0):
+            return np.asarray([], dtype=np.float32)
+
+        denom = np.linalg.norm(profile)
+        if denom == 0:
+            return np.asarray([], dtype=np.float32)
+
+        sims = (knn_model.item_user_matrix @ profile) / denom
+        sims = np.asarray(sims).ravel().astype(np.float32, copy=False)
+        if knn_model.item_pop is not None and float(getattr(knn_model, "popularity_weight", 0.0)) != 0.0:
+            sims = sims + float(getattr(knn_model, "popularity_weight", 0.0)) * np.asarray(knn_model.item_pop, dtype=np.float32)
+        return sims
+
+    recs: dict[int, list[int]] = {}
+    k_int = int(k)
+
     for u in users:
         u = int(u)
-        seen = set(train_hist.get(u, set()))
+        seen = set(int(x) for x in train_hist.get(u, set()))
 
-        knn_scores = knn_model.score_all(u, exclude_seen=True)
+        scores = np.zeros(len(global_items_sorted), dtype=np.float32)
 
-        # MF scores (mask seen)
-        mf_scores_arr = mf_model.predict_user(u)
-        if mf_model.item_to_index is not None:
-            for it in seen:
-                idx = mf_model.item_to_index.get(int(it))
-                if idx is not None and 0 <= int(idx) < len(mf_scores_arr):
-                    mf_scores_arr[int(idx)] = -np.inf
-        mf_scores = {
-            int(mf_model.index_to_item[i]): float(s)
-            for i, s in enumerate(mf_scores_arr)
-            if np.isfinite(s)
-        }
+        # MF contribution
+        if float(weights.get("mf", 0.0)) != 0.0 and mf_items:
+            mf_arr = np.asarray(mf_model.predict_user(u), dtype=np.float32)
+            scores[mf_pos] += float(weights["mf"]) * mf_arr
 
-        pop_scores = {i: s for i, s in pop_scores_global.items() if i not in seen}
+        # kNN contribution
+        if float(weights.get("knn", 0.0)) != 0.0 and knn_items:
+            knn_arr = _knn_scores_array(u)
+            if knn_arr.size:
+                scores[knn_pos] += float(weights["knn"]) * knn_arr
 
-        # Deterministic weighted blend
-        agg: dict[int, float] = {}
-        for source, scores in (("mf", mf_scores), ("knn", knn_scores), ("pop", pop_scores)):
-            w = float(weights.get(source, 0.0))
-            if w == 0.0:
-                continue
-            for item_id, sc in scores.items():
-                agg[int(item_id)] = agg.get(int(item_id), 0.0) + w * float(sc)
+        # Popularity contribution
+        if float(weights.get("pop", 0.0)) != 0.0:
+            scores += float(weights["pop"]) * pop_vec_global
 
-        recs[u] = _stable_rank(agg, top_k=k)
+        # Exclude seen items (applies to blended score)
+        if seen:
+            seen_pos = [global_id_to_pos.get(int(aid)) for aid in seen]
+            seen_pos = [p for p in seen_pos if p is not None]
+            if seen_pos:
+                scores[np.asarray(seen_pos, dtype=np.int32)] = -np.inf
+
+        # Top-k selection (deterministic tie-breaker: score desc, then anime_id asc)
+        if k_int <= 0:
+            recs[u] = []
+            continue
+        k_eff = min(k_int, int(scores.shape[0]))
+        top_idx = np.argpartition(scores, -k_eff)[-k_eff:]
+        top_scores = scores[top_idx]
+        top_aids = np.asarray([global_items_sorted[int(i)] for i in top_idx], dtype=np.int64)
+        order = np.lexsort((top_aids, -top_scores))
+        ordered_idx = top_idx[order]
+
+        recs[u] = [int(global_items_sorted[int(i)]) for i in ordered_idx[:k_eff] if np.isfinite(scores[int(i)])]
 
     metrics = _evaluate_recs(recs, val_hist, k)
 
@@ -446,6 +499,25 @@ def _seed_based_scores(
     all_seed_genres: set[str] = set()
     genre_weights: dict[str, int] = {}
 
+    # Deterministic seed title tokenization for franchise-like backfill.
+    # (No new models; uses existing title_display strings only.)
+    _TITLE_STOP = {
+        "the", "and", "of", "to", "a", "an", "in", "on", "for", "with",
+        "movie", "film", "tv", "ova", "ona", "special", "season", "part",
+        "episode", "eps", "edition", "new",
+    }
+
+    def _title_tokens(s: str) -> set[str]:
+        try:
+            toks = re.findall(r"[a-z0-9]+", str(s).lower())
+        except Exception:
+            toks = []
+        return {t for t in toks if len(t) >= 3 and t not in _TITLE_STOP}
+
+    seed_title_token_map: dict[str, set[str]] = {}
+    for st in seed_titles:
+        seed_title_token_map[str(st)] = _title_tokens(str(st))
+
     for sid, stitle in zip(seed_ids, seed_titles):
         seed_row = work.loc[work["anime_id"].astype(int) == int(sid)].head(1)
         if seed_row.empty:
@@ -472,6 +544,42 @@ def _seed_based_scores(
     stage1_embed_pool: list[dict[str, Any]] = []
     stage1_tfidf_pool: list[dict[str, Any]] = []
     stage1_fallback_pool: list[dict[str, Any]] = []
+
+    # Diagnostics: quantify how often the stricter overlap gate blocks semantic admission.
+    # "Old" admission: (weighted_overlap > 0.0 OR title_overlap >= 0.50)
+    # "New" admission: (weighted_overlap >= 0.50 OR title_overlap >= 0.50)
+    embed_semantic_old_admit = 0
+    embed_semantic_new_admit = 0
+    embed_semantic_blocked = 0
+    tfidf_semantic_old_admit = 0
+    tfidf_semantic_new_admit = 0
+    tfidf_semantic_blocked = 0
+
+    # Keep a small, deterministic sample of the highest-similarity blocked candidates.
+    blocked_embed_top: list[dict[str, Any]] = []
+    blocked_tfidf_top: list[dict[str, Any]] = []
+
+    # "False negative" hunting: blocked candidates that are *very* high similarity.
+    # Defaults are intentionally conservative; override via env vars if desired.
+    try:
+        false_neg_embed_sim = float(os.environ.get("PHASE4_FALSE_NEG_EMB_SIM", "0.55"))
+    except Exception:
+        false_neg_embed_sim = 0.55
+    try:
+        false_neg_tfidf_sim = float(os.environ.get("PHASE4_FALSE_NEG_TFIDF_SIM", "0.08"))
+    except Exception:
+        false_neg_tfidf_sim = 0.08
+
+    embed_semantic_blocked_high_sim = 0
+    tfidf_semantic_blocked_high_sim = 0
+    blocked_embed_high_sim_top: list[dict[str, Any]] = []
+    blocked_tfidf_high_sim_top: list[dict[str, Any]] = []
+
+    def _push_top_blocked(dst: list[dict[str, Any]], entry: dict[str, Any], *, max_n: int = 12) -> None:
+        dst.append(entry)
+        dst.sort(key=lambda x: (-float(x.get("sim", 0.0)), int(x.get("anime_id", 0))))
+        if len(dst) > int(max_n):
+            del dst[int(max_n) :]
 
     stage1_off_type_allowed_sims: list[float] = []
     stage1_off_type_allowed_embed_sims: list[float] = []
@@ -503,6 +611,18 @@ def _seed_based_scores(
 
         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
         synopsis_embed_sim = float(embed_sims_by_id.get(aid, 0.0))
+
+        cand_title = str(row.get("title_display") or row.get("title_primary") or "")
+        cand_tokens = _title_tokens(cand_title)
+        title_overlap = 0.0
+        for _, stoks in seed_title_token_map.items():
+            if not stoks:
+                continue
+            try:
+                title_overlap = max(title_overlap, float(len(stoks & cand_tokens)) / float(len(stoks)))
+            except Exception:
+                continue
+        title_bonus_s1 = 0.40 * float(title_overlap)
         cand_type = None if pd.isna(row.get("type")) else str(row.get("type")).strip()
         cand_eps = row.get("episodes")
         base_passes_gate = synopsis_gate_passes(
@@ -527,6 +647,7 @@ def _seed_based_scores(
                 "weighted_overlap": float(weighted_overlap),
                 "seed_coverage": float(seed_coverage),
                 "metadata_affinity": float(meta_affinity),
+                "title_overlap": float(title_overlap),
                 "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
                 "synopsis_tfidf_base_gate_passed": bool(base_passes_gate),
                 "synopsis_tfidf_high_sim_override": bool(high_sim_override_tfidf),
@@ -538,7 +659,34 @@ def _seed_based_scores(
 
         # Pool A0: embeddings neighbors (gated) – use similarity as the primary Stage 1 rank.
         passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)
-        if bool(passes_gate_effective_embed) and float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM):
+        embed_sem_base_ok = bool(passes_gate_effective_embed) and float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM)
+        embed_sem_old_ok = bool(embed_sem_base_ok) and (float(weighted_overlap) > 0.0 or float(title_overlap) >= 0.50)
+        embed_sem_new_ok = bool(embed_sem_base_ok) and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
+        if bool(embed_sem_old_ok):
+            embed_semantic_old_admit += 1
+        if bool(embed_sem_new_ok):
+            embed_semantic_new_admit += 1
+        if bool(embed_sem_old_ok) and (not bool(embed_sem_new_ok)):
+            embed_semantic_blocked += 1
+            blocked_entry = {
+                "anime_id": int(aid),
+                "title": str(row.get("title_display") or ""),
+                "sim": float(synopsis_embed_sim),
+                "weighted_overlap": float(weighted_overlap),
+                "title_overlap": float(title_overlap),
+                "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
+            }
+            _push_top_blocked(
+                blocked_embed_top,
+                blocked_entry,
+            )
+            if float(synopsis_embed_sim) >= float(false_neg_embed_sim):
+                embed_semantic_blocked_high_sim += 1
+                _push_top_blocked(blocked_embed_high_sim_top, blocked_entry, max_n=20)
+
+        # Extra stabilization: require meaningful seed-conditioning via genres OR strong title overlap.
+        if bool(embed_sem_new_ok):
             item = dict(base)
             item["stage1_score"] = float(synopsis_embed_sim)
             stage1_embed_pool.append(item)
@@ -548,7 +696,33 @@ def _seed_based_scores(
 
         # Pool A: TF-IDF neighbors (gated) – use similarity as the primary Stage 1 rank.
         passes_gate_effective_tfidf = bool(base_passes_gate) or bool(high_sim_override_tfidf)
-        if bool(passes_gate_effective_tfidf) and float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_MIN_SIM):
+        tfidf_sem_base_ok = bool(passes_gate_effective_tfidf) and float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_MIN_SIM)
+        tfidf_sem_old_ok = bool(tfidf_sem_base_ok) and (float(weighted_overlap) > 0.0 or float(title_overlap) >= 0.50)
+        tfidf_sem_new_ok = bool(tfidf_sem_base_ok) and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
+        if bool(tfidf_sem_old_ok):
+            tfidf_semantic_old_admit += 1
+        if bool(tfidf_sem_new_ok):
+            tfidf_semantic_new_admit += 1
+        if bool(tfidf_sem_old_ok) and (not bool(tfidf_sem_new_ok)):
+            tfidf_semantic_blocked += 1
+            blocked_entry = {
+                "anime_id": int(aid),
+                "title": str(row.get("title_display") or ""),
+                "sim": float(synopsis_tfidf_sim),
+                "weighted_overlap": float(weighted_overlap),
+                "title_overlap": float(title_overlap),
+                "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
+            }
+            _push_top_blocked(
+                blocked_tfidf_top,
+                blocked_entry,
+            )
+            if float(synopsis_tfidf_sim) >= float(false_neg_tfidf_sim):
+                tfidf_semantic_blocked_high_sim += 1
+                _push_top_blocked(blocked_tfidf_high_sim_top, blocked_entry, max_n=20)
+
+        if bool(tfidf_sem_new_ok):
             item = dict(base)
             item["stage1_score"] = float(synopsis_tfidf_sim)
             stage1_tfidf_pool.append(item)
@@ -561,6 +735,7 @@ def _seed_based_scores(
             (0.5 * float(weighted_overlap))
             + (0.2 * float(seed_coverage))
             + float(meta_bonus_s1)
+            + float(title_bonus_s1)
         )
         if float(fallback_score) > 0.0:
             item = dict(base)
@@ -585,37 +760,199 @@ def _seed_based_scores(
     )
     stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
+    stage1_gate_blocking_diagnostics = {
+        "embed_semantic_old_admit_count": int(embed_semantic_old_admit),
+        "embed_semantic_new_admit_count": int(embed_semantic_new_admit),
+        "embed_semantic_blocked_by_overlap_ge_050_count": int(embed_semantic_blocked),
+        "embed_semantic_blocked_by_overlap_ge_050_rate": float(embed_semantic_blocked)
+        / float(max(1, embed_semantic_old_admit)),
+        "tfidf_semantic_old_admit_count": int(tfidf_semantic_old_admit),
+        "tfidf_semantic_new_admit_count": int(tfidf_semantic_new_admit),
+        "tfidf_semantic_blocked_by_overlap_ge_050_count": int(tfidf_semantic_blocked),
+        "tfidf_semantic_blocked_by_overlap_ge_050_rate": float(tfidf_semantic_blocked)
+        / float(max(1, tfidf_semantic_old_admit)),
+        "embed_semantic_blocked_top": list(blocked_embed_top),
+        "tfidf_semantic_blocked_top": list(blocked_tfidf_top),
+        "false_neg_embed_sim_threshold": float(false_neg_embed_sim),
+        "false_neg_tfidf_sim_threshold": float(false_neg_tfidf_sim),
+        "embed_semantic_blocked_high_sim_count": int(embed_semantic_blocked_high_sim),
+        "tfidf_semantic_blocked_high_sim_count": int(tfidf_semantic_blocked_high_sim),
+        "embed_semantic_blocked_high_sim_top": list(blocked_embed_high_sim_top),
+        "tfidf_semantic_blocked_high_sim_top": list(blocked_tfidf_high_sim_top),
+    }
+
     shortlist_k = max(0, int(shortlist_size))
     stage1_total_candidates = int(len(stage1_embed_pool) + len(stage1_tfidf_pool) + len(stage1_fallback_pool))
-    if shortlist_k <= 0:
-        shortlist = stage1_embed_pool + stage1_tfidf_pool + stage1_fallback_pool
+    # Phase 4 stabilization: Stage 1 mixture shortlist + semantic confidence gating.
+    # Pool A: semantic neighbors (embeddings and/or TF-IDF; seed-conditioned)
+    # Pool B: seed-conditioned metadata/genre candidates
+    # Pool C: deterministic backfill if A/B are insufficient
+    use_embed = semantic_mode in {"embeddings", "both"}
+    use_tfidf = semantic_mode in {"tfidf", "both"}
+
+    pool_a: list[dict[str, Any]] = []
+    if bool(use_embed):
+        pool_a.extend(stage1_embed_pool)
+    if bool(use_tfidf):
+        pool_a.extend(stage1_tfidf_pool)
+
+    pool_b: list[dict[str, Any]] = list(stage1_fallback_pool)
+
+    def _topk_sim_stats(sim_map: dict[int, float], *, k: int = 50) -> dict[str, Any]:
+        vals: list[float] = []
+        for aid, s in sim_map.items():
+            try:
+                aid_i = int(aid)
+                if aid_i in exclude_ids or aid_i in seed_ids:
+                    continue
+                fs = float(s)
+                if fs <= 0.0:
+                    continue
+                vals.append(fs)
+            except Exception:
+                continue
+        vals.sort(reverse=True)
+        top = vals[: max(0, int(k))]
+        if not top:
+            return {"count": 0, "mean": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
+        arr = np.asarray(top, dtype=np.float64)
+        mean = float(arr.mean())
+        p95 = float(np.percentile(arr, 95)) if int(arr.size) >= 2 else float(arr[0])
+        return {"count": int(arr.size), "mean": float(mean), "p95": float(p95), "min": float(arr.min()), "max": float(arr.max())}
+
+    def _conf_score(stats: dict[str, Any], *, min_sim: float, high_sim: float) -> float:
+        denom = float(max(1e-6, float(high_sim) - float(min_sim)))
+        mean_n = max(0.0, min(1.0, (float(stats.get("mean", 0.0)) - float(min_sim)) / denom))
+        p95_n = max(0.0, min(1.0, (float(stats.get("p95", 0.0)) - float(min_sim)) / denom))
+        return float(0.5 * (mean_n + p95_n))
+
+    embed_stats = _topk_sim_stats(embed_sims_by_id, k=50) if bool(use_embed) else {"count": 0, "mean": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
+    tfidf_stats = _topk_sim_stats(synopsis_sims_by_id, k=50) if bool(use_tfidf) else {"count": 0, "mean": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
+
+    def _neighbor_coherence(pool: list[dict[str, Any]], *, k: int = 50) -> dict[str, Any]:
+        top = pool[: max(0, int(k))]
+        if not top:
+            return {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
+        overlaps = [float((it.get("_stage1") or {}).get("weighted_overlap", 0.0)) for it in top]
+        coverages = [float((it.get("_stage1") or {}).get("seed_coverage", 0.0)) for it in top]
+        any_match = sum(1 for v in overlaps if float(v) > 0.0)
+        return {
+            "count": int(len(top)),
+            "weighted_overlap_mean": float(sum(overlaps) / max(1, len(overlaps))),
+            "seed_coverage_mean": float(sum(coverages) / max(1, len(coverages))),
+            "any_genre_match_frac": float(any_match / max(1, len(overlaps))),
+        }
+
+    embed_coherence = _neighbor_coherence(stage1_embed_pool, k=50) if bool(use_embed) else {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
+    tfidf_coherence = _neighbor_coherence(stage1_tfidf_pool, k=50) if bool(use_tfidf) else {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
+
+    semantic_conf_source = "none"
+    semantic_conf_score = 0.0
+    semantic_conf_tier = "none"
+
+    def _coherence_score(stats: dict[str, Any]) -> float:
+        # Weighted overlap is normalized in [0,1]. Seed coverage is also [0,1].
+        # Scale overlap more aggressively: 0.20 mean overlap is treated as "good".
+        overlap_mean = float(stats.get("weighted_overlap_mean", 0.0))
+        seed_cov_mean = float(stats.get("seed_coverage_mean", 0.0))
+        any_match = float(stats.get("any_genre_match_frac", 0.0))
+        overlap_s = max(0.0, min(1.0, overlap_mean / 0.20))
+        seedcov_s = max(0.0, min(1.0, seed_cov_mean / 0.50))
+        any_s = max(0.0, min(1.0, any_match / 0.80))
+        return float((overlap_s + seedcov_s + any_s) / 3.0)
+
+    if bool(use_embed) and int(embed_stats.get("count", 0)) > 0:
+        semantic_conf_source = "embeddings"
+        sim_conf = _conf_score(embed_stats, min_sim=float(SYNOPSIS_EMBEDDINGS_MIN_SIM), high_sim=float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
+        coh_conf = _coherence_score(embed_coherence)
+        semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
+    elif bool(use_tfidf) and int(tfidf_stats.get("count", 0)) > 0:
+        semantic_conf_source = "tfidf"
+        sim_conf = _conf_score(tfidf_stats, min_sim=float(SYNOPSIS_TFIDF_MIN_SIM), high_sim=float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD))
+        coh_conf = _coherence_score(tfidf_coherence)
+        semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
+
+    if semantic_conf_source == "none":
+        semantic_conf_tier = "none"
+    elif float(semantic_conf_score) >= 0.60:
+        semantic_conf_tier = "high"
+    elif float(semantic_conf_score) >= 0.30:
+        semantic_conf_tier = "medium"
     else:
-        shortlist: list[dict[str, Any]] = []
-        seen_ids: set[int] = set()
-        for it in stage1_embed_pool:
-            if len(shortlist) >= shortlist_k:
-                break
+        semantic_conf_tier = "low"
+
+    # Deterministically allocate shortlist budget between semantic neighbors (A) and metadata/genre candidates (B).
+    if shortlist_k <= 0:
+        shortlist = pool_a + pool_b
+        stage1_k_sem = int(len(pool_a))
+        stage1_k_meta = int(len(pool_b))
+    else:
+        # Keep a robust mixture even when semantic confidence is high.
+        if semantic_conf_tier == "high":
+            sem_frac = 0.50
+        elif semantic_conf_tier == "medium":
+            sem_frac = 0.40
+        elif semantic_conf_tier == "low":
+            sem_frac = 0.20
+        else:
+            sem_frac = 0.0
+
+        stage1_k_sem = int(round(float(shortlist_k) * float(sem_frac)))
+        stage1_k_sem = max(0, min(int(shortlist_k), int(stage1_k_sem)))
+        stage1_k_meta = int(shortlist_k) - int(stage1_k_sem)
+
+        shortlist = []
+        seen_ids = set()
+        a_taken = 0
+        b_taken = 0
+        c_taken = 0
+
+        a_i = 0
+        while a_i < len(pool_a) and a_taken < int(stage1_k_sem) and len(shortlist) < int(shortlist_k):
+            it = pool_a[a_i]
+            a_i += 1
             aid = int(it.get("anime_id", 0))
             if aid in seen_ids:
                 continue
+            (it.get("_stage1") or {}).update({"pool": "A"})
             shortlist.append(it)
             seen_ids.add(aid)
-        for it in stage1_tfidf_pool:
-            if len(shortlist) >= shortlist_k:
-                break
+            a_taken += 1
+
+        b_i = 0
+        while b_i < len(pool_b) and b_taken < int(stage1_k_meta) and len(shortlist) < int(shortlist_k):
+            it = pool_b[b_i]
+            b_i += 1
             aid = int(it.get("anime_id", 0))
             if aid in seen_ids:
                 continue
+            (it.get("_stage1") or {}).update({"pool": "B"})
             shortlist.append(it)
             seen_ids.add(aid)
-        for it in stage1_fallback_pool:
-            if len(shortlist) >= shortlist_k:
-                break
+            b_taken += 1
+
+        # Pool C: deterministic backfill (prefer meta pool first to avoid semantic dominance when confidence is low).
+        while b_i < len(pool_b) and len(shortlist) < int(shortlist_k):
+            it = pool_b[b_i]
+            b_i += 1
             aid = int(it.get("anime_id", 0))
             if aid in seen_ids:
                 continue
+            (it.get("_stage1") or {}).update({"pool": "C"})
             shortlist.append(it)
             seen_ids.add(aid)
+            c_taken += 1
+
+        while a_i < len(pool_a) and len(shortlist) < int(shortlist_k):
+            it = pool_a[a_i]
+            a_i += 1
+            aid = int(it.get("anime_id", 0))
+            if aid in seen_ids:
+                continue
+            (it.get("_stage1") or {}).update({"pool": "C"})
+            shortlist.append(it)
+            seen_ids.add(aid)
+            c_taken += 1
 
     # --- Stage 2: rerank shortlist using existing final scoring --------------
     try:
@@ -759,7 +1096,9 @@ def _seed_based_scores(
                 "meta": c.get("meta") or {},
                 "signals": {
                     "stage1_score": float(s1),
+                    "stage1_pool": str(((c.get("_stage1") or {}).get("pool")) or ""),
                     "weighted_overlap": float(weighted_overlap),
+                    "seed_title_overlap": float((c.get("_stage1") or {}).get("title_overlap", 0.0)),
                     "seed_coverage": float(seed_coverage),
                     "hybrid_val": float(hybrid_val),
                     "popularity_boost": float(popularity_boost),
@@ -879,6 +1218,9 @@ def _seed_based_scores(
 
     # Seed-conditioning diagnostics for Option A shortlist
     top20 = recs_top_n[:20]
+    top20_pool_a = sum(1 for r in top20 if str((r.get("signals") or {}).get("stage1_pool", "")) == "A")
+    top20_pool_b = sum(1 for r in top20 if str((r.get("signals") or {}).get("stage1_pool", "")) == "B")
+    top20_pool_c = sum(1 for r in top20 if str((r.get("signals") or {}).get("stage1_pool", "")) == "C")
     top20_tfidf_nonzero = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_tfidf_sim", 0.0)) > 0.0)
     top20_tfidf_ge_min = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_tfidf_sim", 0.0)) >= 0.02)
 
@@ -924,6 +1266,24 @@ def _seed_based_scores(
 
     diagnostics = {
         "semantic_mode": semantic_mode,
+        "stage1_k_sem": int(stage1_k_sem),
+        "stage1_k_meta": int(stage1_k_meta),
+        "semantic_confidence_source": str(semantic_conf_source),
+        "semantic_confidence_score": float(semantic_conf_score),
+        "semantic_confidence_tier": str(semantic_conf_tier),
+        "embeddings_top50_count": int(embed_stats.get("count", 0)),
+        "embeddings_top50_mean": float(embed_stats.get("mean", 0.0)),
+        "embeddings_top50_p95": float(embed_stats.get("p95", 0.0)),
+        "embeddings_top50_weighted_overlap_mean": float(embed_coherence.get("weighted_overlap_mean", 0.0)),
+        "embeddings_top50_any_genre_match_frac": float(embed_coherence.get("any_genre_match_frac", 0.0)),
+        "tfidf_top50_count": int(tfidf_stats.get("count", 0)),
+        "tfidf_top50_mean": float(tfidf_stats.get("mean", 0.0)),
+        "tfidf_top50_p95": float(tfidf_stats.get("p95", 0.0)),
+        "tfidf_top50_weighted_overlap_mean": float(tfidf_coherence.get("weighted_overlap_mean", 0.0)),
+        "tfidf_top50_any_genre_match_frac": float(tfidf_coherence.get("any_genre_match_frac", 0.0)),
+        "top20_poolA_count": int(top20_pool_a),
+        "top20_poolB_count": int(top20_pool_b),
+        "top20_poolC_count": int(top20_pool_c),
         "stage1_shortlist_target": int(shortlist_k) if shortlist_k > 0 else int(stage1_total_candidates),
         "stage1_shortlist_size": int(len(shortlist)),
         "stage1_shortlist_from_embeddings_count": int(shortlist_from_embed),
@@ -974,6 +1334,12 @@ def _seed_based_scores(
         "top20_moved_count_embeddings": int(top20_moved_embed),
         "top50_moved_count_embeddings": int(top50_moved_embed),
     }
+
+    # Stage 1 semantic admission diagnostics (blocked-by-overlap rates + examples).
+    try:
+        diagnostics.update(stage1_gate_blocking_diagnostics)
+    except Exception:
+        pass
 
     return recs_top_n, diagnostics
 
@@ -1139,6 +1505,11 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
         if diag:
             lines.append(
                 "Diagnostics: "
+                f"K_sem={diag.get('stage1_k_sem')}, K_meta={diag.get('stage1_k_meta')}, "
+                f"sem_conf=({diag.get('semantic_confidence_source')}/{diag.get('semantic_confidence_tier')}) {float(diag.get('semantic_confidence_score', 0.0)):.3f}, "
+                f"emb_top50_mean={float(diag.get('embeddings_top50_mean', 0.0)):.3f}, emb_top50_p95={float(diag.get('embeddings_top50_p95', 0.0)):.3f}, "
+                f"emb_top50_overlap_mean={float(diag.get('embeddings_top50_weighted_overlap_mean', 0.0)):.3f}, emb_top50_any_match={float(diag.get('embeddings_top50_any_genre_match_frac', 0.0)):.2f}, "
+                f"top20_pools(A/B/C)={diag.get('top20_poolA_count')}/{diag.get('top20_poolB_count')}/{diag.get('top20_poolC_count')}, "
                 f"shortlist={diag.get('stage1_shortlist_size')}/{diag.get('stage1_shortlist_target')}, "
                 f"stage1_off_type_allowed={diag.get('stage1_off_type_allowed_count')}, "
                 f"top20_off_type={diag.get('top20_off_type_count')}, "
