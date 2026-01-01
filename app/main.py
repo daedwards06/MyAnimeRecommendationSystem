@@ -1422,6 +1422,21 @@ else:
                             for genre in seed_genres:
                                 genre_weights[genre] = genre_weights.get(genre, 0) + 1
 
+                    # Deterministic seed title tokenization for franchise-like backfill.
+                    _TITLE_STOP = {
+                        "the", "and", "of", "to", "a", "an", "in", "on", "for", "with",
+                        "movie", "film", "tv", "ova", "ona", "special", "season", "part",
+                        "episode", "eps", "edition", "new",
+                    }
+
+                    def _title_tokens(s: str) -> set[str]:
+                        raw = str(s or "").lower()
+                        cleaned = "".join((ch if ch.isalnum() else " ") for ch in raw)
+                        toks = [t for t in cleaned.split() if len(t) >= 3 and t not in _TITLE_STOP]
+                        return set(toks)
+
+                    seed_title_token_map: dict[str, set[str]] = {str(t): _title_tokens(str(t)) for t in (selected_seed_titles or [])}
+
                     # Phase 4 / Chunk A3: lightweight metadata affinity profile.
                     # This is used as a *small* bonus for cold-start candidates.
                     seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
@@ -1518,6 +1533,18 @@ else:
 
                         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
                         synopsis_embed_sim = float(embed_sims_by_id.get(aid, 0.0))
+
+                        cand_title = str(mrow.get("title_display") or mrow.get("title_primary") or "")
+                        cand_tokens = _title_tokens(cand_title)
+                        title_overlap = 0.0
+                        for _, stoks in seed_title_token_map.items():
+                            if not stoks:
+                                continue
+                            try:
+                                title_overlap = max(title_overlap, float(len(stoks & cand_tokens)) / float(len(stoks)))
+                            except Exception:
+                                continue
+                        title_bonus_s1 = 0.40 * float(title_overlap)
                         cand_type = None if pd.isna(mrow.get("type")) else str(mrow.get("type")).strip()
                         cand_eps = mrow.get("episodes")
                         base_passes_gate = synopsis_gate_passes(
@@ -1542,6 +1569,7 @@ else:
                             "overlap_per_seed": overlap_per_seed,
                             "seeds_matched": int(num_seeds_matched),
                             "metadata_affinity": float(meta_affinity),
+                            "title_overlap": float(title_overlap),
                             "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
                             "synopsis_embed_sim": float(synopsis_embed_sim),
                             "passes_gate": bool(base_passes_gate),
@@ -1557,6 +1585,7 @@ else:
                             semantic_mode in {"embeddings", "both"}
                             and bool(passes_gate_effective_embed)
                             and float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM)
+                            and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
                         ):
                             item = dict(base)
                             item["stage1_score"] = float(synopsis_embed_sim)
@@ -1569,6 +1598,7 @@ else:
                             semantic_mode in {"tfidf", "both"}
                             and bool(passes_gate_effective_tfidf)
                             and float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_MIN_SIM)
+                            and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
                         ):
                             item = dict(base)
                             item["stage1_score"] = float(synopsis_tfidf_sim)
@@ -1580,6 +1610,7 @@ else:
                             (0.5 * float(weighted_overlap))
                             + (0.2 * float(seed_coverage))
                             + float(meta_bonus_s1)
+                            + float(title_bonus_s1)
                         )
                         if float(fallback_score) > 0.0:
                             item = dict(base)
@@ -1604,27 +1635,145 @@ else:
                     )
                     stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
-                    shortlist: list[dict] = []
-                    seen_ids: set[int] = set()
-                    for it in stage1_embed_pool:
-                        if len(shortlist) >= seed_shortlist_size:
-                            break
+                    # Phase 4 stabilization: Stage 1 mixture shortlist + semantic confidence gating.
+                    # Pool A: semantic neighbors (embeddings/TF-IDF)
+                    # Pool B: metadata/genre candidates
+                    # Pool C: deterministic backfill if needed
+                    pool_a: list[dict] = []
+                    pool_a.extend(stage1_embed_pool)
+                    pool_a.extend(stage1_tfidf_pool)
+                    pool_b: list[dict] = list(stage1_fallback_pool)
+
+                    def _topk_sim_stats(sim_map: dict[int, float], k: int = 50) -> dict:
+                        vals: list[float] = []
+                        for aid, s in (sim_map or {}).items():
+                            try:
+                                aid_i = int(aid)
+                                if aid_i in ranked_hygiene_exclude_ids or aid_i in selected_seed_ids or aid_i in watched_ids_set:
+                                    continue
+                                fs = float(s)
+                                if fs <= 0.0:
+                                    continue
+                                vals.append(fs)
+                            except Exception:
+                                continue
+                        vals.sort(reverse=True)
+                        top = vals[: max(0, int(k))]
+                        if not top:
+                            return {"count": 0, "mean": 0.0, "p95": 0.0}
+                        arr = np.asarray(top, dtype=np.float64)
+                        mean = float(arr.mean())
+                        p95 = float(np.percentile(arr, 95)) if int(arr.size) >= 2 else float(arr[0])
+                        return {"count": int(arr.size), "mean": float(mean), "p95": float(p95)}
+
+                    def _conf_score(stats: dict, min_sim: float, high_sim: float) -> float:
+                        denom = float(max(1e-6, float(high_sim) - float(min_sim)))
+                        mean_n = max(0.0, min(1.0, (float(stats.get("mean", 0.0)) - float(min_sim)) / denom))
+                        p95_n = max(0.0, min(1.0, (float(stats.get("p95", 0.0)) - float(min_sim)) / denom))
+                        return float(0.5 * (mean_n + p95_n))
+
+                    def _neighbor_coherence(pool: list[dict], k: int = 50) -> dict:
+                        top = pool[: max(0, int(k))]
+                        if not top:
+                            return {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
+                        overlaps = [float(it.get("weighted_overlap", 0.0)) for it in top]
+                        coverages = [float(it.get("seed_coverage", 0.0)) for it in top]
+                        any_match = sum(1 for v in overlaps if float(v) > 0.0)
+                        return {
+                            "count": int(len(top)),
+                            "weighted_overlap_mean": float(sum(overlaps) / max(1, len(overlaps))),
+                            "seed_coverage_mean": float(sum(coverages) / max(1, len(coverages))),
+                            "any_genre_match_frac": float(any_match / max(1, len(overlaps))),
+                        }
+
+                    def _coherence_score(stats: dict) -> float:
+                        overlap_mean = float(stats.get("weighted_overlap_mean", 0.0))
+                        seed_cov_mean = float(stats.get("seed_coverage_mean", 0.0))
+                        any_match = float(stats.get("any_genre_match_frac", 0.0))
+                        overlap_s = max(0.0, min(1.0, overlap_mean / 0.20))
+                        seedcov_s = max(0.0, min(1.0, seed_cov_mean / 0.50))
+                        any_s = max(0.0, min(1.0, any_match / 0.80))
+                        return float((overlap_s + seedcov_s + any_s) / 3.0)
+
+                    # Prefer embeddings for confidence when active; fall back to TF-IDF.
+                    semantic_conf_tier = "none"
+                    semantic_conf_score = 0.0
+                    if semantic_mode in {"embeddings", "both"} and synopsis_embeddings_artifact is not None and embed_sims_by_id:
+                        stats = _topk_sim_stats(embed_sims_by_id, k=50)
+                        if int(stats.get("count", 0)) > 0:
+                            sim_conf = _conf_score(stats, float(SYNOPSIS_EMBEDDINGS_MIN_SIM), float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
+                            coh_conf = _coherence_score(_neighbor_coherence(stage1_embed_pool, k=50))
+                            semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
+                    elif semantic_mode in {"tfidf", "both"} and synopsis_tfidf_artifact is not None and synopsis_sims_by_id:
+                        stats = _topk_sim_stats(synopsis_sims_by_id, k=50)
+                        if int(stats.get("count", 0)) > 0:
+                            sim_conf = _conf_score(stats, float(SYNOPSIS_TFIDF_MIN_SIM), float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD))
+                            coh_conf = _coherence_score(_neighbor_coherence(stage1_tfidf_pool, k=50))
+                            semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
+
+                    if semantic_conf_score <= 0.0:
+                        semantic_conf_tier = "none"
+                    elif float(semantic_conf_score) >= 0.60:
+                        semantic_conf_tier = "high"
+                    elif float(semantic_conf_score) >= 0.30:
+                        semantic_conf_tier = "medium"
+                    else:
+                        semantic_conf_tier = "low"
+
+                    if semantic_conf_tier == "high":
+                        sem_frac = 0.50
+                    elif semantic_conf_tier == "medium":
+                        sem_frac = 0.40
+                    elif semantic_conf_tier == "low":
+                        sem_frac = 0.20
+                    else:
+                        sem_frac = 0.0
+
+                    k_sem = int(round(float(seed_shortlist_size) * float(sem_frac)))
+                    k_sem = max(0, min(int(seed_shortlist_size), int(k_sem)))
+                    k_meta = int(seed_shortlist_size) - int(k_sem)
+
+                    shortlist = []
+                    seen_ids = set()
+
+                    a_taken = 0
+                    b_taken = 0
+
+                    a_i = 0
+                    while a_i < len(pool_a) and a_taken < int(k_sem) and len(shortlist) < int(seed_shortlist_size):
+                        it = pool_a[a_i]
+                        a_i += 1
                         aid = int(it.get("anime_id", 0))
                         if aid in seen_ids:
                             continue
                         shortlist.append(it)
                         seen_ids.add(aid)
-                    for it in stage1_tfidf_pool:
-                        if len(shortlist) >= seed_shortlist_size:
-                            break
+                        a_taken += 1
+
+                    b_i = 0
+                    while b_i < len(pool_b) and b_taken < int(k_meta) and len(shortlist) < int(seed_shortlist_size):
+                        it = pool_b[b_i]
+                        b_i += 1
                         aid = int(it.get("anime_id", 0))
                         if aid in seen_ids:
                             continue
                         shortlist.append(it)
                         seen_ids.add(aid)
-                    for it in stage1_fallback_pool:
-                        if len(shortlist) >= seed_shortlist_size:
-                            break
+                        b_taken += 1
+
+                    # Backfill deterministically (prefer meta pool first).
+                    while b_i < len(pool_b) and len(shortlist) < int(seed_shortlist_size):
+                        it = pool_b[b_i]
+                        b_i += 1
+                        aid = int(it.get("anime_id", 0))
+                        if aid in seen_ids:
+                            continue
+                        shortlist.append(it)
+                        seen_ids.add(aid)
+
+                    while a_i < len(pool_a) and len(shortlist) < int(seed_shortlist_size):
+                        it = pool_a[a_i]
+                        a_i += 1
                         aid = int(it.get("anime_id", 0))
                         if aid in seen_ids:
                             continue
