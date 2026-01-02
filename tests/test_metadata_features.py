@@ -7,6 +7,7 @@ from src.app.metadata_features import (
     METADATA_AFFINITY_YEAR_WINDOW,
     build_seed_metadata_profile,
     compute_metadata_affinity,
+    theme_stage2_tiebreak_bonus,
 )
 
 
@@ -76,3 +77,53 @@ def test_affinity_missing_metadata_is_safe():
 def test_cold_start_coef_is_conservative():
     # Coef should remain small relative to existing seed-based scoring terms.
     assert 0.0 < float(METADATA_AFFINITY_COLD_START_COEF) <= 0.2
+
+
+def test_theme_stage2_tiebreak_bonus_missing_is_zero():
+    assert theme_stage2_tiebreak_bonus(None, semantic_sim=0.9, genre_overlap=1.0) == 0.0
+
+
+def test_theme_stage2_tiebreak_bonus_never_negative_and_capped():
+    # overlap>cap should be capped
+    b = theme_stage2_tiebreak_bonus(1.0, semantic_sim=1.0, genre_overlap=1.0, coef=0.01, cap=0.5)
+    assert b == 0.01 * 0.5
+
+
+def test_theme_stage2_tiebreak_bonus_safety_gate_blocks_irrelevant():
+    # If semantic similarity is too low AND genre overlap is below gate, no bonus.
+    b = theme_stage2_tiebreak_bonus(
+        0.5,
+        semantic_sim=0.01,
+        genre_overlap=0.0,
+        coef=0.01,
+        cap=0.5,
+        min_sem_sim=0.10,
+        genre_gate_overlap=0.50,
+    )
+    assert b == 0.0
+
+
+def test_theme_stage2_tiebreak_bonus_allows_semantic_or_genre_pass():
+    # Semantic pass
+    b1 = theme_stage2_tiebreak_bonus(
+        0.5,
+        semantic_sim=0.20,
+        genre_overlap=0.0,
+        coef=0.01,
+        cap=0.5,
+        min_sem_sim=0.10,
+        genre_gate_overlap=0.50,
+    )
+    assert b1 == 0.01 * 0.5
+
+    # Genre pass
+    b2 = theme_stage2_tiebreak_bonus(
+        0.25,
+        semantic_sim=0.0,
+        genre_overlap=0.60,
+        coef=0.01,
+        cap=0.5,
+        min_sem_sim=0.10,
+        genre_gate_overlap=0.50,
+    )
+    assert b2 == 0.01 * 0.25

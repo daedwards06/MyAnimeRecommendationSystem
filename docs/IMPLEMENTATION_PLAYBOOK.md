@@ -626,6 +626,33 @@ Record decisions that future sessions must not re-litigate.
   - Phase 4 is now sufficiently stable for golden queries (Tokyo Ghoul fixed without harming One Piece or baseline metrics).
   - Optional next steps: refine further for edge cases, or move to Phase 5 (portfolio polish, docs, final QA).
 
+### Session 2026-01-01 (Phase 4 — Ranked scoring polish: Stage 2 theme tie-break)
+
+- **Goal:** Improve ordering within already-admitted Stage 1 candidates by using the `themes` column as a conservative **Stage 2** tie-break bonus.
+- **Explicit non-goals:** No changes to Stage 1 admission thresholds/pools.
+
+- **Rule (Stage 2 only; additive; never gates):**
+  - Define directional overlap: $\text{theme\_overlap} = |T_{seed} \cap T_{cand}| / |T_{seed}|$.
+  - Compute only when both seed and candidate have non-empty themes.
+  - Never penalize missing themes (bonus stays 0 when themes are missing).
+  - Apply a tiny capped bonus:
+    - `theme_bonus = THEME_STAGE2_COEF * min(theme_overlap, THEME_STAGE2_CAP)`
+  - Optional safety gate (conservative): only apply `theme_bonus` when semantic similarity is non-trivial **or** the candidate already passes the genre-overlap gate.
+
+- **Centralized constants:**
+  - `THEME_STAGE2_COEF=0.004` (max bonus ~0.002)
+  - `THEME_STAGE2_CAP=0.50`
+  - `THEME_STAGE2_MIN_SEM_SIM=0.10`
+  - `THEME_STAGE2_GENRE_GATE_OVERLAP=0.50`
+
+- **Rationale:** Theme coverage is partial (~60%), so themes are treated as **bonus-only** and capped to remain a tie-breaker, not a primary signal.
+
+- **Diagnostics added to golden report:**
+  - `theme_bonus_fired(top20/top50)`
+  - `theme_bonus_mean(top20/top50)` and `theme_bonus_max(top20/top50)`
+  - `top20_theme_overlap_count`
+  - For `one_piece` and `tokyo_ghoul`: “Top 5 items by theme_stage2_bonus (within top50)”.
+
 ### Session 2025-12-31 (Phase 4 / Option A — Synopsis embeddings successor)
 
 - What I did:

@@ -41,6 +41,7 @@ from src.app.metadata_features import (
     build_seed_metadata_profile,
     compute_metadata_affinity,
     demographics_overlap_tiebreak_bonus,
+    theme_stage2_tiebreak_bonus,
 )
 from src.app.synopsis_tfidf import (
     compute_seed_similarity_map,
@@ -1952,6 +1953,16 @@ else:
                         else:
                             demo_bonus = 0.0
 
+                        # Optional tiny tie-breaker: themes overlap (Stage 2 only; never gates).
+                        # No penalty for missing themes; only computed when Stage 1 overlap ratio exists.
+                        theme_overlap = c.get("theme_overlap")
+                        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim))
+                        theme_bonus = theme_stage2_tiebreak_bonus(
+                            None if theme_overlap is None else float(theme_overlap),
+                            semantic_sim=float(semantic_sim_for_theme),
+                            genre_overlap=float(weighted_overlap),
+                        )
+
                         s1 = float(c.get("stage1_score", 0.0))
 
                         score = (
@@ -1964,6 +1975,7 @@ else:
                             + synopsis_tfidf_adjustment
                             + synopsis_embed_adjustment
                             + float(demo_bonus)
+                            + float(theme_bonus)
                         )
                         if score <= 0:
                             continue
@@ -1977,6 +1989,7 @@ else:
                             + synopsis_tfidf_adjustment
                             + synopsis_embed_adjustment
                             + float(demo_bonus)
+                            + float(theme_bonus)
                         )
                         raw_pop = (0.05 * popularity_boost)
                         used_components: list[str] = ["knn", "pop"]
@@ -2019,6 +2032,8 @@ else:
                             "synopsis_embed_adjustment": float(synopsis_embed_adjustment),
                             "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
                             "demographics_overlap_bonus": float(demo_bonus),
+                            "theme_overlap": None if theme_overlap is None else float(theme_overlap),
+                            "theme_stage2_bonus": float(theme_bonus),
                             "stage1_score": float(s1),
                             "shortlist_size": int(len(shortlist)),
                         }
