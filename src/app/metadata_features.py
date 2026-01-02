@@ -91,6 +91,23 @@ METADATA_AFFINITY_PERSONALIZED_COEF: float = 0.02
 #   deterministic tie-breaker in Stage 2 rerank.
 METADATA_DEMOGRAPHICS_OVERLAP_TIEBREAK_BONUS: float = 0.002
 
+# Phase 4 ranked scoring polish (2026-01-01): tiny themes tie-break bonus (Stage 2 only).
+#
+# Constraints:
+# - No candidate admission changes (Stage 1 unchanged).
+# - Never penalize missing themes.
+# - Only compute when BOTH seed and candidate have non-empty themes.
+#
+# Theme overlap definition (directional): |themes_seed ∩ themes_candidate| / |themes_seed|
+# We cap overlap contribution to avoid overweighting generic theme matches.
+THEME_STAGE2_COEF: float = 0.004
+THEME_STAGE2_CAP: float = 0.50
+
+# Optional safety gate: only allow theme tie-break if the candidate is already
+# plausibly related via semantic similarity OR via the genre-overlap gate.
+THEME_STAGE2_MIN_SEM_SIM: float = 0.10
+THEME_STAGE2_GENRE_GATE_OVERLAP: float = 0.50
+
 
 @dataclass(frozen=True)
 class SeedMetadataProfile:
@@ -256,6 +273,60 @@ def demographics_overlap_tiebreak_bonus(
     return float(bonus)
 
 
+def theme_stage2_tiebreak_bonus(
+    theme_overlap: Optional[float],
+    *,
+    semantic_sim: float,
+    genre_overlap: float,
+    coef: float = THEME_STAGE2_COEF,
+    cap: float = THEME_STAGE2_CAP,
+    min_sem_sim: float = THEME_STAGE2_MIN_SEM_SIM,
+    genre_gate_overlap: float = THEME_STAGE2_GENRE_GATE_OVERLAP,
+) -> float:
+    """Return a tiny Stage 2 additive bonus based on theme overlap.
+
+    This is a tie-breaker only. Missing themes never incur a penalty.
+
+    Args:
+        theme_overlap: Directional overlap ratio, defined as
+            |themes_seed ∩ themes_candidate| / |themes_seed|.
+            Should be None when seed or candidate themes are missing/empty.
+        semantic_sim: Candidate's semantic similarity to the seed (used only as an
+            optional safety gate).
+        genre_overlap: Candidate's genre overlap with seed profile (used only as an
+            optional safety gate).
+    """
+    if theme_overlap is None:
+        return 0.0
+
+    try:
+        ov = float(theme_overlap)
+    except Exception:
+        return 0.0
+
+    if ov <= 0.0:
+        return 0.0
+
+    # Optional safety: only boost if semantic similarity is non-trivial OR the
+    # candidate already passed the genre overlap gate.
+    try:
+        sem_ok = float(semantic_sim) >= float(min_sem_sim)
+    except Exception:
+        sem_ok = False
+    try:
+        genre_ok = float(genre_overlap) >= float(genre_gate_overlap)
+    except Exception:
+        genre_ok = False
+
+    if not (sem_ok or genre_ok):
+        return 0.0
+
+    capped = min(float(ov), float(cap))
+    if capped <= 0.0:
+        return 0.0
+    return float(coef) * float(capped)
+
+
 def _binary_overlap(a: frozenset[str], b: set[str]) -> Optional[float]:
     if not a or not b:
         return None
@@ -375,7 +446,12 @@ __all__ = [
     "METADATA_AFFINITY_TRAINED_COEF",
     "METADATA_AFFINITY_PERSONALIZED_COEF",
     "METADATA_DEMOGRAPHICS_OVERLAP_TIEBREAK_BONUS",
+    "THEME_STAGE2_COEF",
+    "THEME_STAGE2_CAP",
+    "THEME_STAGE2_MIN_SEM_SIM",
+    "THEME_STAGE2_GENRE_GATE_OVERLAP",
     "build_seed_metadata_profile",
     "demographics_overlap_tiebreak_bonus",
+    "theme_stage2_tiebreak_bonus",
     "compute_metadata_affinity",
 ]

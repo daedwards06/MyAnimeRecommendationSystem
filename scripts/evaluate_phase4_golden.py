@@ -44,6 +44,7 @@ from src.app.metadata_features import (
     build_seed_metadata_profile,
     compute_metadata_affinity,
     demographics_overlap_tiebreak_bonus,
+    theme_stage2_tiebreak_bonus,
 )
 from src.app.synopsis_tfidf import (
     compute_seed_similarity_map,
@@ -1215,6 +1216,15 @@ def _seed_based_scores(
         else:
             demo_bonus = 0.0
 
+        # Optional tiny tie-breaker: themes overlap (Stage 2 only; never gates).
+        theme_overlap = (c.get("_stage1") or {}).get("theme_overlap")
+        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim))
+        theme_bonus = theme_stage2_tiebreak_bonus(
+            None if theme_overlap is None else float(theme_overlap),
+            semantic_sim=float(semantic_sim_for_theme),
+            genre_overlap=float(weighted_overlap),
+        )
+
         score = (
             (0.5 * weighted_overlap)
             + (0.2 * seed_coverage)
@@ -1225,6 +1235,7 @@ def _seed_based_scores(
             + synopsis_tfidf_adjustment
             + synopsis_embed_adjustment
             + float(demo_bonus)
+            + float(theme_bonus)
         )
         if score <= 0.0:
             continue
@@ -1257,6 +1268,8 @@ def _seed_based_scores(
                     "synopsis_embed_adjustment": float(synopsis_embed_adjustment),
                     "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
                     "demographics_overlap_bonus": float(demo_bonus),
+                    "theme_overlap": None if theme_overlap is None else float(theme_overlap),
+                    "theme_stage2_bonus": float(theme_bonus),
                     "score_without_synopsis_tfidf_bonus": float(score - synopsis_tfidf_adjustment),
                     "score_without_synopsis_embeddings_bonus": float(score - synopsis_embed_adjustment),
                     "overlap_per_seed": overlap_per_seed,
@@ -1329,6 +1342,43 @@ def _seed_based_scores(
     top50_mean_abs_delta_embed, top50_moved_embed = _rank_diagnostics(with50, without_embed50)
 
     recs_top_n = scored_with_meta[:top_n]
+
+    # Theme tie-break diagnostics (top20/top50).
+    top20_items = scored_with_meta[:20]
+    top50_items = scored_with_meta[:50]
+
+    theme_bonuses_20 = [
+        float((r.get("signals") or {}).get("theme_stage2_bonus", 0.0))
+        for r in top20_items
+        if r.get("signals") is not None
+    ]
+    theme_bonuses_50 = [
+        float((r.get("signals") or {}).get("theme_stage2_bonus", 0.0))
+        for r in top50_items
+        if r.get("signals") is not None
+    ]
+    theme_fired_20 = [b for b in theme_bonuses_20 if float(b) > 0.0]
+    theme_fired_50 = [b for b in theme_bonuses_50 if float(b) > 0.0]
+
+    top20_theme_overlap_count = sum(
+        1
+        for r in top20_items
+        if (r.get("signals") is not None) and ((r.get("signals") or {}).get("theme_overlap") is not None)
+    )
+
+    top5_by_theme_bonus_top50 = sorted(
+        [
+            {
+                "rank_in_top50": idx,
+                "anime_id": int(r.get("anime_id")),
+                "title_display": str(((r.get("meta") or {}).get("title_display")) or ""),
+                "theme_overlap": (r.get("signals") or {}).get("theme_overlap"),
+                "theme_stage2_bonus": float((r.get("signals") or {}).get("theme_stage2_bonus", 0.0)),
+            }
+            for idx, r in enumerate(top50_items, start=1)
+        ],
+        key=lambda x: (-float(x.get("theme_stage2_bonus", 0.0)), int(x.get("anime_id", 0))),
+    )[:5]
 
     bonuses = [
         float((r.get("signals") or {}).get("metadata_bonus", 0.0))
@@ -1455,6 +1505,15 @@ def _seed_based_scores(
         "embedding_bonus_fired_count": int(len(embed_fired)),
         "embedding_bonus_mean": float(sum(embed_bonuses) / max(1, len(embed_bonuses))),
         "embedding_bonus_max": float(max(embed_bonuses) if embed_bonuses else 0.0),
+
+        "theme_bonus_fired_count_top20": int(len(theme_fired_20)),
+        "theme_bonus_mean_top20": float(sum(theme_bonuses_20) / max(1, len(theme_bonuses_20))),
+        "theme_bonus_max_top20": float(max(theme_bonuses_20) if theme_bonuses_20 else 0.0),
+        "theme_bonus_fired_count_top50": int(len(theme_fired_50)),
+        "theme_bonus_mean_top50": float(sum(theme_bonuses_50) / max(1, len(theme_bonuses_50))),
+        "theme_bonus_max_top50": float(max(theme_bonuses_50) if theme_bonuses_50 else 0.0),
+        "top20_theme_overlap_count": int(top20_theme_overlap_count),
+        "top5_items_by_theme_bonus_top50": list(top5_by_theme_bonus_top50),
         "top20_overlap_with_without_meta": _overlap_ratio(with20, without20),
         "top50_overlap_with_without_meta": _overlap_ratio(with50, without50),
         "top20_mean_abs_rank_delta": float(top20_mean_abs_delta),
@@ -1667,6 +1726,10 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"bonus_max={float(diag.get('metadata_bonus_max', 0.0)):.5f}, "
                 f"tfidf_fired={diag.get('synopsis_tfidf_bonus_fired_count')}, "
                 f"tfidf_mean={float(diag.get('synopsis_tfidf_bonus_mean', 0.0)):.5f}, "
+                f"theme_bonus_fired(top20/top50)={diag.get('theme_bonus_fired_count_top20')}/{diag.get('theme_bonus_fired_count_top50')}, "
+                f"theme_bonus_mean(top20/top50)={float(diag.get('theme_bonus_mean_top20', 0.0)):.5f}/{float(diag.get('theme_bonus_mean_top50', 0.0)):.5f}, "
+                f"theme_bonus_max(top20/top50)={float(diag.get('theme_bonus_max_top20', 0.0)):.5f}/{float(diag.get('theme_bonus_max_top50', 0.0)):.5f}, "
+                f"top20_theme_overlap_count={diag.get('top20_theme_overlap_count')}, "
                 f"top20_overlap_meta={float(diag.get('top20_overlap_with_without_meta', 1.0)):.3f}, "
                 f"top50_overlap_meta={float(diag.get('top50_overlap_with_without_meta', 1.0)):.3f}, "
                 f"top20_moved_meta={diag.get('top20_moved_count')}, "
@@ -1676,6 +1739,27 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"top20_moved_tfidf={diag.get('top20_moved_count_tfidf')}, "
                 f"top50_moved_tfidf={diag.get('top50_moved_count_tfidf')}"
             )
+
+            # Per-request: show top 5 items by theme bonus for One Piece and Tokyo Ghoul.
+            if str(q.get("id")) in {"one_piece", "tokyo_ghoul"}:
+                top5 = diag.get("top5_items_by_theme_bonus_top50") or []
+                if isinstance(top5, list) and top5:
+                    lines.append("")
+                    lines.append("Top 5 items by theme_stage2_bonus (within top50):")
+                    lines.append("")
+                    lines.append("| Rank@50 | anime_id | Title | theme_overlap | theme_stage2_bonus |")
+                    lines.append("|---:|---:|---|---:|---:|")
+                    for it in top5:
+                        try:
+                            r50 = int(it.get("rank_in_top50", 0))
+                            aid = int(it.get("anime_id", 0))
+                            title = str(it.get("title_display", "")).replace("|", "\\|")
+                            to = it.get("theme_overlap")
+                            to_s = "" if to is None else f"{float(to):.3f}"
+                            tb = float(it.get("theme_stage2_bonus", 0.0))
+                            lines.append(f"| {r50} | {aid} | {title} | {to_s} | {tb:.5f} |")
+                        except Exception:
+                            continue
 
             sample_blocked = diag.get("blocked_high_sim_overlap_025_0333_top") or []
             if isinstance(sample_blocked, list) and sample_blocked:
