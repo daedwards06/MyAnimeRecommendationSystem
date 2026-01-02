@@ -78,6 +78,7 @@ from src.app.search import fuzzy_search, normalize_title
 from src.app.badges import badge_payload
 from src.app.explanations import format_explanation
 from src.app.profiling import latency_timer
+from src.app.semantic_admission import stage1_semantic_admission, theme_overlap_ratio
 from src.app.diversity import (
     compute_popularity_percentiles,
     coverage,
@@ -102,6 +103,34 @@ def load_personas(path: str) -> list[dict]:
 
 
 IMPORT_LIGHT = bool(os.environ.get("APP_IMPORT_LIGHT"))
+
+
+def _parse_str_set(val: object) -> set[str]:
+    if val is None:
+        return set()
+    try:
+        if pd.isna(val):
+            return set()
+    except Exception:
+        pass
+    if isinstance(val, str):
+        s = val.strip()
+        if not s:
+            return set()
+        if "|" in s:
+            return {x.strip() for x in s.split("|") if x and x.strip()}
+        return {s}
+    if hasattr(val, "__iter__") and not isinstance(val, str):
+        out: set[str] = set()
+        for x in val:
+            if not x:
+                continue
+            sx = str(x).strip()
+            if sx:
+                out.add(sx)
+        return out
+    s = str(val).strip()
+    return {s} if s else set()
 
 
 def _render_artifact_load_failure(err: Exception) -> None:
@@ -1498,6 +1527,9 @@ else:
                     stage1_tfidf_pool: list[dict] = []
                     stage1_fallback_pool: list[dict] = []
 
+                    seed_genres_count = int(len(all_seed_genres))
+                    seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
+
                     for _, mrow in metadata.iterrows():
                         aid = int(mrow["anime_id"])
                         if aid in selected_seed_ids:
@@ -1514,6 +1546,8 @@ else:
                             item_genres = {str(g).strip() for g in row_genres if g}
                         else:
                             item_genres = set()
+
+                        item_themes = _parse_str_set(mrow.get("themes"))
 
                         raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
                         max_possible_overlap = len(all_seed_genres) * num_seeds
@@ -1565,6 +1599,7 @@ else:
                             "mrow": mrow,
                             "item_genres": item_genres,
                             "weighted_overlap": float(weighted_overlap),
+                            "theme_overlap": theme_overlap_ratio(seed_themes, item_themes),
                             "seed_coverage": float(seed_coverage),
                             "overlap_per_seed": overlap_per_seed,
                             "seeds_matched": int(num_seeds_matched),
@@ -1584,8 +1619,18 @@ else:
                         if (
                             semantic_mode in {"embeddings", "both"}
                             and bool(passes_gate_effective_embed)
-                            and float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM)
-                            and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
+                            and bool(
+                                stage1_semantic_admission(
+                                    semantic_sim=float(synopsis_embed_sim),
+                                    min_sim=float(SYNOPSIS_EMBEDDINGS_MIN_SIM),
+                                    high_sim=float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD),
+                                    genre_overlap=float(weighted_overlap),
+                                    title_overlap=float(title_overlap),
+                                    seed_genres_count=int(seed_genres_count),
+                                    num_seeds=int(num_seeds),
+                                    theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
+                                ).admitted
+                            )
                         ):
                             item = dict(base)
                             item["stage1_score"] = float(synopsis_embed_sim)
@@ -1597,8 +1642,18 @@ else:
                         if (
                             semantic_mode in {"tfidf", "both"}
                             and bool(passes_gate_effective_tfidf)
-                            and float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_MIN_SIM)
-                            and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
+                            and bool(
+                                stage1_semantic_admission(
+                                    semantic_sim=float(synopsis_tfidf_sim),
+                                    min_sim=float(SYNOPSIS_TFIDF_MIN_SIM),
+                                    high_sim=float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD),
+                                    genre_overlap=float(weighted_overlap),
+                                    title_overlap=float(title_overlap),
+                                    seed_genres_count=int(seed_genres_count),
+                                    num_seeds=int(num_seeds),
+                                    theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
+                                ).admitted
+                            )
                         ):
                             item = dict(base)
                             item["stage1_score"] = float(synopsis_tfidf_sim)
