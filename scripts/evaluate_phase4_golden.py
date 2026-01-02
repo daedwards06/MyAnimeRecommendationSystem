@@ -65,6 +65,8 @@ from src.app.synopsis_embeddings import (
     synopsis_embeddings_penalty_for_candidate,
 )
 
+from src.app.semantic_admission import stage1_semantic_admission, theme_overlap_ratio
+
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
 from src.eval.splits import build_validation, sample_user_ids
@@ -263,6 +265,15 @@ def _parse_genres(val: Any) -> set[str]:
         return {g.strip() for g in val.split("|") if g and g.strip()}
     if hasattr(val, "__iter__") and not isinstance(val, str):
         return {str(g).strip() for g in val if g and str(g).strip()}
+    return set()
+
+
+def _parse_themes(val: Any) -> set[str]:
+    # Keep consistent with genre parsing: tolerate pipe-delimited strings and iterables.
+    if isinstance(val, str):
+        return {t.strip() for t in val.split("|") if t and t.strip()}
+    if hasattr(val, "__iter__") and not isinstance(val, str):
+        return {str(t).strip() for t in val if t and str(t).strip()}
     return set()
 
 
@@ -545,19 +556,34 @@ def _seed_based_scores(
     stage1_tfidf_pool: list[dict[str, Any]] = []
     stage1_fallback_pool: list[dict[str, Any]] = []
 
-    # Diagnostics: quantify how often the stricter overlap gate blocks semantic admission.
-    # "Old" admission: (weighted_overlap > 0.0 OR title_overlap >= 0.50)
-    # "New" admission: (weighted_overlap >= 0.50 OR title_overlap >= 0.50)
+    seed_genres_count = int(len(all_seed_genres))
+    seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
+
+    # Diagnostics: quantify admission behavior under the adaptive two-lane policy.
+    # Baseline ("old") is kept for comparability: semantic min-sim AND (overlap>0 OR title>=0.50).
+    # Policy ("new"): stage1_semantic_admission(...) decision.
     embed_semantic_old_admit = 0
-    embed_semantic_new_admit = 0
-    embed_semantic_blocked = 0
+    embed_semantic_policy_admit = 0
+    embed_semantic_blocked_by_policy = 0
     tfidf_semantic_old_admit = 0
-    tfidf_semantic_new_admit = 0
-    tfidf_semantic_blocked = 0
+    tfidf_semantic_policy_admit = 0
+    tfidf_semantic_blocked_by_policy = 0
+
+    admitted_by_lane_A_count = 0
+    admitted_by_lane_B_count = 0
+    admitted_by_theme_override_count = 0
+    blocked_due_to_overlap_count = 0
+    blocked_due_to_low_sim_count = 0
 
     # Keep a small, deterministic sample of the highest-similarity blocked candidates.
     blocked_embed_top: list[dict[str, Any]] = []
     blocked_tfidf_top: list[dict[str, Any]] = []
+
+    # Keep a small, deterministic sample of Lane A admissions.
+    laneA_admitted_examples_top: list[dict[str, Any]] = []
+
+    # For inspection: high-sim blocked candidates with overlap in {0.25, 0.333}.
+    blocked_high_sim_overlap_025_0333: list[dict[str, Any]] = []
 
     # "False negative" hunting: blocked candidates that are *very* high similarity.
     # Defaults are intentionally conservative; override via env vars if desired.
@@ -581,6 +607,12 @@ def _seed_based_scores(
         if len(dst) > int(max_n):
             del dst[int(max_n) :]
 
+    def _push_top_laneA_admit(dst: list[dict[str, Any]], entry: dict[str, Any], *, max_n: int = 12) -> None:
+        dst.append(entry)
+        dst.sort(key=lambda x: (-float(x.get("sim", 0.0)), int(x.get("anime_id", 0))))
+        if len(dst) > int(max_n):
+            del dst[int(max_n) :]
+
     stage1_off_type_allowed_sims: list[float] = []
     stage1_off_type_allowed_embed_sims: list[float] = []
 
@@ -592,9 +624,12 @@ def _seed_based_scores(
             continue
 
         item_genres = _parse_genres(row.get("genres"))
+        item_themes = _parse_themes(row.get("themes"))
         raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
         max_possible_overlap = len(all_seed_genres) * num_seeds
         weighted_overlap = (raw_overlap / max_possible_overlap) if max_possible_overlap > 0 else 0.0
+
+        themes_overlap = theme_overlap_ratio(seed_themes, item_themes)
 
         overlap_per_seed = {
             seed_title: int(len(seed_genres & item_genres))
@@ -645,6 +680,7 @@ def _seed_based_scores(
             },
             "_stage1": {
                 "weighted_overlap": float(weighted_overlap),
+                "theme_overlap": None if themes_overlap is None else float(themes_overlap),
                 "seed_coverage": float(seed_coverage),
                 "metadata_affinity": float(meta_affinity),
                 "title_overlap": float(title_overlap),
@@ -659,34 +695,82 @@ def _seed_based_scores(
 
         # Pool A0: embeddings neighbors (gated) – use similarity as the primary Stage 1 rank.
         passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)
+
+        embed_decision = stage1_semantic_admission(
+            semantic_sim=float(synopsis_embed_sim),
+            min_sim=float(SYNOPSIS_EMBEDDINGS_MIN_SIM),
+            high_sim=float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD),
+            genre_overlap=float(weighted_overlap),
+            title_overlap=float(title_overlap),
+            seed_genres_count=int(seed_genres_count),
+            num_seeds=int(num_seeds),
+            theme_overlap=themes_overlap,
+        )
+
+        if bool(passes_gate_effective_embed):
+            if embed_decision.admitted:
+                if embed_decision.lane == "A":
+                    admitted_by_lane_A_count += 1
+                    if bool(embed_decision.used_theme_override):
+                        admitted_by_theme_override_count += 1
+
+                    laneA_entry = {
+                        "anime_id": int(aid),
+                        "title": str(row.get("title_display") or ""),
+                        "source": "embeddings",
+                        "sim": float(synopsis_embed_sim),
+                        "weighted_overlap": float(weighted_overlap),
+                        "theme_overlap": None if themes_overlap is None else float(themes_overlap),
+                        "title_overlap": float(title_overlap),
+                        "low_genre_overlap": float(embed_decision.low_genre_overlap),
+                        "used_theme_override": bool(embed_decision.used_theme_override),
+                        "rescued_from_overlap_ge_050": bool(
+                            float(weighted_overlap) < 0.50 and float(title_overlap) < 0.50
+                        ),
+                        "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                        "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
+                    }
+                    _push_top_laneA_admit(laneA_admitted_examples_top, laneA_entry, max_n=12)
+                elif embed_decision.lane == "B":
+                    admitted_by_lane_B_count += 1
+            else:
+                if embed_decision.lane == "blocked_overlap":
+                    blocked_due_to_overlap_count += 1
+                elif embed_decision.lane == "blocked_low_sim":
+                    blocked_due_to_low_sim_count += 1
+
         embed_sem_base_ok = bool(passes_gate_effective_embed) and float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM)
         embed_sem_old_ok = bool(embed_sem_base_ok) and (float(weighted_overlap) > 0.0 or float(title_overlap) >= 0.50)
-        embed_sem_new_ok = bool(embed_sem_base_ok) and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
+        embed_sem_policy_ok = bool(embed_sem_base_ok) and bool(embed_decision.admitted)
         if bool(embed_sem_old_ok):
             embed_semantic_old_admit += 1
-        if bool(embed_sem_new_ok):
-            embed_semantic_new_admit += 1
-        if bool(embed_sem_old_ok) and (not bool(embed_sem_new_ok)):
-            embed_semantic_blocked += 1
+        if bool(embed_sem_policy_ok):
+            embed_semantic_policy_admit += 1
+        if bool(embed_sem_old_ok) and (not bool(embed_sem_policy_ok)):
+            embed_semantic_blocked_by_policy += 1
             blocked_entry = {
                 "anime_id": int(aid),
                 "title": str(row.get("title_display") or ""),
+                "source": "embeddings",
                 "sim": float(synopsis_embed_sim),
                 "weighted_overlap": float(weighted_overlap),
+                "theme_overlap": None if themes_overlap is None else float(themes_overlap),
                 "title_overlap": float(title_overlap),
+                "low_genre_overlap": float(embed_decision.low_genre_overlap),
                 "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
                 "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
             }
-            _push_top_blocked(
-                blocked_embed_top,
-                blocked_entry,
-            )
+            _push_top_blocked(blocked_embed_top, blocked_entry)
             if float(synopsis_embed_sim) >= float(false_neg_embed_sim):
                 embed_semantic_blocked_high_sim += 1
                 _push_top_blocked(blocked_embed_high_sim_top, blocked_entry, max_n=20)
 
-        # Extra stabilization: require meaningful seed-conditioning via genres OR strong title overlap.
-        if bool(embed_sem_new_ok):
+            if float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD):
+                ov = round(float(weighted_overlap), 3)
+                if ov in {0.25, 0.333}:
+                    _push_top_blocked(blocked_high_sim_overlap_025_0333, blocked_entry, max_n=12)
+
+        if bool(passes_gate_effective_embed) and bool(embed_decision.admitted):
             item = dict(base)
             item["stage1_score"] = float(synopsis_embed_sim)
             stage1_embed_pool.append(item)
@@ -696,33 +780,82 @@ def _seed_based_scores(
 
         # Pool A: TF-IDF neighbors (gated) – use similarity as the primary Stage 1 rank.
         passes_gate_effective_tfidf = bool(base_passes_gate) or bool(high_sim_override_tfidf)
+
+        tfidf_decision = stage1_semantic_admission(
+            semantic_sim=float(synopsis_tfidf_sim),
+            min_sim=float(SYNOPSIS_TFIDF_MIN_SIM),
+            high_sim=float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD),
+            genre_overlap=float(weighted_overlap),
+            title_overlap=float(title_overlap),
+            seed_genres_count=int(seed_genres_count),
+            num_seeds=int(num_seeds),
+            theme_overlap=themes_overlap,
+        )
+
+        if bool(passes_gate_effective_tfidf):
+            if tfidf_decision.admitted:
+                if tfidf_decision.lane == "A":
+                    admitted_by_lane_A_count += 1
+                    if bool(tfidf_decision.used_theme_override):
+                        admitted_by_theme_override_count += 1
+
+                    laneA_entry = {
+                        "anime_id": int(aid),
+                        "title": str(row.get("title_display") or ""),
+                        "source": "tfidf",
+                        "sim": float(synopsis_tfidf_sim),
+                        "weighted_overlap": float(weighted_overlap),
+                        "theme_overlap": None if themes_overlap is None else float(themes_overlap),
+                        "title_overlap": float(title_overlap),
+                        "low_genre_overlap": float(tfidf_decision.low_genre_overlap),
+                        "used_theme_override": bool(tfidf_decision.used_theme_override),
+                        "rescued_from_overlap_ge_050": bool(
+                            float(weighted_overlap) < 0.50 and float(title_overlap) < 0.50
+                        ),
+                        "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                        "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
+                    }
+                    _push_top_laneA_admit(laneA_admitted_examples_top, laneA_entry, max_n=12)
+                elif tfidf_decision.lane == "B":
+                    admitted_by_lane_B_count += 1
+            else:
+                if tfidf_decision.lane == "blocked_overlap":
+                    blocked_due_to_overlap_count += 1
+                elif tfidf_decision.lane == "blocked_low_sim":
+                    blocked_due_to_low_sim_count += 1
+
         tfidf_sem_base_ok = bool(passes_gate_effective_tfidf) and float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_MIN_SIM)
         tfidf_sem_old_ok = bool(tfidf_sem_base_ok) and (float(weighted_overlap) > 0.0 or float(title_overlap) >= 0.50)
-        tfidf_sem_new_ok = bool(tfidf_sem_base_ok) and (float(weighted_overlap) >= 0.50 or float(title_overlap) >= 0.50)
+        tfidf_sem_policy_ok = bool(tfidf_sem_base_ok) and bool(tfidf_decision.admitted)
         if bool(tfidf_sem_old_ok):
             tfidf_semantic_old_admit += 1
-        if bool(tfidf_sem_new_ok):
-            tfidf_semantic_new_admit += 1
-        if bool(tfidf_sem_old_ok) and (not bool(tfidf_sem_new_ok)):
-            tfidf_semantic_blocked += 1
+        if bool(tfidf_sem_policy_ok):
+            tfidf_semantic_policy_admit += 1
+        if bool(tfidf_sem_old_ok) and (not bool(tfidf_sem_policy_ok)):
+            tfidf_semantic_blocked_by_policy += 1
             blocked_entry = {
                 "anime_id": int(aid),
                 "title": str(row.get("title_display") or ""),
+                "source": "tfidf",
                 "sim": float(synopsis_tfidf_sim),
                 "weighted_overlap": float(weighted_overlap),
+                "theme_overlap": None if themes_overlap is None else float(themes_overlap),
                 "title_overlap": float(title_overlap),
+                "low_genre_overlap": float(tfidf_decision.low_genre_overlap),
                 "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
                 "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
             }
-            _push_top_blocked(
-                blocked_tfidf_top,
-                blocked_entry,
-            )
+            _push_top_blocked(blocked_tfidf_top, blocked_entry)
             if float(synopsis_tfidf_sim) >= float(false_neg_tfidf_sim):
                 tfidf_semantic_blocked_high_sim += 1
                 _push_top_blocked(blocked_tfidf_high_sim_top, blocked_entry, max_n=20)
 
-        if bool(tfidf_sem_new_ok):
+            if float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD):
+                ov = round(float(weighted_overlap), 3)
+                if ov in {0.25, 0.333}:
+                    _push_top_blocked(blocked_high_sim_overlap_025_0333, blocked_entry, max_n=12)
+
+        if bool(passes_gate_effective_tfidf) and bool(tfidf_decision.admitted):
             item = dict(base)
             item["stage1_score"] = float(synopsis_tfidf_sim)
             stage1_tfidf_pool.append(item)
@@ -762,15 +895,22 @@ def _seed_based_scores(
 
     stage1_gate_blocking_diagnostics = {
         "embed_semantic_old_admit_count": int(embed_semantic_old_admit),
-        "embed_semantic_new_admit_count": int(embed_semantic_new_admit),
-        "embed_semantic_blocked_by_overlap_ge_050_count": int(embed_semantic_blocked),
-        "embed_semantic_blocked_by_overlap_ge_050_rate": float(embed_semantic_blocked)
+        "embed_semantic_policy_admit_count": int(embed_semantic_policy_admit),
+        "embed_semantic_blocked_by_policy_count": int(embed_semantic_blocked_by_policy),
+        "embed_semantic_blocked_by_policy_rate": float(embed_semantic_blocked_by_policy)
         / float(max(1, embed_semantic_old_admit)),
         "tfidf_semantic_old_admit_count": int(tfidf_semantic_old_admit),
-        "tfidf_semantic_new_admit_count": int(tfidf_semantic_new_admit),
-        "tfidf_semantic_blocked_by_overlap_ge_050_count": int(tfidf_semantic_blocked),
-        "tfidf_semantic_blocked_by_overlap_ge_050_rate": float(tfidf_semantic_blocked)
+        "tfidf_semantic_policy_admit_count": int(tfidf_semantic_policy_admit),
+        "tfidf_semantic_blocked_by_policy_count": int(tfidf_semantic_blocked_by_policy),
+        "tfidf_semantic_blocked_by_policy_rate": float(tfidf_semantic_blocked_by_policy)
         / float(max(1, tfidf_semantic_old_admit)),
+        "admitted_by_lane_A_count": int(admitted_by_lane_A_count),
+        "admitted_by_lane_B_count": int(admitted_by_lane_B_count),
+        "admitted_by_theme_override_count": int(admitted_by_theme_override_count),
+        "blocked_due_to_overlap_count": int(blocked_due_to_overlap_count),
+        "blocked_due_to_low_sim_count": int(blocked_due_to_low_sim_count),
+        "laneA_admitted_examples_top": list(laneA_admitted_examples_top),
+        "blocked_high_sim_overlap_025_0333_top": list(blocked_high_sim_overlap_025_0333),
         "embed_semantic_blocked_top": list(blocked_embed_top),
         "tfidf_semantic_blocked_top": list(blocked_tfidf_top),
         "false_neg_embed_sim_threshold": float(false_neg_embed_sim),
@@ -1517,6 +1657,11 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"off_type_sim_mean={float(diag.get('stage1_off_type_allowed_sim_mean', 0.0)):.5f}, "
                 f"off_type_sim_max={float(diag.get('stage1_off_type_allowed_sim_max', 0.0)):.5f}, "
                 f"top20_tfidf_nonzero={diag.get('top20_tfidf_nonzero_count')}, "
+                f"embed_blocked%={100.0 * float(diag.get('embed_semantic_blocked_by_policy_rate', 0.0)):.1f}%, "
+                f"tfidf_blocked%={100.0 * float(diag.get('tfidf_semantic_blocked_by_policy_rate', 0.0)):.1f}%, "
+                f"laneA={diag.get('admitted_by_lane_A_count')}, laneB={diag.get('admitted_by_lane_B_count')}, "
+                f"theme_override={diag.get('admitted_by_theme_override_count')}, "
+                f"blocked_overlap={diag.get('blocked_due_to_overlap_count')}, blocked_low_sim={diag.get('blocked_due_to_low_sim_count')}, "
                 f"bonus_fired={diag.get('metadata_bonus_fired_count')}, "
                 f"bonus_mean={float(diag.get('metadata_bonus_mean', 0.0)):.5f}, "
                 f"bonus_max={float(diag.get('metadata_bonus_max', 0.0)):.5f}, "
@@ -1531,6 +1676,26 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"top20_moved_tfidf={diag.get('top20_moved_count_tfidf')}, "
                 f"top50_moved_tfidf={diag.get('top50_moved_count_tfidf')}"
             )
+
+            sample_blocked = diag.get("blocked_high_sim_overlap_025_0333_top") or []
+            if isinstance(sample_blocked, list) and sample_blocked:
+                lines.append("")
+                lines.append("High-sim blocked candidates (overlap in {0.25, 0.333}):")
+                lines.append("")
+                lines.append("| Source | anime_id | Title | Sim | genre_overlap | theme_overlap |")
+                lines.append("|---|---:|---|---:|---:|---:|")
+                for it in sample_blocked[:10]:
+                    try:
+                        src = str(it.get("source", ""))
+                        aid = int(it.get("anime_id"))
+                        title = str(it.get("title", "")).replace("|", "\\|")
+                        sim = float(it.get("sim", 0.0))
+                        go = float(it.get("weighted_overlap", 0.0))
+                        to = it.get("theme_overlap")
+                        to_s = "" if to is None else f"{float(to):.3f}"
+                        lines.append(f"| {src} | {aid} | {title} | {sim:.3f} | {go:.3f} | {to_s} |")
+                    except Exception:
+                        continue
         lines.append("")
 
         # Table header

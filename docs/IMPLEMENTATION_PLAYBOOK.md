@@ -551,6 +551,42 @@ Record decisions that future sessions must not re-litigate.
 
 ## 7) Session Log (Tiny, but consistent)
 
+### Session 2026-01-02 (Phase 4 — Stage 1 semantic admission: adaptive multi-signal)
+
+- **Problem:** The fixed Stage 1 semantic admission gate (`weighted_overlap >= 0.50 OR title_overlap >= 0.50`) preserved Tokyo Ghoul quality, but caused over-blocking for other seeds: plausible semantic neighbors with overlap in the 0.25–0.333 range were excluded even at high semantic similarity.
+
+- **Decision:** Replace the fixed overlap-only gate with an **adaptive two-lane policy**:
+  - **Always admit** if `title_overlap >= 0.50` (franchise/title-confirmed).
+  - **Lane B (standard):** admit if `semantic_sim >= MIN_SIM` **and** `genre_overlap >= HIGH_GENRE_OVERLAP`.
+  - **Lane A (high-confidence rescue):** if Lane B fails, admit if `semantic_sim >= HIGH_SIM` **and** (`genre_overlap >= LOW_GENRE_OVERLAP` **or** `theme_overlap >= THEME_MIN_OVERLAP`).
+    - **Single-seed adaptive low overlap:** `LOW_GENRE_OVERLAP = max(1 / |Gseed|, 0.20)`.
+
+- **Themes constraint (must not regress):**
+  - Themes are **never** a hard gate.
+  - Missing themes are **never** penalized.
+  - Theme overlap is computed only when **both** seed and candidate themes are non-empty.
+  - Themes may only act as an **optional confirmer** in Lane A (high semantic confidence).
+
+- **Centralization:** Stage 1 admission constants + logic live in [src/app/semantic_admission.py](src/app/semantic_admission.py) so the golden harness and Streamlit app share identical deterministic behavior.
+
+- **Key files changed:**
+  - [src/app/semantic_admission.py](src/app/semantic_admission.py): new centralized policy + constants (`HIGH_GENRE_OVERLAP=0.50`, `MIN_GENRE_FLOOR=0.20`, `THEME_MIN_OVERLAP=0.33`).
+  - [app/main.py](app/main.py): Stage 1 embeddings/TF-IDF pool admission now uses the adaptive policy; themes are only used as a confirmer (never required).
+  - [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py): expanded diagnostics (`laneA/laneB/theme_override`, blocked counts, and per-query samples of high-sim blocked overlap=0.25/0.333).
+
+- **Observed impact (baseline → latest):**
+  - Artifacts: `phase4_golden_queries_20260101235332` → `phase4_golden_queries_20260102004751`.
+  - **Over-blocking decreased for embeddings** (blocked% vs the permissive overlap>0 baseline):
+    - Tokyo Ghoul: **67.4% → 63.6%**
+    - One Piece: **51.4% → 47.3%**
+    - Attack on Titan: **81.4% → 69.3%**
+    - Steins;Gate: **82.2% → 64.4%**
+  - **TF-IDF blocked%** was largely unchanged (as expected, since TF-IDF Lane A requires very high sim).
+  - **No regressions in safety checks:** `violation_count` stayed at **0 for all 12 golden queries**.
+  - **Theme confirmer usage was rare** (theme overrides fired only a handful of times across the golden set), consistent with “themes do not gate / do not penalize missingness”.
+
+- **Tradeoff note:** Tokyo Ghoul top-20 remained violation-free but experienced minor churn (one Movie candidate entered top-20); keep monitoring for “kids/shorts” reintroduction if we further relax overlap.
+
 ### Session 2026-01-01 (Phase 4 — Stabilized Stage 1 mixture shortlist gating)
 
 - **What I did:**
