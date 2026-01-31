@@ -16,8 +16,11 @@ Pillow==10.4.0  # image thumbnail processing for enrich_images pipeline
 httpx==0.27.2   # HTTP client (already listed below but kept for clarity near image deps)
 
 # Optional (enable embeddings content path). Comment out to slim further.
-sentence-transformers==2.7.0
-torch>=2.2,<2.5
+
+# NOTE (Phase 5): torch/transformers are intentionally NOT included in the
+# Windows runtime requirements. Neural embeddings are built offline in WSL2 and
+# consumed on Windows via serialized artifacts.
+# See: requirements-wsl-neural.txt
 
 # Dev / evaluation (can be excluded in minimal prod):
 matplotlib==3.9.2

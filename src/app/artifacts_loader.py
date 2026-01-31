@@ -348,6 +348,23 @@ def build_artifacts(
         # Embeddings are optional; do not block app startup.
         pass
 
+    # Optional: synopsis neural embeddings artifact (Phase 5 semantic generalization).
+    # Built offline in WSL2; Windows runtime only loads the serialized arrays.
+    synopsis_neural_candidates = sorted([k for k in models.keys() if k.startswith("synopsis_neural_embeddings")])
+    try:
+        synopsis_neural_stem = _select_model_stem(
+            models,
+            candidates=synopsis_neural_candidates,
+            env_var="APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM",
+            label="Synopsis neural embeddings",
+            preferred_stem=None,
+        )
+        models["synopsis_neural_embeddings"] = models[synopsis_neural_stem]
+        models["_synopsis_neural_embeddings_stem"] = synopsis_neural_stem
+    except ArtifactContractError:
+        # Neural embeddings are optional; do not block app startup.
+        pass
+
     explanations = _load_json_glob(reports_dir_p, "**/*explanations*.json")
     diversity = _load_json_glob(reports_dir_p, "**/*diversity*.json")
 

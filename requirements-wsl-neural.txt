@@ -1,0 +1,15 @@
+# WSL2-only requirements for building the Phase 5 neural synopsis embeddings artifact.
+# Intentionally separate from Windows runtime requirements to keep Windows torch-free.
+
+numpy==1.26.4
+pandas==2.2.2
+pyarrow==16.1.0
+joblib==1.4.2
+
+# Sentence embeddings build dependencies (WSL2 only)
+# Note: using the CPU wheel index keeps WSL2 installs smaller and avoids CUDA.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.4.1
+sentence-transformers==2.7.0
+transformers==4.45.2
