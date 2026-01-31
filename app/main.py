@@ -63,6 +63,14 @@ from src.app.synopsis_embeddings import (
     synopsis_embeddings_penalty_for_candidate,
     personalized_synopsis_embeddings_bonus_for_candidate,
 )
+from src.app.synopsis_neural_embeddings import (
+    compute_seed_similarity_map as compute_seed_neural_similarity_map,
+    SYNOPSIS_NEURAL_MIN_SIM,
+    SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD,
+    SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY,
+    synopsis_neural_bonus_for_candidate,
+    synopsis_neural_penalty_for_candidate,
+)
 from src.app.theme import get_theme
 from src.app.constants import (
     DEFAULT_TOP_N,
@@ -1471,15 +1479,23 @@ else:
                     # This is used as a *small* bonus for cold-start candidates.
                     seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
 
-                    # Phase 4: semantic rerank artifacts (TF-IDF legacy; embeddings successor).
+                    # Phase 4/5: semantic rerank artifacts
+                    # - TF-IDF (legacy)
+                    # - SVD embeddings (Phase 4; lightweight, lexical-ish)
+                    # - Neural sentence embeddings (Phase 5; built offline in WSL2)
                     synopsis_tfidf_artifact = bundle.get("models", {}).get("synopsis_tfidf")
                     synopsis_embeddings_artifact = bundle.get("models", {}).get("synopsis_embeddings")
+                    synopsis_neural_artifact = bundle.get("models", {}).get("synopsis_neural_embeddings")
 
                     semantic_mode = str(os.environ.get("PHASE4_SEMANTIC_MODE", "")).strip().lower()
-                    if semantic_mode not in {"embeddings", "tfidf", "both", "none", ""}:
+                    if semantic_mode not in {"neural", "embeddings", "tfidf", "both", "none", ""}:
                         semantic_mode = ""
                     if not semantic_mode:
-                        if synopsis_embeddings_artifact is not None and synopsis_tfidf_artifact is not None:
+                        # Default remains conservative and deterministic.
+                        # Prefer Phase 5 neural when present; otherwise keep Phase 4 behavior.
+                        if synopsis_neural_artifact is not None:
+                            semantic_mode = "neural"
+                        elif synopsis_embeddings_artifact is not None and synopsis_tfidf_artifact is not None:
                             semantic_mode = "both"
                         elif synopsis_embeddings_artifact is not None:
                             semantic_mode = "embeddings"
@@ -1490,6 +1506,7 @@ else:
 
                     synopsis_sims_by_id: dict[int, float] = {}
                     embed_sims_by_id: dict[int, float] = {}
+                    neural_sims_by_id: dict[int, float] = {}
                     seed_type_target: str | None = None
 
                     try:
@@ -1512,6 +1529,14 @@ else:
                             )
                         except Exception:
                             embed_sims_by_id = {}
+
+                    if semantic_mode in {"neural"} and synopsis_neural_artifact is not None:
+                        try:
+                            neural_sims_by_id = compute_seed_neural_similarity_map(
+                                synopsis_neural_artifact, seed_ids=selected_seed_ids
+                            )
+                        except Exception:
+                            neural_sims_by_id = {}
                     
                     num_seeds = len(selected_seed_ids)
 
@@ -1526,6 +1551,7 @@ else:
 
                     stage1_embed_pool: list[dict] = []
                     stage1_tfidf_pool: list[dict] = []
+                    stage1_neural_pool: list[dict] = []
                     stage1_fallback_pool: list[dict] = []
 
                     seed_genres_count = int(len(all_seed_genres))
@@ -1568,6 +1594,7 @@ else:
 
                         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
                         synopsis_embed_sim = float(embed_sims_by_id.get(aid, 0.0))
+                        synopsis_neural_sim = float(neural_sims_by_id.get(aid, 0.0))
 
                         cand_title = str(mrow.get("title_display") or mrow.get("title_primary") or "")
                         cand_tokens = _title_tokens(cand_title)
@@ -1594,6 +1621,9 @@ else:
                         high_sim_override_embed = (not bool(base_passes_gate)) and (
                             float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD)
                         )
+                        high_sim_override_neural = (not bool(base_passes_gate)) and (
+                            float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD)
+                        )
 
                         base = {
                             "anime_id": aid,
@@ -1608,12 +1638,37 @@ else:
                             "title_overlap": float(title_overlap),
                             "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
                             "synopsis_embed_sim": float(synopsis_embed_sim),
+                            "synopsis_neural_sim": float(synopsis_neural_sim),
                             "passes_gate": bool(base_passes_gate),
                             "synopsis_tfidf_high_sim_override": bool(high_sim_override_tfidf),
                             "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
+                            "synopsis_neural_high_sim_override": bool(high_sim_override_neural),
                             "cand_type": cand_type,
                             "cand_eps": cand_eps,
                         }
+
+                        # Neural-first pool (gated): Phase 5 semantic generalization.
+                        passes_gate_effective_neural = bool(base_passes_gate) or bool(high_sim_override_neural)
+                        if (
+                            semantic_mode in {"neural"}
+                            and bool(passes_gate_effective_neural)
+                            and bool(
+                                stage1_semantic_admission(
+                                    semantic_sim=float(synopsis_neural_sim),
+                                    min_sim=float(SYNOPSIS_NEURAL_MIN_SIM),
+                                    high_sim=float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD),
+                                    genre_overlap=float(weighted_overlap),
+                                    title_overlap=float(title_overlap),
+                                    seed_genres_count=int(seed_genres_count),
+                                    num_seeds=int(num_seeds),
+                                    theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
+                                ).admitted
+                            )
+                        ):
+                            item = dict(base)
+                            item["stage1_score"] = float(synopsis_neural_sim)
+                            stage1_neural_pool.append(item)
+                            continue
 
                         # Embeddings-first pool (gated): keep shortlist semantically seed-like.
                         passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)
@@ -1689,6 +1744,14 @@ else:
                             int(x.get("anime_id", 0)),
                         )
                     )
+                    stage1_neural_pool.sort(
+                        key=lambda x: (
+                            -float(x.get("synopsis_neural_sim", 0.0)),
+                            -float(x.get("weighted_overlap", 0.0)),
+                            -float(x.get("metadata_affinity", 0.0)),
+                            int(x.get("anime_id", 0)),
+                        )
+                    )
                     stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
                     # Phase 4 stabilization: Stage 1 mixture shortlist + semantic confidence gating.
@@ -1696,6 +1759,7 @@ else:
                     # Pool B: metadata/genre candidates
                     # Pool C: deterministic backfill if needed
                     pool_a: list[dict] = []
+                    pool_a.extend(stage1_neural_pool)
                     pool_a.extend(stage1_embed_pool)
                     pool_a.extend(stage1_tfidf_pool)
                     pool_b: list[dict] = list(stage1_fallback_pool)
@@ -1870,6 +1934,7 @@ else:
 
                         synopsis_tfidf_sim = float(c.get("synopsis_tfidf_sim", 0.0))
                         synopsis_embed_sim = float(c.get("synopsis_embed_sim", 0.0))
+                        synopsis_neural_sim = float(c.get("synopsis_neural_sim", 0.0))
                         passes_gate = bool(c.get("passes_gate", False))
                         high_sim_override_tfidf = (not bool(passes_gate)) and (
                             float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD)
@@ -1877,8 +1942,12 @@ else:
                         high_sim_override_embed = (not bool(passes_gate)) and (
                             float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD)
                         )
+                        high_sim_override_neural = (not bool(passes_gate)) and (
+                            float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD)
+                        )
                         passes_gate_effective_tfidf = bool(passes_gate) or bool(high_sim_override_tfidf)
                         passes_gate_effective_embed = bool(passes_gate) or bool(high_sim_override_embed)
+                        passes_gate_effective_neural = bool(passes_gate) or bool(high_sim_override_neural)
                         cand_eps = c.get("cand_eps")
 
                         # If we admitted a candidate via the high-sim override, treat it as a
@@ -1887,12 +1956,15 @@ else:
                         hybrid_val_for_scoring = float(hybrid_val)
                         hybrid_val_for_tfidf = float(hybrid_val)
                         hybrid_val_for_embed = float(hybrid_val)
-                        if bool(high_sim_override_tfidf) or bool(high_sim_override_embed):
+                        hybrid_val_for_neural = float(hybrid_val)
+                        if bool(high_sim_override_tfidf) or bool(high_sim_override_embed) or bool(high_sim_override_neural):
                             hybrid_val_for_scoring = max(0.0, float(hybrid_val))
                         if bool(high_sim_override_tfidf):
                             hybrid_val_for_tfidf = 0.0
                         if bool(high_sim_override_embed):
                             hybrid_val_for_embed = 0.0
+                        if bool(high_sim_override_neural):
+                            hybrid_val_for_neural = 0.0
 
                         synopsis_tfidf_bonus = 0.0
                         synopsis_tfidf_penalty = 0.0
@@ -1944,6 +2016,30 @@ else:
                                 )
                             synopsis_embed_adjustment = float(synopsis_embed_bonus + synopsis_embed_penalty)
 
+                        synopsis_neural_bonus = 0.0
+                        synopsis_neural_penalty = 0.0
+                        synopsis_neural_adjustment = 0.0
+                        if semantic_mode in {"neural"}:
+                            if bool(passes_gate_effective_neural):
+                                synopsis_neural_bonus = float(
+                                    synopsis_neural_bonus_for_candidate(
+                                        sim=synopsis_neural_sim,
+                                        hybrid_val=hybrid_val_for_neural,
+                                    )
+                                )
+
+                            if bool(high_sim_override_neural):
+                                synopsis_neural_penalty = -float(SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY)
+                            else:
+                                synopsis_neural_penalty = float(
+                                    synopsis_neural_penalty_for_candidate(
+                                        passes_gate=passes_gate,
+                                        sim=synopsis_neural_sim,
+                                        candidate_episodes=cand_eps,
+                                    )
+                                )
+                            synopsis_neural_adjustment = float(synopsis_neural_bonus + synopsis_neural_penalty)
+
                         # Optional tiny tie-breaker: demographics overlap (Stage 2 only; never gates).
                         if "demographics" in metadata.columns:
                             demo_bonus = demographics_overlap_tiebreak_bonus(
@@ -1956,7 +2052,7 @@ else:
                         # Optional tiny tie-breaker: themes overlap (Stage 2 only; never gates).
                         # No penalty for missing themes; only computed when Stage 1 overlap ratio exists.
                         theme_overlap = c.get("theme_overlap")
-                        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim))
+                        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim), float(synopsis_neural_sim))
                         theme_bonus = theme_stage2_tiebreak_bonus(
                             None if theme_overlap is None else float(theme_overlap),
                             semantic_sim=float(semantic_sim_for_theme),
@@ -1974,6 +2070,7 @@ else:
                             + meta_bonus
                             + synopsis_tfidf_adjustment
                             + synopsis_embed_adjustment
+                            + synopsis_neural_adjustment
                             + float(demo_bonus)
                             + float(theme_bonus)
                         )

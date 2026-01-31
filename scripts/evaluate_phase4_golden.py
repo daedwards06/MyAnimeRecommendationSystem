@@ -65,6 +65,14 @@ from src.app.synopsis_embeddings import (
     synopsis_embeddings_bonus_for_candidate,
     synopsis_embeddings_penalty_for_candidate,
 )
+from src.app.synopsis_neural_embeddings import (
+    compute_seed_similarity_map as compute_seed_neural_similarity_map,
+    SYNOPSIS_NEURAL_MIN_SIM,
+    SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD,
+    SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY,
+    synopsis_neural_bonus_for_candidate,
+    synopsis_neural_penalty_for_candidate,
+)
 
 from src.app.semantic_admission import stage1_semantic_admission, theme_overlap_ratio
 
@@ -427,6 +435,7 @@ def _seed_based_scores(
     exclude_ids: set[int] | None = None,
     synopsis_tfidf_artifact: Any | None = None,
     synopsis_embeddings_artifact: Any | None = None,
+    synopsis_neural_embeddings_artifact: Any | None = None,
     shortlist_size: int = 600,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not seed_ids:
@@ -460,16 +469,32 @@ def _seed_based_scores(
             "top50_mean_abs_rank_delta_embeddings": 0.0,
             "top20_moved_count_embeddings": 0,
             "top50_moved_count_embeddings": 0,
+            "neural_bonus_fired_count": 0,
+            "neural_bonus_mean": 0.0,
+            "neural_bonus_max": 0.0,
+            "top20_overlap_with_without_neural": 1.0,
+            "top50_overlap_with_without_neural": 1.0,
+            "top20_mean_abs_rank_delta_neural": 0.0,
+            "top50_mean_abs_rank_delta_neural": 0.0,
+            "top20_moved_count_neural": 0,
+            "top50_moved_count_neural": 0,
         }
 
-    # Semantic mode: embeddings (successor), tfidf (legacy), both, none.
-    # Default is deterministic and conservative: use BOTH when available so
-    # embeddings can help without regressing cases where TF-IDF still helps.
+    # Semantic mode:
+    # - neural: Phase 5 sentence-transformer embeddings (offline-built; runtime numpy-only)
+    # - embeddings: Phase 4 deterministic (local) embeddings successor
+    # - tfidf: Phase 4 legacy
+    # - both: embeddings + tfidf
+    # - none: disable semantic
     semantic_mode = str(os.environ.get("PHASE4_SEMANTIC_MODE", "")).strip().lower()
-    if semantic_mode not in {"embeddings", "tfidf", "both", "none", ""}:
+    if semantic_mode not in {"neural", "embeddings", "tfidf", "both", "none", ""}:
         semantic_mode = ""
     if not semantic_mode:
-        if synopsis_embeddings_artifact is not None and synopsis_tfidf_artifact is not None:
+        # Deterministic + conservative default.
+        # Prefer Phase 5 neural when present; otherwise keep Phase 4 behavior.
+        if synopsis_neural_embeddings_artifact is not None:
+            semantic_mode = "neural"
+        elif synopsis_embeddings_artifact is not None and synopsis_tfidf_artifact is not None:
             semantic_mode = "both"
         elif synopsis_embeddings_artifact is not None:
             semantic_mode = "embeddings"
@@ -486,12 +511,13 @@ def _seed_based_scores(
     # Phase 4 / Chunk A3: seed metadata affinity profile (used as a cold-start bonus only).
     seed_meta_profile = build_seed_metadata_profile(work, seed_ids=seed_ids)
 
-    # Phase 4: optional semantic similarity maps (TF-IDF legacy; embeddings successor).
+    # Phase 4/5: optional semantic similarity maps.
     synopsis_sims_by_id: dict[int, float] = {}
     embed_sims_by_id: dict[int, float] = {}
-    seed_type_target: str | None = None
+    neural_sims_by_id: dict[int, float] = {}
+
     try:
-        seed_type_target = most_common_seed_type(work, seed_ids)
+        seed_type_target: str | None = most_common_seed_type(work, seed_ids=seed_ids)
     except Exception:
         seed_type_target = None
 
@@ -506,6 +532,12 @@ def _seed_based_scores(
             embed_sims_by_id = compute_seed_embedding_similarity_map(synopsis_embeddings_artifact, seed_ids=seed_ids)
         except Exception:
             embed_sims_by_id = {}
+
+    if semantic_mode == "neural" and synopsis_neural_embeddings_artifact is not None:
+        try:
+            neural_sims_by_id = compute_seed_neural_similarity_map(synopsis_neural_embeddings_artifact, seed_ids=seed_ids)
+        except Exception:
+            neural_sims_by_id = {}
 
     seed_genre_map: dict[str, set[str]] = {}
     all_seed_genres: set[str] = set()
@@ -555,6 +587,7 @@ def _seed_based_scores(
     # the shortlist seed-conditioned before allowing hybrid/MF priors in Stage 2.
     stage1_embed_pool: list[dict[str, Any]] = []
     stage1_tfidf_pool: list[dict[str, Any]] = []
+    stage1_neural_pool: list[dict[str, Any]] = []
     stage1_fallback_pool: list[dict[str, Any]] = []
 
     seed_genres_count = int(len(all_seed_genres))
@@ -568,6 +601,10 @@ def _seed_based_scores(
     embed_semantic_blocked_by_policy = 0
     tfidf_semantic_old_admit = 0
     tfidf_semantic_policy_admit = 0
+
+    neural_semantic_old_admit = 0
+    neural_semantic_policy_admit = 0
+    neural_semantic_blocked_by_policy = 0
     tfidf_semantic_blocked_by_policy = 0
 
     admitted_by_lane_A_count = 0
@@ -579,6 +616,7 @@ def _seed_based_scores(
     # Keep a small, deterministic sample of the highest-similarity blocked candidates.
     blocked_embed_top: list[dict[str, Any]] = []
     blocked_tfidf_top: list[dict[str, Any]] = []
+    blocked_neural_top: list[dict[str, Any]] = []
 
     # Keep a small, deterministic sample of Lane A admissions.
     laneA_admitted_examples_top: list[dict[str, Any]] = []
@@ -597,10 +635,19 @@ def _seed_based_scores(
     except Exception:
         false_neg_tfidf_sim = 0.08
 
+    try:
+        false_neg_neural_sim = float(
+            os.environ.get("PHASE5_FALSE_NEG_NEURAL_SIM", str(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD))
+        )
+    except Exception:
+        false_neg_neural_sim = float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD)
+
     embed_semantic_blocked_high_sim = 0
     tfidf_semantic_blocked_high_sim = 0
     blocked_embed_high_sim_top: list[dict[str, Any]] = []
     blocked_tfidf_high_sim_top: list[dict[str, Any]] = []
+    blocked_neural_high_sim_top: list[dict[str, Any]] = []
+    neural_semantic_blocked_high_sim = 0
 
     def _push_top_blocked(dst: list[dict[str, Any]], entry: dict[str, Any], *, max_n: int = 12) -> None:
         dst.append(entry)
@@ -616,6 +663,7 @@ def _seed_based_scores(
 
     stage1_off_type_allowed_sims: list[float] = []
     stage1_off_type_allowed_embed_sims: list[float] = []
+    stage1_off_type_allowed_neural_sims: list[float] = []
 
     for _, row in work.iterrows():
         aid = int(row["anime_id"])
@@ -647,6 +695,7 @@ def _seed_based_scores(
 
         synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
         synopsis_embed_sim = float(embed_sims_by_id.get(aid, 0.0))
+        synopsis_neural_sim = float(neural_sims_by_id.get(aid, 0.0))
 
         cand_title = str(row.get("title_display") or row.get("title_primary") or "")
         cand_tokens = _title_tokens(cand_title)
@@ -669,6 +718,7 @@ def _seed_based_scores(
 
         high_sim_override_tfidf = (not bool(base_passes_gate)) and (float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD))
         high_sim_override_embed = (not bool(base_passes_gate)) and (float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
+        high_sim_override_neural = (not bool(base_passes_gate)) and (float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD))
 
         base = {
             "anime_id": aid,
@@ -690,12 +740,98 @@ def _seed_based_scores(
                 "synopsis_tfidf_high_sim_override": bool(high_sim_override_tfidf),
                 "synopsis_embed_sim": float(synopsis_embed_sim),
                 "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
+                "synopsis_neural_sim": float(synopsis_neural_sim),
+                "synopsis_neural_high_sim_override": bool(high_sim_override_neural),
                 "overlap_per_seed": overlap_per_seed,
             },
         }
 
+        # Pool A0: neural sentence-transformer neighbors (gated)
+        if semantic_mode == "neural":
+            passes_gate_effective_neural = bool(base_passes_gate) or bool(high_sim_override_neural)
+
+            neural_decision = stage1_semantic_admission(
+                semantic_sim=float(synopsis_neural_sim),
+                min_sim=float(SYNOPSIS_NEURAL_MIN_SIM),
+                high_sim=float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD),
+                genre_overlap=float(weighted_overlap),
+                title_overlap=float(title_overlap),
+                seed_genres_count=int(seed_genres_count),
+                num_seeds=int(num_seeds),
+                theme_overlap=themes_overlap,
+            )
+
+            if bool(passes_gate_effective_neural):
+                if neural_decision.admitted:
+                    if neural_decision.lane == "A":
+                        admitted_by_lane_A_count += 1
+                        if bool(neural_decision.used_theme_override):
+                            admitted_by_theme_override_count += 1
+
+                        laneA_entry = {
+                            "anime_id": int(aid),
+                            "title": str(row.get("title_display") or ""),
+                            "source": "neural",
+                            "sim": float(synopsis_neural_sim),
+                            "weighted_overlap": float(weighted_overlap),
+                            "theme_overlap": None if themes_overlap is None else float(themes_overlap),
+                            "title_overlap": float(title_overlap),
+                            "low_genre_overlap": float(neural_decision.low_genre_overlap),
+                            "used_theme_override": bool(neural_decision.used_theme_override),
+                            "rescued_from_overlap_ge_050": bool(
+                                float(weighted_overlap) < 0.50 and float(title_overlap) < 0.50
+                            ),
+                            "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                            "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
+                        }
+                        _push_top_laneA_admit(laneA_admitted_examples_top, laneA_entry, max_n=12)
+                    elif neural_decision.lane == "B":
+                        admitted_by_lane_B_count += 1
+                else:
+                    if neural_decision.lane == "blocked_overlap":
+                        blocked_due_to_overlap_count += 1
+                    elif neural_decision.lane == "blocked_low_sim":
+                        blocked_due_to_low_sim_count += 1
+
+            neural_sem_base_ok = bool(passes_gate_effective_neural) and float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_MIN_SIM)
+            neural_sem_old_ok = bool(neural_sem_base_ok) and (float(weighted_overlap) > 0.0 or float(title_overlap) >= 0.50)
+            neural_sem_policy_ok = bool(neural_sem_base_ok) and bool(neural_decision.admitted)
+            if bool(neural_sem_old_ok):
+                neural_semantic_old_admit += 1
+            if bool(neural_sem_policy_ok):
+                neural_semantic_policy_admit += 1
+            if bool(neural_sem_old_ok) and (not bool(neural_sem_policy_ok)):
+                neural_semantic_blocked_by_policy += 1
+                blocked_entry = {
+                    "anime_id": int(aid),
+                    "title": str(row.get("title_display") or ""),
+                    "source": "neural",
+                    "sim": float(synopsis_neural_sim),
+                    "weighted_overlap": float(weighted_overlap),
+                    "theme_overlap": None if themes_overlap is None else float(themes_overlap),
+                    "title_overlap": float(title_overlap),
+                    "low_genre_overlap": float(neural_decision.low_genre_overlap),
+                    "type": None if pd.isna(row.get("type")) else str(row.get("type")).strip(),
+                    "episodes": None if pd.isna(row.get("episodes")) else int(row.get("episodes")),
+                }
+                _push_top_blocked(blocked_neural_top, blocked_entry)
+                if float(synopsis_neural_sim) >= float(false_neg_neural_sim):
+                    neural_semantic_blocked_high_sim += 1
+                    _push_top_blocked(blocked_neural_high_sim_top, blocked_entry, max_n=20)
+
+            if bool(passes_gate_effective_neural) and bool(neural_decision.admitted):
+                item = dict(base)
+                item["stage1_score"] = float(synopsis_neural_sim)
+                stage1_neural_pool.append(item)
+                if bool(high_sim_override_neural):
+                    stage1_off_type_allowed_neural_sims.append(float(synopsis_neural_sim))
+                continue
+
         # Pool A0: embeddings neighbors (gated) – use similarity as the primary Stage 1 rank.
-        passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)
+        if semantic_mode not in {"embeddings", "both"}:
+            passes_gate_effective_embed = False
+        else:
+            passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)
 
         embed_decision = stage1_semantic_admission(
             semantic_sim=float(synopsis_embed_sim),
@@ -780,7 +916,10 @@ def _seed_based_scores(
             continue
 
         # Pool A: TF-IDF neighbors (gated) – use similarity as the primary Stage 1 rank.
-        passes_gate_effective_tfidf = bool(base_passes_gate) or bool(high_sim_override_tfidf)
+        if semantic_mode not in {"tfidf", "both"}:
+            passes_gate_effective_tfidf = False
+        else:
+            passes_gate_effective_tfidf = bool(base_passes_gate) or bool(high_sim_override_tfidf)
 
         tfidf_decision = stage1_semantic_admission(
             semantic_sim=float(synopsis_tfidf_sim),
@@ -892,6 +1031,14 @@ def _seed_based_scores(
             int(x.get("anime_id", 0)),
         )
     )
+    stage1_neural_pool.sort(
+        key=lambda x: (
+            -float((x.get("_stage1") or {}).get("synopsis_neural_sim", 0.0)),
+            -float((x.get("_stage1") or {}).get("weighted_overlap", 0.0)),
+            -float((x.get("_stage1") or {}).get("metadata_affinity", 0.0)),
+            int(x.get("anime_id", 0)),
+        )
+    )
     stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
     stage1_gate_blocking_diagnostics = {
@@ -905,6 +1052,11 @@ def _seed_based_scores(
         "tfidf_semantic_blocked_by_policy_count": int(tfidf_semantic_blocked_by_policy),
         "tfidf_semantic_blocked_by_policy_rate": float(tfidf_semantic_blocked_by_policy)
         / float(max(1, tfidf_semantic_old_admit)),
+        "neural_semantic_old_admit_count": int(neural_semantic_old_admit),
+        "neural_semantic_policy_admit_count": int(neural_semantic_policy_admit),
+        "neural_semantic_blocked_by_policy_count": int(neural_semantic_blocked_by_policy),
+        "neural_semantic_blocked_by_policy_rate": float(neural_semantic_blocked_by_policy)
+        / float(max(1, neural_semantic_old_admit)),
         "admitted_by_lane_A_count": int(admitted_by_lane_A_count),
         "admitted_by_lane_B_count": int(admitted_by_lane_B_count),
         "admitted_by_theme_override_count": int(admitted_by_theme_override_count),
@@ -914,24 +1066,32 @@ def _seed_based_scores(
         "blocked_high_sim_overlap_025_0333_top": list(blocked_high_sim_overlap_025_0333),
         "embed_semantic_blocked_top": list(blocked_embed_top),
         "tfidf_semantic_blocked_top": list(blocked_tfidf_top),
+        "neural_semantic_blocked_top": list(blocked_neural_top),
         "false_neg_embed_sim_threshold": float(false_neg_embed_sim),
         "false_neg_tfidf_sim_threshold": float(false_neg_tfidf_sim),
+        "false_neg_neural_sim_threshold": float(false_neg_neural_sim),
         "embed_semantic_blocked_high_sim_count": int(embed_semantic_blocked_high_sim),
         "tfidf_semantic_blocked_high_sim_count": int(tfidf_semantic_blocked_high_sim),
+        "neural_semantic_blocked_high_sim_count": int(neural_semantic_blocked_high_sim),
         "embed_semantic_blocked_high_sim_top": list(blocked_embed_high_sim_top),
         "tfidf_semantic_blocked_high_sim_top": list(blocked_tfidf_high_sim_top),
+        "neural_semantic_blocked_high_sim_top": list(blocked_neural_high_sim_top),
     }
 
     shortlist_k = max(0, int(shortlist_size))
-    stage1_total_candidates = int(len(stage1_embed_pool) + len(stage1_tfidf_pool) + len(stage1_fallback_pool))
+    stage1_total_candidates = int(
+        len(stage1_neural_pool) + len(stage1_embed_pool) + len(stage1_tfidf_pool) + len(stage1_fallback_pool)
+    )
     # Phase 4 stabilization: Stage 1 mixture shortlist + semantic confidence gating.
-    # Pool A: semantic neighbors (embeddings and/or TF-IDF; seed-conditioned)
+    # Pool A: semantic neighbors (neural OR embeddings/tfidf; seed-conditioned)
     # Pool B: seed-conditioned metadata/genre candidates
     # Pool C: deterministic backfill if A/B are insufficient
     use_embed = semantic_mode in {"embeddings", "both"}
     use_tfidf = semantic_mode in {"tfidf", "both"}
-
+    use_neural = semantic_mode in {"neural"}
     pool_a: list[dict[str, Any]] = []
+    if bool(use_neural):
+        pool_a.extend(stage1_neural_pool)
     if bool(use_embed):
         pool_a.extend(stage1_embed_pool)
     if bool(use_tfidf):
@@ -969,6 +1129,7 @@ def _seed_based_scores(
 
     embed_stats = _topk_sim_stats(embed_sims_by_id, k=50) if bool(use_embed) else {"count": 0, "mean": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
     tfidf_stats = _topk_sim_stats(synopsis_sims_by_id, k=50) if bool(use_tfidf) else {"count": 0, "mean": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
+    neural_stats = _topk_sim_stats(neural_sims_by_id, k=50) if bool(use_neural) else {"count": 0, "mean": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
 
     def _neighbor_coherence(pool: list[dict[str, Any]], *, k: int = 50) -> dict[str, Any]:
         top = pool[: max(0, int(k))]
@@ -986,6 +1147,7 @@ def _seed_based_scores(
 
     embed_coherence = _neighbor_coherence(stage1_embed_pool, k=50) if bool(use_embed) else {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
     tfidf_coherence = _neighbor_coherence(stage1_tfidf_pool, k=50) if bool(use_tfidf) else {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
+    neural_coherence = _neighbor_coherence(stage1_neural_pool, k=50) if bool(use_neural) else {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
 
     semantic_conf_source = "none"
     semantic_conf_score = 0.0
@@ -1002,7 +1164,12 @@ def _seed_based_scores(
         any_s = max(0.0, min(1.0, any_match / 0.80))
         return float((overlap_s + seedcov_s + any_s) / 3.0)
 
-    if bool(use_embed) and int(embed_stats.get("count", 0)) > 0:
+    if bool(use_neural) and int(neural_stats.get("count", 0)) > 0:
+        semantic_conf_source = "neural"
+        sim_conf = _conf_score(neural_stats, min_sim=float(SYNOPSIS_NEURAL_MIN_SIM), high_sim=float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD))
+        coh_conf = _coherence_score(neural_coherence)
+        semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
+    elif bool(use_embed) and int(embed_stats.get("count", 0)) > 0:
         semantic_conf_source = "embeddings"
         sim_conf = _conf_score(embed_stats, min_sim=float(SYNOPSIS_EMBEDDINGS_MIN_SIM), high_sim=float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
         coh_conf = _coherence_score(embed_coherence)
@@ -1114,6 +1281,7 @@ def _seed_based_scores(
         meta_affinity = float((c.get("_stage1") or {}).get("metadata_affinity", 0.0))
         synopsis_tfidf_sim = float((c.get("_stage1") or {}).get("synopsis_tfidf_sim", 0.0))
         synopsis_embed_sim = float((c.get("_stage1") or {}).get("synopsis_embed_sim", 0.0))
+        synopsis_neural_sim = float((c.get("_stage1") or {}).get("synopsis_neural_sim", 0.0))
         overlap_per_seed = (c.get("_stage1") or {}).get("overlap_per_seed") or {}
 
         pop_pct = _pop_pct(pop_pct_by_id, aid)
@@ -1141,8 +1309,10 @@ def _seed_based_scores(
         )
         high_sim_override_tfidf = (not bool(passes_gate)) and (float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD))
         high_sim_override_embed = (not bool(passes_gate)) and (float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
+        high_sim_override_neural = (not bool(passes_gate)) and (float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD))
         passes_gate_effective_tfidf = bool(passes_gate) or bool(high_sim_override_tfidf)
         passes_gate_effective_embed = bool(passes_gate) or bool(high_sim_override_embed)
+        passes_gate_effective_neural = bool(passes_gate) or bool(high_sim_override_neural)
 
         # If we admitted a candidate via the high-sim override, treat it as a
         # cold-start-ish semantic neighbor for TF-IDF coefficient selection and
@@ -1150,12 +1320,15 @@ def _seed_based_scores(
         hybrid_val_for_scoring = float(hybrid_val)
         hybrid_val_for_tfidf = float(hybrid_val)
         hybrid_val_for_embed = float(hybrid_val)
-        if bool(high_sim_override_tfidf) or bool(high_sim_override_embed):
+        hybrid_val_for_neural = float(hybrid_val)
+        if bool(high_sim_override_tfidf) or bool(high_sim_override_embed) or bool(high_sim_override_neural):
             hybrid_val_for_scoring = max(0.0, float(hybrid_val))
         if bool(high_sim_override_tfidf):
             hybrid_val_for_tfidf = 0.0
         if bool(high_sim_override_embed):
             hybrid_val_for_embed = 0.0
+        if bool(high_sim_override_neural):
+            hybrid_val_for_neural = 0.0
 
         synopsis_tfidf_bonus = 0.0
         synopsis_tfidf_penalty = 0.0
@@ -1207,6 +1380,30 @@ def _seed_based_scores(
                 )
             synopsis_embed_adjustment = float(synopsis_embed_bonus + synopsis_embed_penalty)
 
+        synopsis_neural_bonus = 0.0
+        synopsis_neural_penalty = 0.0
+        synopsis_neural_adjustment = 0.0
+        if semantic_mode == "neural":
+            if bool(passes_gate_effective_neural):
+                synopsis_neural_bonus = float(
+                    synopsis_neural_bonus_for_candidate(
+                        sim=synopsis_neural_sim,
+                        hybrid_val=hybrid_val_for_neural,
+                    )
+                )
+
+            if bool(high_sim_override_neural):
+                synopsis_neural_penalty = -float(SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY)
+            else:
+                synopsis_neural_penalty = float(
+                    synopsis_neural_penalty_for_candidate(
+                        passes_gate=passes_gate,
+                        sim=synopsis_neural_sim,
+                        candidate_episodes=cand_eps_val,
+                    )
+                )
+            synopsis_neural_adjustment = float(synopsis_neural_bonus + synopsis_neural_penalty)
+
         # Optional tiny tie-breaker: demographics overlap (Stage 2 only; never gates).
         if "demographics" in work.columns:
             seed_demo = seed_meta_profile.demographics
@@ -1218,7 +1415,7 @@ def _seed_based_scores(
 
         # Optional tiny tie-breaker: themes overlap (Stage 2 only; never gates).
         theme_overlap = (c.get("_stage1") or {}).get("theme_overlap")
-        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim))
+        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim), float(synopsis_neural_sim))
         theme_bonus = theme_stage2_tiebreak_bonus(
             None if theme_overlap is None else float(theme_overlap),
             semantic_sim=float(semantic_sim_for_theme),
@@ -1234,6 +1431,7 @@ def _seed_based_scores(
             + meta_bonus
             + synopsis_tfidf_adjustment
             + synopsis_embed_adjustment
+            + synopsis_neural_adjustment
             + float(demo_bonus)
             + float(theme_bonus)
         )
@@ -1267,11 +1465,17 @@ def _seed_based_scores(
                     "synopsis_embed_penalty": float(synopsis_embed_penalty),
                     "synopsis_embed_adjustment": float(synopsis_embed_adjustment),
                     "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
+                    "synopsis_neural_sim": float(synopsis_neural_sim),
+                    "synopsis_neural_bonus": float(synopsis_neural_bonus),
+                    "synopsis_neural_penalty": float(synopsis_neural_penalty),
+                    "synopsis_neural_adjustment": float(synopsis_neural_adjustment),
+                    "synopsis_neural_high_sim_override": bool(high_sim_override_neural),
                     "demographics_overlap_bonus": float(demo_bonus),
                     "theme_overlap": None if theme_overlap is None else float(theme_overlap),
                     "theme_stage2_bonus": float(theme_bonus),
                     "score_without_synopsis_tfidf_bonus": float(score - synopsis_tfidf_adjustment),
                     "score_without_synopsis_embeddings_bonus": float(score - synopsis_embed_adjustment),
+                    "score_without_synopsis_neural_bonus": float(score - synopsis_neural_adjustment),
                     "overlap_per_seed": overlap_per_seed,
                 },
             }
@@ -1293,6 +1497,13 @@ def _seed_based_scores(
         scored,
         key=lambda x: (
             -float(x.get("signals", {}).get("score_without_synopsis_embeddings_bonus", 0.0)),
+            int(x["anime_id"]),
+        ),
+    )
+    scored_without_neural = sorted(
+        scored,
+        key=lambda x: (
+            -float(x.get("signals", {}).get("score_without_synopsis_neural_bonus", 0.0)),
             int(x["anime_id"]),
         ),
     )
@@ -1332,6 +1543,9 @@ def _seed_based_scores(
     without_embed20 = _top_ids(scored_without_embeddings, 20)
     without_embed50 = _top_ids(scored_without_embeddings, 50)
 
+    without_neural20 = _top_ids(scored_without_neural, 20)
+    without_neural50 = _top_ids(scored_without_neural, 50)
+
     top20_mean_abs_delta, top20_moved = _rank_diagnostics(with20, without20)
     top50_mean_abs_delta, top50_moved = _rank_diagnostics(with50, without50)
 
@@ -1340,6 +1554,9 @@ def _seed_based_scores(
 
     top20_mean_abs_delta_embed, top20_moved_embed = _rank_diagnostics(with20, without_embed20)
     top50_mean_abs_delta_embed, top50_moved_embed = _rank_diagnostics(with50, without_embed50)
+
+    top20_mean_abs_delta_neural, top20_moved_neural = _rank_diagnostics(with20, without_neural20)
+    top50_mean_abs_delta_neural, top50_moved_neural = _rank_diagnostics(with50, without_neural50)
 
     recs_top_n = scored_with_meta[:top_n]
 
@@ -1406,6 +1623,13 @@ def _seed_based_scores(
     ]
     embed_fired = [b for b in embed_bonuses if float(b) > 0.0]
 
+    neural_bonuses = [
+        float((r.get("signals") or {}).get("synopsis_neural_bonus", 0.0))
+        for r in recs_top_n
+        if r.get("signals") is not None
+    ]
+    neural_fired = [b for b in neural_bonuses if float(b) > 0.0]
+
     # Seed-conditioning diagnostics for Option A shortlist
     top20 = recs_top_n[:20]
     top20_pool_a = sum(1 for r in top20 if str((r.get("signals") or {}).get("stage1_pool", "")) == "A")
@@ -1417,11 +1641,15 @@ def _seed_based_scores(
     top20_embed_nonzero = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_embed_sim", 0.0)) > 0.0)
     top20_embed_ge_min = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_embed_sim", 0.0)) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM))
 
+    top20_neural_nonzero = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_neural_sim", 0.0)) > 0.0)
+    top20_neural_ge_min = sum(1 for r in top20 if float((r.get("signals") or {}).get("synopsis_neural_sim", 0.0)) >= float(SYNOPSIS_NEURAL_MIN_SIM))
+
     # Off-type here means: fails the conservative base gate (same type OR episodes>=min).
     top20_off_type = sum(1 for r in top20 if not bool((r.get("signals") or {}).get("synopsis_tfidf_base_gate_passed", True)))
 
     shortlist_from_tfidf = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_tfidf_sim", 0.0)) >= 0.02)
     shortlist_from_embed = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_embed_sim", 0.0)) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM))
+    shortlist_from_neural = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_neural_sim", 0.0)) >= float(SYNOPSIS_NEURAL_MIN_SIM))
 
     stage1_off_type_allowed_count = int(len(stage1_off_type_allowed_sims))
     if stage1_off_type_allowed_sims:
@@ -1442,6 +1670,16 @@ def _seed_based_scores(
         e_min = 0.0
         e_mean = 0.0
         e_max = 0.0
+
+    stage1_off_type_allowed_neural_count = int(len(stage1_off_type_allowed_neural_sims))
+    if stage1_off_type_allowed_neural_sims:
+        n_min = float(min(stage1_off_type_allowed_neural_sims))
+        n_mean = float(sum(stage1_off_type_allowed_neural_sims) / len(stage1_off_type_allowed_neural_sims))
+        n_max = float(max(stage1_off_type_allowed_neural_sims))
+    else:
+        n_min = 0.0
+        n_mean = 0.0
+        n_max = 0.0
 
     top20_embed_sims = [float((r.get("signals") or {}).get("synopsis_embed_sim", 0.0)) for r in top20]
     top20_embed_sims_nz = [s for s in top20_embed_sims if float(s) > 0.0]
@@ -1471,11 +1709,17 @@ def _seed_based_scores(
         "tfidf_top50_p95": float(tfidf_stats.get("p95", 0.0)),
         "tfidf_top50_weighted_overlap_mean": float(tfidf_coherence.get("weighted_overlap_mean", 0.0)),
         "tfidf_top50_any_genre_match_frac": float(tfidf_coherence.get("any_genre_match_frac", 0.0)),
+        "neural_top50_count": int(neural_stats.get("count", 0)),
+        "neural_top50_mean": float(neural_stats.get("mean", 0.0)),
+        "neural_top50_p95": float(neural_stats.get("p95", 0.0)),
+        "neural_top50_weighted_overlap_mean": float(neural_coherence.get("weighted_overlap_mean", 0.0)),
+        "neural_top50_any_genre_match_frac": float(neural_coherence.get("any_genre_match_frac", 0.0)),
         "top20_poolA_count": int(top20_pool_a),
         "top20_poolB_count": int(top20_pool_b),
         "top20_poolC_count": int(top20_pool_c),
         "stage1_shortlist_target": int(shortlist_k) if shortlist_k > 0 else int(stage1_total_candidates),
         "stage1_shortlist_size": int(len(shortlist)),
+        "stage1_shortlist_from_neural_count": int(shortlist_from_neural),
         "stage1_shortlist_from_embeddings_count": int(shortlist_from_embed),
         "stage1_shortlist_from_tfidf_count": int(shortlist_from_tfidf),
         "stage1_off_type_allowed_count": int(stage1_off_type_allowed_count),
@@ -1486,11 +1730,17 @@ def _seed_based_scores(
         "stage1_off_type_allowed_embeddings_sim_min": float(e_min),
         "stage1_off_type_allowed_embeddings_sim_mean": float(e_mean),
         "stage1_off_type_allowed_embeddings_sim_max": float(e_max),
+        "stage1_off_type_allowed_neural_count": int(stage1_off_type_allowed_neural_count),
+        "stage1_off_type_allowed_neural_sim_min": float(n_min),
+        "stage1_off_type_allowed_neural_sim_mean": float(n_mean),
+        "stage1_off_type_allowed_neural_sim_max": float(n_max),
         "top20_embedding_nonzero_count": int(top20_embed_nonzero),
         "top20_embedding_ge_min_sim_count": int(top20_embed_ge_min),
         "top20_embedding_sim_min": float(top20_embed_sim_min),
         "top20_embedding_sim_mean": float(top20_embed_sim_mean),
         "top20_embedding_sim_max": float(top20_embed_sim_max),
+        "top20_neural_nonzero_count": int(top20_neural_nonzero),
+        "top20_neural_ge_min_sim_count": int(top20_neural_ge_min),
         "top20_tfidf_nonzero_count": int(top20_tfidf_nonzero),
         "top20_tfidf_ge_min_sim_count": int(top20_tfidf_ge_min),
         "top20_off_type_count": int(top20_off_type),
@@ -1505,6 +1755,9 @@ def _seed_based_scores(
         "embedding_bonus_fired_count": int(len(embed_fired)),
         "embedding_bonus_mean": float(sum(embed_bonuses) / max(1, len(embed_bonuses))),
         "embedding_bonus_max": float(max(embed_bonuses) if embed_bonuses else 0.0),
+        "neural_bonus_fired_count": int(len(neural_fired)),
+        "neural_bonus_mean": float(sum(neural_bonuses) / max(1, len(neural_bonuses))),
+        "neural_bonus_max": float(max(neural_bonuses) if neural_bonuses else 0.0),
 
         "theme_bonus_fired_count_top20": int(len(theme_fired_20)),
         "theme_bonus_mean_top20": float(sum(theme_bonuses_20) / max(1, len(theme_bonuses_20))),
@@ -1532,6 +1785,12 @@ def _seed_based_scores(
         "top50_mean_abs_rank_delta_embeddings": float(top50_mean_abs_delta_embed),
         "top20_moved_count_embeddings": int(top20_moved_embed),
         "top50_moved_count_embeddings": int(top50_moved_embed),
+        "top20_overlap_with_without_neural": _overlap_ratio(with20, without_neural20),
+        "top50_overlap_with_without_neural": _overlap_ratio(with50, without_neural50),
+        "top20_mean_abs_rank_delta_neural": float(top20_mean_abs_delta_neural),
+        "top50_mean_abs_rank_delta_neural": float(top50_mean_abs_delta_neural),
+        "top20_moved_count_neural": int(top20_moved_neural),
+        "top50_moved_count_neural": int(top50_moved_neural),
     }
 
     # Stage 1 semantic admission diagnostics (blocked-by-overlap rates + examples).
@@ -1556,6 +1815,7 @@ def _evaluate_golden_queries(
 
     synopsis_tfidf_artifact = bundle.get("models", {}).get("synopsis_tfidf")
     synopsis_embeddings_artifact = bundle.get("models", {}).get("synopsis_embeddings")
+    synopsis_neural_embeddings_artifact = bundle.get("models", {}).get("synopsis_neural_embeddings")
 
     # Phase 4 / Chunk A2: apply app-like ranked candidate hygiene in golden harness.
     ranked_hygiene_exclude_ids = build_ranked_candidate_hygiene_exclude_ids(metadata)
@@ -1606,6 +1866,7 @@ def _evaluate_golden_queries(
             exclude_ids=ranked_hygiene_exclude_ids,
             synopsis_tfidf_artifact=synopsis_tfidf_artifact,
             synopsis_embeddings_artifact=synopsis_embeddings_artifact,
+            synopsis_neural_embeddings_artifact=synopsis_neural_embeddings_artifact,
         )
 
         violations: list[dict[str, Any]] = []
