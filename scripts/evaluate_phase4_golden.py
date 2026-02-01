@@ -38,6 +38,13 @@ from src.app.recommender import HybridComponents, HybridRecommender, choose_weig
 from src.app.search import fuzzy_search
 from src.app.diversity import compute_popularity_percentiles
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
+from src.app.constants import FORCE_NEURAL_MIN_SIM, FORCE_NEURAL_TOPK
+from src.app.stage1_shortlist import (
+    build_stage1_shortlist,
+    force_neural_enabled,
+    forced_pool_stats,
+    select_forced_neural_pairs,
+)
 from src.app.metadata_features import (
     METADATA_AFFINITY_COLD_START_COEF,
     METADATA_AFFINITY_TRAINED_COEF,
@@ -429,6 +436,7 @@ def _pop_pct(pop_pct_by_id: dict[int, float], anime_id: int) -> float:
 
 def _seed_based_scores(
     *,
+    query_id: str | None = None,
     metadata: pd.DataFrame,
     components: HybridComponents,
     recommender: HybridRecommender,
@@ -540,7 +548,14 @@ def _seed_based_scores(
 
     if semantic_mode == "neural" and synopsis_neural_embeddings_artifact is not None:
         try:
-            neural_sims_by_id = compute_seed_neural_similarity_map(synopsis_neural_embeddings_artifact, seed_ids=seed_ids)
+            min_sim_neural = float(SYNOPSIS_NEURAL_MIN_SIM)
+            if bool(force_neural_enabled(semantic_mode=semantic_mode)):
+                min_sim_neural = float(min(float(min_sim_neural), float(FORCE_NEURAL_MIN_SIM)))
+            neural_sims_by_id = compute_seed_neural_similarity_map(
+                synopsis_neural_embeddings_artifact,
+                seed_ids=seed_ids,
+                min_sim=float(min_sim_neural),
+            )
         except Exception:
             neural_sims_by_id = {}
 
@@ -593,10 +608,24 @@ def _seed_based_scores(
     stage1_embed_pool: list[dict[str, Any]] = []
     stage1_tfidf_pool: list[dict[str, Any]] = []
     stage1_neural_pool: list[dict[str, Any]] = []
+    stage1_forced_neural_pool: list[dict[str, Any]] = []
     stage1_fallback_pool: list[dict[str, Any]] = []
 
     seed_genres_count = int(len(all_seed_genres))
     seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
+
+    forced_neural_pairs: list[tuple[int, float]] = []
+    forced_neural_ids: set[int] = set()
+    if semantic_mode == "neural" and bool(force_neural_enabled(semantic_mode=semantic_mode)) and bool(neural_sims_by_id):
+        forced_neural_pairs = select_forced_neural_pairs(
+            neural_sims_by_id,
+            seed_ids=seed_ids,
+            exclude_ids=set(exclude_ids),
+            watched_ids=None,
+            topk=int(FORCE_NEURAL_TOPK),
+            min_sim=float(FORCE_NEURAL_MIN_SIM),
+        )
+        forced_neural_ids = {int(aid) for aid, _ in forced_neural_pairs}
 
     # Phase 5 diagnostics: demographics-aware admission is sparse and must never
     # penalize missingness.
@@ -754,9 +783,27 @@ def _seed_based_scores(
                 "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
                 "synopsis_neural_sim": float(synopsis_neural_sim),
                 "synopsis_neural_high_sim_override": bool(high_sim_override_neural),
+                "forced_neural": bool(aid in forced_neural_ids),
                 "overlap_per_seed": overlap_per_seed,
             },
         }
+
+        # Phase 5 refinement: force-include top-K neural neighbors into Stage 1 shortlist.
+        # This bypasses only the type/episodes gate; ranked hygiene exclusions were already
+        # applied via exclude_ids above.
+        if (
+            semantic_mode == "neural"
+            and bool((base.get("_stage1") or {}).get("forced_neural"))
+            and float(synopsis_neural_sim) >= float(FORCE_NEURAL_MIN_SIM)
+        ):
+            forced_item = dict(base)
+            forced_item["stage1_score"] = float(synopsis_neural_sim)
+            stage1_forced_neural_pool.append(forced_item)
+
+            # Ensure the existing off-type admission diagnostics reflect that off-type
+            # candidates can enter via the force pool (not only via HIGH_SIM overrides).
+            if (not bool(base_passes_gate)) and (not bool(high_sim_override_neural)):
+                stage1_off_type_allowed_neural_sims.append(float(synopsis_neural_sim))
 
         # Pool A0: neural sentence-transformer neighbors (gated)
         if semantic_mode == "neural":
@@ -1067,6 +1114,9 @@ def _seed_based_scores(
             int(x.get("anime_id", 0)),
         )
     )
+    stage1_forced_neural_pool.sort(
+        key=lambda x: (-float((x.get("_stage1") or {}).get("synopsis_neural_sim", 0.0)), int(x.get("anime_id", 0)))
+    )
     stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
     stage1_gate_blocking_diagnostics = {
@@ -1220,9 +1270,16 @@ def _seed_based_scores(
 
     # Deterministically allocate shortlist budget between semantic neighbors (A) and metadata/genre candidates (B).
     if shortlist_k <= 0:
-        shortlist = pool_a + pool_b
         stage1_k_sem = int(len(pool_a))
         stage1_k_meta = int(len(pool_b))
+        shortlist, forced_added_count = build_stage1_shortlist(
+            pool_a=pool_a,
+            pool_b=pool_b,
+            shortlist_k=int(len(pool_a) + len(pool_b) + len(stage1_forced_neural_pool)),
+            k_sem=int(stage1_k_sem),
+            k_meta=int(stage1_k_meta),
+            forced_first=stage1_forced_neural_pool,
+        )
     else:
         # Keep a robust mixture even when semantic confidence is high.
         if semantic_conf_tier == "high":
@@ -1238,58 +1295,14 @@ def _seed_based_scores(
         stage1_k_sem = max(0, min(int(shortlist_k), int(stage1_k_sem)))
         stage1_k_meta = int(shortlist_k) - int(stage1_k_sem)
 
-        shortlist = []
-        seen_ids = set()
-        a_taken = 0
-        b_taken = 0
-        c_taken = 0
-
-        a_i = 0
-        while a_i < len(pool_a) and a_taken < int(stage1_k_sem) and len(shortlist) < int(shortlist_k):
-            it = pool_a[a_i]
-            a_i += 1
-            aid = int(it.get("anime_id", 0))
-            if aid in seen_ids:
-                continue
-            (it.get("_stage1") or {}).update({"pool": "A"})
-            shortlist.append(it)
-            seen_ids.add(aid)
-            a_taken += 1
-
-        b_i = 0
-        while b_i < len(pool_b) and b_taken < int(stage1_k_meta) and len(shortlist) < int(shortlist_k):
-            it = pool_b[b_i]
-            b_i += 1
-            aid = int(it.get("anime_id", 0))
-            if aid in seen_ids:
-                continue
-            (it.get("_stage1") or {}).update({"pool": "B"})
-            shortlist.append(it)
-            seen_ids.add(aid)
-            b_taken += 1
-
-        # Pool C: deterministic backfill (prefer meta pool first to avoid semantic dominance when confidence is low).
-        while b_i < len(pool_b) and len(shortlist) < int(shortlist_k):
-            it = pool_b[b_i]
-            b_i += 1
-            aid = int(it.get("anime_id", 0))
-            if aid in seen_ids:
-                continue
-            (it.get("_stage1") or {}).update({"pool": "C"})
-            shortlist.append(it)
-            seen_ids.add(aid)
-            c_taken += 1
-
-        while a_i < len(pool_a) and len(shortlist) < int(shortlist_k):
-            it = pool_a[a_i]
-            a_i += 1
-            aid = int(it.get("anime_id", 0))
-            if aid in seen_ids:
-                continue
-            (it.get("_stage1") or {}).update({"pool": "C"})
-            shortlist.append(it)
-            seen_ids.add(aid)
-            c_taken += 1
+        shortlist, forced_added_count = build_stage1_shortlist(
+            pool_a=pool_a,
+            pool_b=pool_b,
+            shortlist_k=int(shortlist_k),
+            k_sem=int(stage1_k_sem),
+            k_meta=int(stage1_k_meta),
+            forced_first=stage1_forced_neural_pool,
+        )
 
     # --- Stage 2: rerank shortlist using existing final scoring --------------
     try:
@@ -1475,6 +1488,7 @@ def _seed_based_scores(
                 "signals": {
                     "stage1_score": float(s1),
                     "stage1_pool": str(((c.get("_stage1") or {}).get("pool")) or ""),
+                    "forced_neural": bool((c.get("_stage1") or {}).get("forced_neural", False)),
                     "weighted_overlap": float(weighted_overlap),
                     "seed_title_overlap": float((c.get("_stage1") or {}).get("title_overlap", 0.0)),
                     "seed_coverage": float(seed_coverage),
@@ -1676,6 +1690,50 @@ def _seed_based_scores(
     # Off-type here means: fails the conservative base gate (same type OR episodes>=min).
     top20_off_type = sum(1 for r in top20 if not bool((r.get("signals") or {}).get("synopsis_tfidf_base_gate_passed", True)))
 
+    forced_in_shortlist_pairs: list[tuple[int, float]] = [
+        (int(it.get("anime_id", 0)), float((it.get("_stage1") or {}).get("synopsis_neural_sim", 0.0)))
+        for it in shortlist
+        if bool((it.get("_stage1") or {}).get("forced_neural", False))
+    ]
+    forced_stats = forced_pool_stats(forced_in_shortlist_pairs)
+    forced_in_top20 = sum(1 for r in top20 if bool((r.get("signals") or {}).get("forced_neural", False)))
+    forced_in_top50 = sum(1 for r in top50_items if bool((r.get("signals") or {}).get("forced_neural", False)))
+
+    forced_top10_rows: list[dict[str, Any]] = []
+    if semantic_mode == "neural" and forced_neural_pairs:
+        top20_ids = {int(r.get("anime_id", 0)) for r in top20}
+        top50_ids = [int(r.get("anime_id", 0)) for r in top50_items]
+        top50_rank = {int(aid): int(rank) for rank, aid in enumerate(top50_ids, start=1)}
+        shortlist_ids = {int(it.get("anime_id", 0)) for it in shortlist}
+        for aid, sim in forced_neural_pairs[:10]:
+            m = work.loc[work["anime_id"].astype(int) == int(aid)].head(1)
+            if m.empty:
+                title = ""
+                typ = None
+            else:
+                mr = m.iloc[0]
+                title = str(mr.get("title_display") or mr.get("title_primary") or "")
+                typ = None if pd.isna(mr.get("type")) else str(mr.get("type")).strip()
+
+            forced_top10_rows.append(
+                {
+                    "anime_id": int(aid),
+                    "title_display": title,
+                    "type": typ,
+                    "sim": float(sim),
+                    "in_shortlist": bool(int(aid) in shortlist_ids),
+                    "in_top20": bool(int(aid) in top20_ids),
+                    "rank_in_top50": int(top50_rank[int(aid)]) if int(aid) in top50_rank else None,
+                }
+            )
+
+    if str(query_id or "").strip().lower() == "one_piece" and forced_top10_rows:
+        print("\n[Phase 5] one_piece forced-neural top10 (by similarity):")
+        for r in forced_top10_rows:
+            print(
+                f"  - {r.get('anime_id')} | sim={float(r.get('sim', 0.0)):.4f} | in_shortlist={bool(r.get('in_shortlist'))} | rank@50={r.get('rank_in_top50')} | in_top20={bool(r.get('in_top20'))} | {r.get('type')} | {r.get('title_display')}"
+            )
+
     shortlist_from_tfidf = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_tfidf_sim", 0.0)) >= 0.02)
     shortlist_from_embed = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_embed_sim", 0.0)) >= float(SYNOPSIS_EMBEDDINGS_MIN_SIM))
     shortlist_from_neural = sum(1 for it in shortlist if float((it.get("_stage1") or {}).get("synopsis_neural_sim", 0.0)) >= float(SYNOPSIS_NEURAL_MIN_SIM))
@@ -1728,6 +1786,18 @@ def _seed_based_scores(
 
     diagnostics = {
         "semantic_mode": semantic_mode,
+        "force_neural_enabled": bool(semantic_mode == "neural" and force_neural_enabled(semantic_mode=semantic_mode)),
+        "force_neural_topk": int(FORCE_NEURAL_TOPK),
+        "force_neural_min_sim": float(FORCE_NEURAL_MIN_SIM),
+        "forced_neural_count": int(forced_stats.forced_count),
+        "forced_neural_sim_min": float(forced_stats.sim_min),
+        "forced_neural_sim_mean": float(forced_stats.sim_mean),
+        "forced_neural_sim_max": float(forced_stats.sim_max),
+        "forced_neural_in_top20_count": int(forced_in_top20),
+        "forced_neural_in_top50_count": int(forced_in_top50),
+        "forced_neural_top10": list(forced_top10_rows)
+        if str(query_id or "").strip().lower() == "one_piece"
+        else [],
         "stage1_k_sem": int(stage1_k_sem),
         "stage1_k_meta": int(stage1_k_meta),
         "semantic_confidence_source": str(semantic_conf_source),
@@ -1893,6 +1963,7 @@ def _evaluate_golden_queries(
             )
 
         recs, recs_diag = _seed_based_scores(
+            query_id=qid,
             metadata=metadata,
             components=components,
             recommender=recommender,
@@ -2027,12 +2098,18 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
             lines.append(
                 "Diagnostics: "
                 f"K_sem={diag.get('stage1_k_sem')}, K_meta={diag.get('stage1_k_meta')}, "
+                f"force_neural={bool(diag.get('force_neural_enabled', False))}, "
+                f"force_topk={diag.get('force_neural_topk')}, force_min_sim={float(diag.get('force_neural_min_sim', 0.0)):.3f}, "
                 f"sem_conf=({diag.get('semantic_confidence_source')}/{diag.get('semantic_confidence_tier')}) {float(diag.get('semantic_confidence_score', 0.0)):.3f}, "
                 f"sem_top50_mean={float(sem_mean):.3f}, sem_top50_p95={float(sem_p95):.3f}, "
                 f"sem_top50_overlap_mean={float(sem_ov):.3f}, sem_top50_any_match={float(sem_any):.2f}, "
                 f"top20_pools(A/B/C)={diag.get('top20_poolA_count')}/{diag.get('top20_poolB_count')}/{diag.get('top20_poolC_count')}, "
                 f"shortlist={diag.get('stage1_shortlist_size')}/{diag.get('stage1_shortlist_target')}, "
+                f"forced_neural_shortlist={diag.get('forced_neural_count')}, "
+                f"forced_sim_min/mean/max={float(diag.get('forced_neural_sim_min', 0.0)):.3f}/{float(diag.get('forced_neural_sim_mean', 0.0)):.3f}/{float(diag.get('forced_neural_sim_max', 0.0)):.3f}, "
+                f"forced_in_top20/top50={diag.get('forced_neural_in_top20_count')}/{diag.get('forced_neural_in_top50_count')}, "
                 f"stage1_off_type_allowed={diag.get('stage1_off_type_allowed_count')}, "
+                f"stage1_off_type_allowed_neural={diag.get('stage1_off_type_allowed_neural_count')}, "
                 f"top20_off_type={diag.get('top20_off_type_count')}, "
                 f"off_type_sim_min={float(diag.get('stage1_off_type_allowed_sim_min', 0.0)):.5f}, "
                 f"off_type_sim_mean={float(diag.get('stage1_off_type_allowed_sim_mean', 0.0)):.5f}, "
@@ -2065,6 +2142,31 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"top20_moved_tfidf={diag.get('top20_moved_count_tfidf')}, "
                 f"top50_moved_tfidf={diag.get('top50_moved_count_tfidf')}"
             )
+
+            if str(q.get("id")) == "one_piece":
+                forced_top10 = diag.get("forced_neural_top10") or []
+                if isinstance(forced_top10, list) and forced_top10:
+                    lines.append("")
+                    lines.append("Forced-neural top10 neighbors (by similarity):")
+                    lines.append("")
+                    lines.append("| anime_id | Title | Type | sim | in_shortlist | rank@50 | in_top20 |")
+                    lines.append("|---:|---|---|---:|---:|---:|---:|")
+                    for it in forced_top10:
+                        try:
+                            aid = int(it.get("anime_id", 0))
+                            title = str(it.get("title_display") or "")
+                            typ = it.get("type")
+                            typ_s = "" if typ is None else str(typ)
+                            sim = float(it.get("sim", 0.0))
+                            in_shortlist = bool(it.get("in_shortlist", False))
+                            rank50 = it.get("rank_in_top50", None)
+                            rank50_s = "" if rank50 is None else str(int(rank50))
+                            in_top20 = bool(it.get("in_top20", False))
+                        except Exception:
+                            continue
+                        lines.append(
+                            f"| {aid} | {title} | {typ_s} | {sim:.4f} | {in_shortlist} | {rank50_s} | {in_top20} |"
+                        )
 
             # Per-request: show top 5 items by theme bonus for One Piece and Tokyo Ghoul.
             if str(q.get("id")) in {"one_piece", "tokyo_ghoul"}:

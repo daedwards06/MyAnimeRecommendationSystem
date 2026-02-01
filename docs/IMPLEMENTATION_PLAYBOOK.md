@@ -27,14 +27,18 @@ How to use:
   - Centralized in [src/app/semantic_admission.py](src/app/semantic_admission.py) (new lane: `demo_shounen`; token normalizer; shounen-only).
   - Wired into Streamlit Stage 1 neural admission in [app/main.py](app/main.py) and the golden harness in [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
   - Ensured app pruned metadata retains `demographics` by adding it to `MIN_METADATA_COLUMNS` in [src/app/constants.py](src/app/constants.py).
+- Phase 5: Implemented a **forced-neural neighbor inclusion** policy (Stage 1) so the top-K neural neighbors are always unioned into the Stage 1 shortlist (before conservative type/episodes gating can exclude them).
+  - Centralized config in [src/app/constants.py](src/app/constants.py): `FORCE_NEURAL_TOPK`, `FORCE_NEURAL_MIN_SIM`, `FORCE_NEURAL_ENABLE`.
+  - Shared helper in [src/app/stage1_shortlist.py](src/app/stage1_shortlist.py) and used by both [app/main.py](app/main.py) and [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
+  - Guardrails: still respects ranked hygiene exclusions (e.g., `Special`/`Music` and recap/summary regex); deterministic sort by (sim desc, anime_id asc).
 - Golden harness observability improved:
   - Report now prints semantic stats for the active semantic source (neural/embeddings/tfidf) via `sem_top50_*` (fixes earlier misleading `emb_top50_* = 0` under neural mode).
   - Added per-query diagnostics: `seed_demo_tokens`, `seed_has_shounen_demo`, `demo_override_admitted_count`, `demo_override_used_in_top20_count`.
-- Latest neural + override run: [reports/phase4_golden_queries_20260201021802.md](reports/phase4_golden_queries_20260201021802.md) and [reports/artifacts/phase4_golden_queries_20260201021802.json](reports/artifacts/phase4_golden_queries_20260201021802.json).
+- Latest neural run (with forced-neural diagnostics): [reports/phase4_golden_queries_20260201155513.md](reports/phase4_golden_queries_20260201155513.md) and [reports/artifacts/phase4_golden_queries_20260201155513.json](reports/artifacts/phase4_golden_queries_20260201155513.json).
 - Safety check: total `violation_count` remained **0** (baseline artifact [reports/artifacts/phase4_golden_queries_20260201013913.json](reports/artifacts/phase4_golden_queries_20260201013913.json) vs override artifact above).
 
 **Next action (single sentence):**
-- Investigate why `one_piece` top-20 remains low-quality under neural mode despite non-zero semantic signal and the shounen override (likely seed-conditioning / catalog hygiene / weights, not Stage 1 admission).
+- Investigate why `one_piece` strong in-franchise neural neighbors remain mostly outside top-20 despite being present in the shortlist (likely a Stage 2 scoring/penalty balance issue, not Stage 1 admission).
 
 ---
 
@@ -493,6 +497,15 @@ Notes:
 ---
 
 ## 6) Decision Log (Keep This Short)
+
+### 2026-02-01 — Phase 5: Stage 1 Recall via Forced Neural Neighbors
+
+- **Decision:** When `semantic_mode == "neural"`, force-include the top-K neural neighbors (above `FORCE_NEURAL_MIN_SIM`) into the Stage 1 shortlist so they cannot be dropped by conservative type/episodes gating before Stage 2 reranking.
+- **Config:** `FORCE_NEURAL_TOPK` (default 300), `FORCE_NEURAL_MIN_SIM` (default 0.20), `FORCE_NEURAL_ENABLE` (env override) in [src/app/constants.py](src/app/constants.py).
+- **Where implemented:** Shared helper [src/app/stage1_shortlist.py](src/app/stage1_shortlist.py), wired into [app/main.py](app/main.py) and [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
+- **Guardrails:** Still applies ranked hygiene exclusions (disallowed types + recap/summary regex); excludes seeds/watched; deterministic ordering by (similarity desc, anime_id asc).
+- **Evidence:** Golden report includes `forced_neural_*` diagnostics and a One Piece forced-neighbor table in [reports/phase4_golden_queries_20260201155513.md](reports/phase4_golden_queries_20260201155513.md).
+
 ### 2025-12-29 — Phase 4 / Chunk A2: Ranked candidate hygiene
 
 - **Decision:** In ranked modes only, exclude candidates when:
