@@ -30,7 +30,9 @@ For multi-seed queries, adaptive_low_genre_overlap defaults to HIGH.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Literal
+from typing import Any, Iterable, Optional, Literal
+
+import unicodedata
 
 STAGE1_TITLE_OVERLAP_ALWAYS_ADMIT: float = 0.50
 
@@ -44,11 +46,35 @@ STAGE1_MIN_GENRE_FLOOR: float = 0.20
 # Start at 1-of-3 themes.
 STAGE1_THEME_MIN_OVERLAP: float = 0.33
 
+# ---------------------------------------------------------------------------
+# Phase 5 (targeted): demographic-aware semantic admission override
+# ---------------------------------------------------------------------------
+#
+# Problem: For some long-running shounen seeds, seed-conditioned genre overlap
+# gates can prevent semantic neighbors from entering the Stage 1 shortlist,
+# making the neural semantic signal appear inert.
+#
+# Constraints:
+# - Deterministic and sparse: only applies when BOTH seed and candidate have
+#   non-empty demographics.
+# - Never penalize missing demographics.
+# - Experiment scope: shounen only.
+#
+# NOTE: This override does NOT bypass global Stage 1 hygiene/type gates; callers
+# must still enforce those separately (as they already do).
+STAGE1_DEMO_SHOUNEN_TOKEN: str = "shounen"
+
+# Conservative starting point for neural sentence-transformer similarity.
+# If diagnostics still show the neural semantic pool is empty/inert for shounen
+# seeds, consider lowering to ~0.15.
+STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL: float = 0.20
+
 
 AdmissionLane = Literal[
     "title",
     "B",
     "A",
+    "demo_shounen",
     "blocked_low_sim",
     "blocked_overlap",
 ]
@@ -60,6 +86,99 @@ class Stage1AdmissionDecision:
     lane: AdmissionLane
     used_theme_override: bool
     low_genre_overlap: float
+
+
+def normalize_demographics_tokens(val: Any) -> set[str]:
+    """Return a normalized set of demographic tokens.
+
+    Handles:
+      - list/tuple/set-like
+      - pipe-delimited strings
+      - scalars/NA
+
+    Normalization:
+      - case-fold to lowercase
+      - trim whitespace
+      - unicode normalize (NFKD) and drop combining marks
+
+    The override experiment matches only the canonical token
+    `STAGE1_DEMO_SHOUNEN_TOKEN`.
+    """
+    if val is None:
+        return set()
+
+    # Avoid importing pandas here; handle common NA spellings defensively.
+    try:
+        if isinstance(val, float) and val != val:  # NaN
+            return set()
+    except Exception:
+        pass
+
+    def _norm_one(x: Any) -> Optional[str]:
+        if x is None:
+            return None
+        s = str(x).strip()
+        if not s or s.lower() in {"nan", "none", "null"}:
+            return None
+
+        # Fold diacritics deterministically.
+        try:
+            s_nfkd = unicodedata.normalize("NFKD", s)
+            s = "".join(ch for ch in s_nfkd if not unicodedata.combining(ch))
+        except Exception:
+            pass
+
+        s = " ".join(s.split()).lower()
+
+        # Canonicalize common romanizations.
+        if s in {"shounen", "shonen", "shonen"}:
+            return STAGE1_DEMO_SHOUNEN_TOKEN
+        if s in {"shoujo", "shojo"}:
+            return "shoujo"
+        if s == "seinen":
+            return "seinen"
+        if s == "josei":
+            return "josei"
+        return s
+
+    # Strings: allow pipe-delimited format.
+    if isinstance(val, str):
+        s = val.strip()
+        if not s:
+            return set()
+        parts: Iterable[Any]
+        if "|" in s:
+            parts = [p for p in s.split("|")]
+        else:
+            parts = [s]
+        out: set[str] = set()
+        for p in parts:
+            n = _norm_one(p)
+            if n:
+                out.add(n)
+        return out
+
+    # Iterables (including numpy arrays via .tolist())
+    if isinstance(val, (list, tuple, set, frozenset)):
+        it: Iterable[Any] = val
+    else:
+        try:
+            tolist = getattr(val, "tolist", None)
+            it = tolist() if callable(tolist) else None  # type: ignore[assignment]
+        except Exception:
+            it = None  # type: ignore[assignment]
+
+    if it is not None:
+        out: set[str] = set()
+        for x in it:
+            n = _norm_one(x)
+            if n:
+                out.add(n)
+        return out
+
+    # Fallback scalar
+    n = _norm_one(val)
+    return {n} if n else set()
 
 
 def adaptive_low_genre_overlap(seed_genres_count: int, *, min_floor: float = STAGE1_MIN_GENRE_FLOOR) -> float:
@@ -90,6 +209,9 @@ def stage1_semantic_admission(
     seed_genres_count: int,
     num_seeds: int,
     theme_overlap: Optional[float],
+    seed_demographics: Any = None,
+    candidate_demographics: Any = None,
+    demo_shounen_min_sim: Optional[float] = None,
     high_genre_overlap: float = STAGE1_HIGH_GENRE_OVERLAP,
     theme_min_overlap: float = STAGE1_THEME_MIN_OVERLAP,
     title_always_admit: float = STAGE1_TITLE_OVERLAP_ALWAYS_ADMIT,
@@ -117,7 +239,31 @@ def stage1_semantic_admission(
             low_genre_overlap=float(high_genre_overlap),
         )
 
-    # Too low similarity for either lane.
+    # Phase 5 targeted override: shounen↔shounen semantic admission.
+    #
+    # Important: This override uses its own similarity threshold (and may
+    # therefore admit candidates even when below the global min_sim), because
+    # the failure mode we are addressing is that strict global gates can make
+    # the neural semantic signal inert for long-running shounen seeds.
+    if demo_shounen_min_sim is not None:
+        seed_demo = normalize_demographics_tokens(seed_demographics)
+        cand_demo = normalize_demographics_tokens(candidate_demographics)
+        if (
+            (STAGE1_DEMO_SHOUNEN_TOKEN in seed_demo)
+            and (STAGE1_DEMO_SHOUNEN_TOKEN in cand_demo)
+            and (fsim >= float(demo_shounen_min_sim))
+        ):
+            low_genre = float(high_genre_overlap)
+            if int(num_seeds) == 1:
+                low_genre = adaptive_low_genre_overlap(int(seed_genres_count))
+            return Stage1AdmissionDecision(
+                admitted=True,
+                lane="demo_shounen",
+                used_theme_override=False,
+                low_genre_overlap=float(low_genre),
+            )
+
+    # Too low similarity for either standard lane.
     if fsim < fmin:
         return Stage1AdmissionDecision(
             admitted=False,

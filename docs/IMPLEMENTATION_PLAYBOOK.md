@@ -13,23 +13,28 @@ How to use:
 
 **Project:** Anime Recommendation System (Streamlit portfolio app)
 
-**Primary goal right now:** Phase 4
+**Primary goal right now:** Phase 5 (neural synopsis embeddings built in WSL2, consumed on Windows)
 
-**Current phase:** Phase 4
+**Current phase:** Phase 5
 
-**Last updated:** 2026-01-01
+**Last updated:** 2026-02-01
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
 
 **What changed last session (short):**
-- Phase 4: **Stabilized Stage 1 shortlist** by tightening semantic pool admission to require meaningful seed-genre overlap (`weighted_overlap >= 0.50` or strong title overlap `>= 0.50`). This prevents semantic neighbors with only 1-in-4 genre match from dominating the shortlist for semantically-driven searches like Tokyo Ghoul, preventing off-theme kids/catalog content from surfacing in top-20.
-- Tokyo Ghoul regression resolved: before (artifact `20251231222355`) top-20 was mostly kids/shorts; after (artifact `20251231235313`) top-20 includes dark anime with matching themes (Parasyte, Claymore, High School of the Dead, Future Diary, Soul Eater, Kabaneri, Attack on Titan, Dororo, Mononoke).
-- One Piece franchise items (movies/specials) preserved in top-20 before/after.
-- All tests pass; `violation_count` remains 0; determinism maintained.
+- Phase 5: Implemented a **demographic-aware semantic admission override** (Stage 1) for **shounen↔shounen** pairs so strong neural semantic neighbors can enter the Stage 1 shortlist even when genre overlap gates would block them.
+  - Centralized in [src/app/semantic_admission.py](src/app/semantic_admission.py) (new lane: `demo_shounen`; token normalizer; shounen-only).
+  - Wired into Streamlit Stage 1 neural admission in [app/main.py](app/main.py) and the golden harness in [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
+  - Ensured app pruned metadata retains `demographics` by adding it to `MIN_METADATA_COLUMNS` in [src/app/constants.py](src/app/constants.py).
+- Golden harness observability improved:
+  - Report now prints semantic stats for the active semantic source (neural/embeddings/tfidf) via `sem_top50_*` (fixes earlier misleading `emb_top50_* = 0` under neural mode).
+  - Added per-query diagnostics: `seed_demo_tokens`, `seed_has_shounen_demo`, `demo_override_admitted_count`, `demo_override_used_in_top20_count`.
+- Latest neural + override run: [reports/phase4_golden_queries_20260201021802.md](reports/phase4_golden_queries_20260201021802.md) and [reports/artifacts/phase4_golden_queries_20260201021802.json](reports/artifacts/phase4_golden_queries_20260201021802.json).
+- Safety check: total `violation_count` remained **0** (baseline artifact [reports/artifacts/phase4_golden_queries_20260201013913.json](reports/artifacts/phase4_golden_queries_20260201013913.json) vs override artifact above).
 
 **Next action (single sentence):**
-- Phase 4: Optionally refine further or proceed to Phase 5 (portfolio polish + docs + QA).
+- Investigate why `one_piece` top-20 remains low-quality under neural mode despite non-zero semantic signal and the shounen override (likely seed-conditioning / catalog hygiene / weights, not Stage 1 admission).
 
 ---
 
@@ -41,7 +46,8 @@ Set one phase to **IN PROGRESS**. Keep the rest **NOT STARTED** or **DONE**.
 - Phase 2 — Score Semantics + Explanations (Credibility): DONE
 - Phase 3 — UX Flow + Progressive Disclosure (Clarity): DONE
 - Phase 4 — Refactor + Tests + Performance (Maintainability): IN PROGRESS
-- Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal): NOT STARTED 
+- Phase 4 — Refactor + Tests + Performance (Maintainability): DONE
+- Phase 5 — Portfolio “Wow” + Docs + QA (Hiring Signal): IN PROGRESS
 
 ---
 
@@ -106,6 +112,25 @@ Build command:
 
 Artifact metadata tracking:
 - Appends build info under `data/processed/artifacts_manifest.json` with key `synopsis_tfidf`
+
+### 2.5 Synopsis neural embeddings artifact (Phase 5; ranked semantic)
+
+If present, the app may load a neural sentence-embedding artifact and use it for **semantic shortlist admission + small additive rerank** in ranked modes.
+
+- File pattern: `models/synopsis_neural_embeddings_v*.joblib`
+- Selected deterministically by default; override by setting `APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM=<stem>`
+- Loaded into bundle at: `bundle["models"]["synopsis_neural_embeddings"]`
+- Expected object: `SynopsisNeuralEmbeddingsArtifact` (see `src/app/synopsis_neural_embeddings.py`)
+  - Must include an `anime_ids` alignment and an `anime_id_to_row` mapping for deterministic lookup
+  - Must include L2-normalized `float32` embeddings (cosine similarity computed as dot product)
+  - Must include `schema`, model name, and a build timestamp/version for traceability
+
+Build command (WSL2 only):
+- `pip install -r requirements-wsl-neural.txt`
+- `python scripts/build_synopsis_neural_embeddings_artifact.py`
+
+Windows runtime notes:
+- The Windows app/eval runtime must not import torch/transformers; it only loads the joblib artifact and uses NumPy for cosine similarity.
 
 ---
 
@@ -550,6 +575,123 @@ Record decisions that future sessions must not re-litigate.
 ---
 
 ## 7) Session Log (Tiny, but consistent)
+
+### Session 2026-02-01 (Phase 5 — Stage 1 demographic-aware semantic admission override: shounen-only)
+
+- **Problem:** For some long-running shounen seeds (notably One Piece), neural semantic neighbors could be effectively inert in Stage 1 because genre-overlap gates blocked plausible candidates. This was intended to protect dark/horror seeds (Tokyo Ghoul) from off-theme shorts, so we needed a conservative, deterministic exception.
+
+- **Decision (Stage 1; shounen-only experiment):** Add a new deterministic admission lane:
+  - If **both** seed and candidate have a `demographics` field and both include the token `shounen`, admit if `semantic_sim >= STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL`.
+  - This lane may admit even when `genre_overlap` is below the normal Stage 1 overlap gates.
+  - Missing `demographics` is **never** penalized; if either side lacks demographics, behavior is unchanged.
+
+- **Implementation notes:**
+  - Demographics token normalization is centralized (handles NA, strings, lists; normalizes `shonen/shounen`).
+  - The shounen override is evaluated **before** the generic `sim < MIN_SIM` early return so it can function as an actual override.
+  - The override threshold is separate from the global min-sim (`STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL=0.20` initially; tune only if needed).
+
+- **Key files changed:**
+  - [src/app/semantic_admission.py](src/app/semantic_admission.py): `normalize_demographics_tokens()` + new lane (`demo_shounen`) + shounen override threshold.
+  - [src/app/constants.py](src/app/constants.py): retain `demographics` in pruned metadata (`MIN_METADATA_COLUMNS`).
+  - [app/main.py](app/main.py): Stage 1 neural admission now passes seed/candidate demographics into the centralized policy.
+  - [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py): same policy call + new diagnostics in the markdown report.
+
+- **Observed impact (neural baseline → shounen override):**
+  - Before (neural, no override): [reports/phase4_golden_queries_20260201013913.md](reports/phase4_golden_queries_20260201013913.md)
+  - After (neural + override): [reports/phase4_golden_queries_20260201021802.md](reports/phase4_golden_queries_20260201021802.md)
+  - **Safety:** total `violation_count` stayed **0** across the golden set.
+  - **Tokyo Ghoul:** `seed_has_shounen_demo=False` (`[seinen]`); override unused (`demo_override_* = 0`); no safety regressions.
+  - **One Piece:** `seed_has_shounen_demo=True` (`[shounen]`); override admits candidates into Stage 1 (`demo_override_admitted_count=18`) and reaches the final top-20 (`demo_override_used_in_top20_count=1`), but the overall top-20 quality remains poor and likely needs separate diagnosis (seed conditioning / metadata hygiene / weighting).
+  - **Top-20 before/after diff (helper):**
+    - `python scripts/compare_golden_top20.py --before reports/artifacts/phase4_golden_queries_20260201013913.json --after reports/artifacts/phase4_golden_queries_20260201021802.json --query one_piece --query tokyo_ghoul --k 20`
+
+- **Phase 5 diagnostics — raw neural neighbors (One Piece; pre-admission/ranking):**
+  - **Command:** `python scripts/sanity_check_neural_neighbors.py --anime-id 21 --topk 50`
+  - **Stdout (top-50, raw cosine):**
+
+```text
+== Phase 5 Neural Neighbor Sanity Check ==
+seed_anime_id=21
+artifact_stem=synopsis_neural_embeddings_v2026.01.31_235728
+artifact_schema=synopsis_neural_embeddings_v1 dim=384 items=13037 normalized=True
+
+-- Seed metadata --
+title: One Piece
+type: TV
+synopsis_length_chars: 1111
+seed_embedding_norm: 1.0
+demographics: Shounen
+genres: Action, Adventure, Fantasy
+themes:
+
+-- Global diagnostics --
+embedding_norm_nonfinite_count: 0
+embedding_zero_vector_count (<=1e-12): 402
+embedding_near_zero_vector_count (1e-12..1e-3): 0
+catalog_count: 13037
+catalog_with_nonempty_synopsis: 12635
+catalog_with_nonempty_demographics: 4556
+catalog_with_nonempty_genres: 11956
+similarity_percentiles (seed vs all, excl self):
+  p50=0.103049 p90=0.206546 p95=0.241483 p99=0.319461 max=0.722193
+
+-- Top-50 raw cosine neighbors (no admission/ranking) --
+rank    anime_id        type    cosine_sim      has_synopsis    synopsis_len    d
+emographics     genres  themes  title                                            1       60022   None    0.7221934795    True    903     Shounen Action, Adventure
+, Fantasy               One Piece Fan Letter                                     2       4155    Movie   0.6178361773    True    709     Shounen Action, Adventure
+, Fantasy               One Piece Film: Strong World                             3       38234   None    0.6082330346    True    731     Shounen Action, Adventure
+, Fantasy               One Piece: Stampede                                      4       5252    OVA     0.6072348356    True    530     Shounen Action, Adventure
+, Fantasy               One Piece: Romance Dawn Story                            5       464     Movie   0.6000096798    True    1025    Shounen Action, Adventure
+, Drama, Fantasy                One Piece: Baron Omatsuri and the Secret Island  6       12859   Movie   0.5993023515    True    796     Shounen Action, Adventure
+, Fantasy               One Piece Film: Z                                        7       31490   Movie   0.5806214809    True    892     Shounen Action, Adventure
+, Fantasy               One Piece Film: Gold                                     8       459     Movie   0.5802047253    True    595     Shounen Action, Adventure
+, Fantasy               One Piece: The Movie                                     9       462     Movie   0.5461117029    True    587     Shounen Action, Adventure
+, Fantasy               One Piece: Dead End Adventure                            10      460     Movie   0.5427403450    True    332     Shounen Action, Adventure
+, Fantasy               One Piece: Clockwork Island Adventure                    11      19505   TV      0.5418593884    True    643             Adventure       K
+aizoku Ouji                                                                      12      3842    Movie   0.5287158489    True    503             Adventure       A
+nimal Treasure Island                                                            13      1238    TV Special      0.5169433355    True    758     Shounen Action, A
+dventure, Fantasy               One Piece: Protect! The Last Great Performance   14      25161   TV Special      0.5065627098    True    838     Shounen Adventure
+, Fantasy               One Piece 3D2Y: Overcoming Ace's Death! Luffy's Pledge to His Friends                                                                     15      2618    TV      0.4958783686    True    482             Adventure, Drama,
+ Mystery        Historical      Treasure Island                                  16      1237    TV Special      0.4840319157    True    985     Shounen Action, A
+dventure, Fantasy               One Piece: Open Upon the Great Sea! A Father's Huge, HUGE Dream!                                                                  17      11685   OVA     0.4789015055    True    423             Adventure, Drama,
+ Mystery, Supernatural  Historical      Takarajima Memorial: Yuunagi to Yobareta Otoko                                                                            18      466     OVA     0.4773917794    True    484     Shounen Action, Adventure
+, Fantasy               One Piece: Defeat the Pirate Ganzack!                    19      31289   TV Special      0.4639740586    True    360     Shounen Action, A
+dventure, Fantasy               One Piece: Episode of Sabo - Bond of Three Brothers, A Miraculous Reunion and an Inherited Will                                   20      32534   Movie   0.4580593109    True    631             Adventure, Fantas
+y, Supernatural Historical, Martial Arts        Monkey King: Hero Is Back        21      19123   TV Special      0.4535465539    True    493     Shounen Action, A
+dventure, Fantasy               One Piece: Episode of Merry - The Tale of One More Friend                                                                         22      6701    TV      0.4447429776    True    439     Kids    Adventure, Fantas
+y               Jim Button                                                       23      465     Movie   0.4445810914    True    403     Shounen Action, Adventure
+, Fantasy               One Piece: The Giant Mechanical Soldier of Karakuri Castle                                                                                24      15323   TV Special      0.4419125319    True    446     Shounen Action, A
+dventure, Fantasy               One Piece: Episode of Nami - Tears of a Navigator and the Bonds of Friends                                                        25      1386    OVA     0.4398550093    True    195             Hentai          B
+lood Royale                                                                      26      2451    TV      0.4345474243    True    1179    Shounen Action, Adventure
+, Sci-Fi        Adult Cast, Space       Space Adventure Cobra                    27      463     Movie   0.4306727350    True    453     Shounen Action, Adventure
+, Fantasy               One Piece: The Curse of the Sacred Sword                 28      33338   TV Special      0.4283522367    True    403     Shounen Action, A
+dventure, Comedy, Drama, Fantasy                One Piece: Heart of Gold         29      1443    OVA     0.4235673547    True    389             Action, Adventure
+, Sci-Fi        Space   Sol Bianca                                               30      2107    Movie   0.4230411351    True    482     Shounen Action, Adventure
+, Fantasy               One Piece: Episode of Alabasta - The Desert Princess and the Pirates                                                                      31      5133    TV Special      0.4204596877    True    517             Sci-Fi  O
+ne-Million Year Trip: Bander Book                                                32      2386    Movie   0.4168220758    True    220     Shounen Comedy, Fantasy, 
+Sports  Team Sports     One Piece: Dream Soccer King                             33      1421    TV Special      0.4154676199    True    587     Seinen  Action, A
+dventure, Comedy, Mystery       Adult Cast      Lupin III: The Hemingway Papers  34      2664    Movie   0.4111410379    True    477     Kids, Shounen   Adventure
+, Award Winning, Comedy, Fantasy, Sci-Fi                Doraemon the Movie: Nobita's Great Adventure in the South Seas                                            35      12803   Movie   0.4099749923    True    124     Kids    Comedy, Fantasy C
+hinkoroheibei and the Treasure Box                                               36      2385    Special 0.4099466503    True    421     Shounen Comedy, Fantasy O
+ne Piece: Django's Dance Carnival                                                37      1417    TV Special      0.4050686955    True    354     Seinen  Action, A
+dventure, Comedy, Mystery       Adult Cast      Lupin III: Dragon of Doom        38      2263    OVA     0.4046947062    True    917             Adventure, Comedy
+, Sci-Fi        Anthropomorphic Sonic the Hedgehog: The Movie                    39      20141   TV Special      0.4019756913    True    404     Seinen  Action, A
+dventure, Comedy        Adult Cast      Lupin III: Princess of the Breeze        40      15335   Movie   0.4003969431    True    1059    Shounen Action, Comedy, S
+ci-Fi   Gag Humor, Historical, Parody, Samurai, Time Travel     Gintama: The Movie: The Final Chapter: Be Forever Yorozuya                                        41      50410   None    0.3995553255    True    910     Shounen Action, Adventure
+, Award Winning, Comedy, Drama, Fantasy Idols (Female)  One Piece Film: Red      42      11009   Movie   0.3993654251    True    438     Kids    Adventure, Comedy
+, Fantasy               Pokémon 4D: Pikachu's Ocean Adventure                    43      8740    OVA     0.3968234658    True    234     Shounen Adventure, Fantas
+y               One Piece Film: Strong World Episode 0                           44      1250    TV      0.3941925764    True    562     Shounen Action, Adventure
+, Fantasy, Romance              Elemental Gelade                                 45      11777   TV Special      0.3931015134    True    278     Seinen  Action, A
+dventure, Comedy        Adult Cast      Lupin III: Blood Seal of the Eternal Mermaid                                                                              46      1519    TV      0.3886177838    True    819     Seinen  Action  Adult Cas
+t, Organized Crime      Black Lagoon: The Second Barrage                         47      1435    Movie   0.3883401752    True    350     Seinen  Action, Adventure
+, Comedy, Mystery       Adult Cast      Lupin III: The Mystery of Mamo           48      416     Movie   0.3880552649    True    994             Action, Adventure
+, Award Winning, Comedy, Drama, Romance Historical, Military    Porco Rosso      49      889     TV      0.3862249851    True    1083    Seinen  Action  Adult Cas
+t, Organized Crime      Black Lagoon                                             50      13169   TV Special      0.3853461742    True    489             Adventure
+, Comedy, Fantasy       Historical      Buta
+```
+
+  - **Interpretation:** The embedding signal for One Piece is strong (max sim ~0.72), but it is almost entirely dominated by in-franchise movies/specials/OVAs and adjacent “adventure” catalog items; there are no obvious cross-franchise long-shounen peers (Naruto/Bleach/HxH/Fairy Tail) in the raw top-50 neighborhood.
+  - **Recommended next step:** Treat this as an **embedding-input/text policy** limitation (synopsis-only is too franchise-specific / entity-dominated for cross-franchise similarity). Next diagnostic is to run the same script for a few other long shounen seeds (e.g., Naruto/Bleach/HxH) to confirm whether cross-franchise neighbors exist for them, and if not, plan a Phase 5 follow-up to incorporate non-synopsis signals into the embedding text (e.g., genres/themes tokens) during the offline build.
 
 ### Session 2026-01-02 (Phase 4 — Stage 1 semantic admission: adaptive multi-signal)
 
