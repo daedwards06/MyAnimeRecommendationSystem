@@ -75,7 +75,11 @@ from src.app.theme import get_theme
 from src.app.constants import (
     DEFAULT_TOP_N,
     PERSONAS_JSON,
+    FORCE_NEURAL_TOPK,
+    FORCE_NEURAL_MIN_SIM,
 )
+
+from src.app.stage1_shortlist import build_stage1_shortlist, force_neural_enabled, select_forced_neural_pairs
 from src.app.recommender import (
     HybridComponents,
     HybridRecommender,
@@ -1536,8 +1540,13 @@ else:
 
                     if semantic_mode in {"neural"} and synopsis_neural_artifact is not None:
                         try:
+                            min_sim_neural = float(SYNOPSIS_NEURAL_MIN_SIM)
+                            if bool(force_neural_enabled(semantic_mode=semantic_mode)):
+                                min_sim_neural = float(min(float(min_sim_neural), float(FORCE_NEURAL_MIN_SIM)))
                             neural_sims_by_id = compute_seed_neural_similarity_map(
-                                synopsis_neural_artifact, seed_ids=selected_seed_ids
+                                synopsis_neural_artifact,
+                                seed_ids=selected_seed_ids,
+                                min_sim=float(min_sim_neural),
                             )
                         except Exception:
                             neural_sims_by_id = {}
@@ -1556,10 +1565,29 @@ else:
                     stage1_embed_pool: list[dict] = []
                     stage1_tfidf_pool: list[dict] = []
                     stage1_neural_pool: list[dict] = []
+                    stage1_forced_neural_pool: list[dict] = []
                     stage1_fallback_pool: list[dict] = []
 
                     seed_genres_count = int(len(all_seed_genres))
                     seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
+
+                    forced_neural_pairs: list[tuple[int, float]] = []
+                    forced_neural_ids: set[int] = set()
+                    if (
+                        semantic_mode in {"neural"}
+                        and synopsis_neural_artifact is not None
+                        and bool(force_neural_enabled(semantic_mode=semantic_mode))
+                        and bool(neural_sims_by_id)
+                    ):
+                        forced_neural_pairs = select_forced_neural_pairs(
+                            neural_sims_by_id,
+                            seed_ids=selected_seed_ids,
+                            exclude_ids=set(ranked_hygiene_exclude_ids),
+                            watched_ids=set(watched_ids_set),
+                            topk=int(FORCE_NEURAL_TOPK),
+                            min_sim=float(FORCE_NEURAL_MIN_SIM),
+                        )
+                        forced_neural_ids = {int(aid) for aid, _ in forced_neural_pairs}
 
                     for _, mrow in metadata.iterrows():
                         aid = int(mrow["anime_id"])
@@ -1649,7 +1677,16 @@ else:
                             "synopsis_neural_high_sim_override": bool(high_sim_override_neural),
                             "cand_type": cand_type,
                             "cand_eps": cand_eps,
+                            "forced_neural": bool(aid in forced_neural_ids),
                         }
+
+                        # Phase 5 refinement: force-include top-K neural neighbors into the
+                        # Stage 1 shortlist (ranked modes only). This bypasses only the
+                        # type/episodes gate; ranked hygiene exclusions were already applied.
+                        if bool(base.get("forced_neural")) and float(synopsis_neural_sim) >= float(FORCE_NEURAL_MIN_SIM):
+                            forced_item = dict(base)
+                            forced_item["stage1_score"] = float(synopsis_neural_sim)
+                            stage1_forced_neural_pool.append(forced_item)
 
                         # Neural-first pool (gated): Phase 5 semantic generalization.
                         passes_gate_effective_neural = bool(base_passes_gate) or bool(high_sim_override_neural)
@@ -1755,6 +1792,9 @@ else:
                             int(x.get("anime_id", 0)),
                         )
                     )
+                    stage1_forced_neural_pool.sort(
+                        key=lambda x: (-float(x.get("synopsis_neural_sim", 0.0)), int(x.get("anime_id", 0)))
+                    )
                     stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
                     # Phase 4 stabilization: Stage 1 mixture shortlist + semantic confidence gating.
@@ -1856,52 +1896,14 @@ else:
                     k_sem = max(0, min(int(seed_shortlist_size), int(k_sem)))
                     k_meta = int(seed_shortlist_size) - int(k_sem)
 
-                    shortlist = []
-                    seen_ids = set()
-
-                    a_taken = 0
-                    b_taken = 0
-
-                    a_i = 0
-                    while a_i < len(pool_a) and a_taken < int(k_sem) and len(shortlist) < int(seed_shortlist_size):
-                        it = pool_a[a_i]
-                        a_i += 1
-                        aid = int(it.get("anime_id", 0))
-                        if aid in seen_ids:
-                            continue
-                        shortlist.append(it)
-                        seen_ids.add(aid)
-                        a_taken += 1
-
-                    b_i = 0
-                    while b_i < len(pool_b) and b_taken < int(k_meta) and len(shortlist) < int(seed_shortlist_size):
-                        it = pool_b[b_i]
-                        b_i += 1
-                        aid = int(it.get("anime_id", 0))
-                        if aid in seen_ids:
-                            continue
-                        shortlist.append(it)
-                        seen_ids.add(aid)
-                        b_taken += 1
-
-                    # Backfill deterministically (prefer meta pool first).
-                    while b_i < len(pool_b) and len(shortlist) < int(seed_shortlist_size):
-                        it = pool_b[b_i]
-                        b_i += 1
-                        aid = int(it.get("anime_id", 0))
-                        if aid in seen_ids:
-                            continue
-                        shortlist.append(it)
-                        seen_ids.add(aid)
-
-                    while a_i < len(pool_a) and len(shortlist) < int(seed_shortlist_size):
-                        it = pool_a[a_i]
-                        a_i += 1
-                        aid = int(it.get("anime_id", 0))
-                        if aid in seen_ids:
-                            continue
-                        shortlist.append(it)
-                        seen_ids.add(aid)
+                    shortlist, _forced_added = build_stage1_shortlist(
+                        pool_a=pool_a,
+                        pool_b=pool_b,
+                        shortlist_k=int(seed_shortlist_size),
+                        k_sem=int(k_sem),
+                        k_meta=int(k_meta),
+                        forced_first=stage1_forced_neural_pool,
+                    )
 
                     # Stage 2: rerank shortlist using existing hybrid + pop + bonuses.
                     try:
