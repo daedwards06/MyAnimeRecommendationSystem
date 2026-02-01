@@ -87,7 +87,11 @@ from src.app.search import fuzzy_search, normalize_title
 from src.app.badges import badge_payload
 from src.app.explanations import format_explanation
 from src.app.profiling import latency_timer
-from src.app.semantic_admission import stage1_semantic_admission, theme_overlap_ratio
+from src.app.semantic_admission import (
+    STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL,
+    stage1_semantic_admission,
+    theme_overlap_ratio,
+)
 from src.app.diversity import (
     compute_popularity_percentiles,
     coverage,
@@ -1649,26 +1653,25 @@ else:
 
                         # Neural-first pool (gated): Phase 5 semantic generalization.
                         passes_gate_effective_neural = bool(base_passes_gate) or bool(high_sim_override_neural)
-                        if (
-                            semantic_mode in {"neural"}
-                            and bool(passes_gate_effective_neural)
-                            and bool(
-                                stage1_semantic_admission(
-                                    semantic_sim=float(synopsis_neural_sim),
-                                    min_sim=float(SYNOPSIS_NEURAL_MIN_SIM),
-                                    high_sim=float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD),
-                                    genre_overlap=float(weighted_overlap),
-                                    title_overlap=float(title_overlap),
-                                    seed_genres_count=int(seed_genres_count),
-                                    num_seeds=int(num_seeds),
-                                    theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
-                                ).admitted
+                        if semantic_mode in {"neural"} and bool(passes_gate_effective_neural):
+                            neural_decision = stage1_semantic_admission(
+                                semantic_sim=float(synopsis_neural_sim),
+                                min_sim=float(SYNOPSIS_NEURAL_MIN_SIM),
+                                high_sim=float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD),
+                                genre_overlap=float(weighted_overlap),
+                                title_overlap=float(title_overlap),
+                                seed_genres_count=int(seed_genres_count),
+                                num_seeds=int(num_seeds),
+                                theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
+                                seed_demographics=getattr(seed_meta_profile, "demographics", frozenset()) or frozenset(),
+                                candidate_demographics=mrow.get("demographics"),
+                                demo_shounen_min_sim=float(STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL),
                             )
-                        ):
-                            item = dict(base)
-                            item["stage1_score"] = float(synopsis_neural_sim)
-                            stage1_neural_pool.append(item)
-                            continue
+                            if bool(neural_decision.admitted):
+                                item = dict(base)
+                                item["stage1_score"] = float(synopsis_neural_sim)
+                                stage1_neural_pool.append(item)
+                                continue
 
                         # Embeddings-first pool (gated): keep shortlist semantically seed-like.
                         passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)

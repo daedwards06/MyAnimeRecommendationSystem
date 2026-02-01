@@ -74,7 +74,12 @@ from src.app.synopsis_neural_embeddings import (
     synopsis_neural_penalty_for_candidate,
 )
 
-from src.app.semantic_admission import stage1_semantic_admission, theme_overlap_ratio
+from src.app.semantic_admission import (
+    STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL,
+    normalize_demographics_tokens,
+    stage1_semantic_admission,
+    theme_overlap_ratio,
+)
 
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
@@ -593,6 +598,11 @@ def _seed_based_scores(
     seed_genres_count = int(len(all_seed_genres))
     seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
 
+    # Phase 5 diagnostics: demographics-aware admission is sparse and must never
+    # penalize missingness.
+    seed_demo_tokens = normalize_demographics_tokens(getattr(seed_meta_profile, "demographics", frozenset()) or frozenset())
+    seed_has_shounen_demo = bool("shounen" in seed_demo_tokens)
+
     # Diagnostics: quantify admission behavior under the adaptive two-lane policy.
     # Baseline ("old") is kept for comparability: semantic min-sim AND (overlap>0 OR title>=0.50).
     # Policy ("new"): stage1_semantic_admission(...) decision.
@@ -610,6 +620,8 @@ def _seed_based_scores(
     admitted_by_lane_A_count = 0
     admitted_by_lane_B_count = 0
     admitted_by_theme_override_count = 0
+    admitted_by_demo_override_shounen_count = 0
+    demo_override_admitted_ids: set[int] = set()
     blocked_due_to_overlap_count = 0
     blocked_due_to_low_sim_count = 0
 
@@ -759,6 +771,9 @@ def _seed_based_scores(
                 seed_genres_count=int(seed_genres_count),
                 num_seeds=int(num_seeds),
                 theme_overlap=themes_overlap,
+                seed_demographics=getattr(seed_meta_profile, "demographics", frozenset()) or frozenset(),
+                candidate_demographics=row.get("demographics"),
+                demo_shounen_min_sim=float(STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL),
             )
 
             if bool(passes_gate_effective_neural):
@@ -787,6 +802,9 @@ def _seed_based_scores(
                         _push_top_laneA_admit(laneA_admitted_examples_top, laneA_entry, max_n=12)
                     elif neural_decision.lane == "B":
                         admitted_by_lane_B_count += 1
+                    elif neural_decision.lane == "demo_shounen":
+                        admitted_by_demo_override_shounen_count += 1
+                        demo_override_admitted_ids.add(int(aid))
                 else:
                     if neural_decision.lane == "blocked_overlap":
                         blocked_due_to_overlap_count += 1
@@ -821,6 +839,16 @@ def _seed_based_scores(
 
             if bool(passes_gate_effective_neural) and bool(neural_decision.admitted):
                 item = dict(base)
+                s1 = item.get("_stage1")
+                if not isinstance(s1, dict):
+                    s1 = {}
+                    item["_stage1"] = s1
+                s1.update(
+                    {
+                        "neural_admission_lane": str(neural_decision.lane),
+                        "neural_demo_override_shounen": bool(neural_decision.lane == "demo_shounen"),
+                    }
+                )
                 item["stage1_score"] = float(synopsis_neural_sim)
                 stage1_neural_pool.append(item)
                 if bool(high_sim_override_neural):
@@ -1060,6 +1088,7 @@ def _seed_based_scores(
         "admitted_by_lane_A_count": int(admitted_by_lane_A_count),
         "admitted_by_lane_B_count": int(admitted_by_lane_B_count),
         "admitted_by_theme_override_count": int(admitted_by_theme_override_count),
+        "admitted_by_demo_override_shounen_count": int(admitted_by_demo_override_shounen_count),
         "blocked_due_to_overlap_count": int(blocked_due_to_overlap_count),
         "blocked_due_to_low_sim_count": int(blocked_due_to_low_sim_count),
         "laneA_admitted_examples_top": list(laneA_admitted_examples_top),
@@ -1692,6 +1721,11 @@ def _seed_based_scores(
         top20_embed_sim_mean = 0.0
         top20_embed_sim_max = 0.0
 
+    demo_override_admitted_count = int(len(demo_override_admitted_ids))
+    demo_override_used_in_top20_count = int(
+        sum(1 for r in top20 if int(r.get("anime_id", 0)) in demo_override_admitted_ids)
+    )
+
     diagnostics = {
         "semantic_mode": semantic_mode,
         "stage1_k_sem": int(stage1_k_sem),
@@ -1714,6 +1748,10 @@ def _seed_based_scores(
         "neural_top50_p95": float(neural_stats.get("p95", 0.0)),
         "neural_top50_weighted_overlap_mean": float(neural_coherence.get("weighted_overlap_mean", 0.0)),
         "neural_top50_any_genre_match_frac": float(neural_coherence.get("any_genre_match_frac", 0.0)),
+        "seed_has_shounen_demo": bool(seed_has_shounen_demo),
+        "seed_demo_tokens": sorted(list(seed_demo_tokens)),
+        "demo_override_admitted_count": int(demo_override_admitted_count),
+        "demo_override_used_in_top20_count": int(demo_override_used_in_top20_count),
         "top20_poolA_count": int(top20_pool_a),
         "top20_poolB_count": int(top20_pool_b),
         "top20_poolC_count": int(top20_pool_c),
@@ -1963,12 +2001,35 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
 
         diag = q.get("diagnostics") or {}
         if diag:
+            sem_src = str(diag.get("semantic_confidence_source") or "none")
+            if sem_src == "neural":
+                sem_mean = float(diag.get("neural_top50_mean", 0.0))
+                sem_p95 = float(diag.get("neural_top50_p95", 0.0))
+                sem_ov = float(diag.get("neural_top50_weighted_overlap_mean", 0.0))
+                sem_any = float(diag.get("neural_top50_any_genre_match_frac", 0.0))
+            elif sem_src == "tfidf":
+                sem_mean = float(diag.get("tfidf_top50_mean", 0.0))
+                sem_p95 = float(diag.get("tfidf_top50_p95", 0.0))
+                sem_ov = float(diag.get("tfidf_top50_weighted_overlap_mean", 0.0))
+                sem_any = float(diag.get("tfidf_top50_any_genre_match_frac", 0.0))
+            else:
+                sem_mean = float(diag.get("embeddings_top50_mean", 0.0))
+                sem_p95 = float(diag.get("embeddings_top50_p95", 0.0))
+                sem_ov = float(diag.get("embeddings_top50_weighted_overlap_mean", 0.0))
+                sem_any = float(diag.get("embeddings_top50_any_genre_match_frac", 0.0))
+
+            seed_demo_tokens = diag.get("seed_demo_tokens") or []
+            if isinstance(seed_demo_tokens, list):
+                seed_demo_str = ",".join(str(x) for x in seed_demo_tokens)
+            else:
+                seed_demo_str = str(seed_demo_tokens)
+
             lines.append(
                 "Diagnostics: "
                 f"K_sem={diag.get('stage1_k_sem')}, K_meta={diag.get('stage1_k_meta')}, "
                 f"sem_conf=({diag.get('semantic_confidence_source')}/{diag.get('semantic_confidence_tier')}) {float(diag.get('semantic_confidence_score', 0.0)):.3f}, "
-                f"emb_top50_mean={float(diag.get('embeddings_top50_mean', 0.0)):.3f}, emb_top50_p95={float(diag.get('embeddings_top50_p95', 0.0)):.3f}, "
-                f"emb_top50_overlap_mean={float(diag.get('embeddings_top50_weighted_overlap_mean', 0.0)):.3f}, emb_top50_any_match={float(diag.get('embeddings_top50_any_genre_match_frac', 0.0)):.2f}, "
+                f"sem_top50_mean={float(sem_mean):.3f}, sem_top50_p95={float(sem_p95):.3f}, "
+                f"sem_top50_overlap_mean={float(sem_ov):.3f}, sem_top50_any_match={float(sem_any):.2f}, "
                 f"top20_pools(A/B/C)={diag.get('top20_poolA_count')}/{diag.get('top20_poolB_count')}/{diag.get('top20_poolC_count')}, "
                 f"shortlist={diag.get('stage1_shortlist_size')}/{diag.get('stage1_shortlist_target')}, "
                 f"stage1_off_type_allowed={diag.get('stage1_off_type_allowed_count')}, "
@@ -1981,6 +2042,10 @@ def _render_markdown_report(*, golden_results: dict[str, Any], out_path: Path) -
                 f"tfidf_blocked%={100.0 * float(diag.get('tfidf_semantic_blocked_by_policy_rate', 0.0)):.1f}%, "
                 f"laneA={diag.get('admitted_by_lane_A_count')}, laneB={diag.get('admitted_by_lane_B_count')}, "
                 f"theme_override={diag.get('admitted_by_theme_override_count')}, "
+                f"seed_has_shounen_demo={bool(diag.get('seed_has_shounen_demo', False))}, "
+                f"seed_demo_tokens=[{seed_demo_str}], "
+                f"demo_override_admitted={diag.get('demo_override_admitted_count')}, "
+                f"demo_override_top20={diag.get('demo_override_used_in_top20_count')}, "
                 f"blocked_overlap={diag.get('blocked_due_to_overlap_count')}, blocked_low_sim={diag.get('blocked_due_to_low_sim_count')}, "
                 f"bonus_fired={diag.get('metadata_bonus_fired_count')}, "
                 f"bonus_mean={float(diag.get('metadata_bonus_mean', 0.0)):.5f}, "
