@@ -1626,12 +1626,37 @@ def _seed_based_scores(
             genre_overlap=float(weighted_overlap),
         )
 
+        # Retrieve MAL score and members count for quality scaling.
+        item_mal_score = (c.get("meta") or {}).get("mal_score")
+        item_members_count = (c.get("meta") or {}).get("members_count")
+        if item_mal_score is not None:
+            try:
+                item_mal_score = float(item_mal_score)
+            except Exception:
+                item_mal_score = None
+        if item_members_count is not None:
+            try:
+                item_members_count = int(item_members_count)
+            except Exception:
+                item_members_count = None
+
+        # Phase 5 fix: Quality-scaled neural contribution.
+        # Scale neural_sim by quality factor: MAL 5.0->0.15, 7.0->0.5, 9.0->1.0
+        if item_mal_score is not None and item_mal_score > 0:
+            quality_factor = max(0.15, min(1.0, (item_mal_score - 5.0) / 4.0))
+        else:
+            quality_factor = 0.3  # Conservative default for missing scores
+
+        neural_contribution = 1.5 * float(synopsis_neural_sim) * quality_factor
+
+        # Phase 5 fix: rebalanced weights to make neural similarity dominant.
         score_before = (
-            (0.5 * weighted_overlap)
-            + (0.2 * seed_coverage)
-            + (0.25 * float(hybrid_val_for_scoring))
+            (0.3 * weighted_overlap)
+            + (0.1 * seed_coverage)
+            + (0.15 * float(hybrid_val_for_scoring))
             + (0.05 * popularity_boost)
             + (0.10 * float(s1))
+            + neural_contribution  # Quality-scaled neural contribution
             + meta_bonus
             + synopsis_tfidf_adjustment
             + synopsis_embed_adjustment
@@ -1639,6 +1664,17 @@ def _seed_based_scores(
             + float(demo_bonus)
             + float(theme_bonus)
         )
+
+        # Phase 5 fix: Obscurity/quality penalty for low-quality/unknown items.
+        obscurity_penalty = 0.0
+        if item_members_count is not None and item_members_count < 50000:
+            obscurity_penalty += 0.25  # Low member count penalty (aggressive)
+        if item_mal_score is None:
+            obscurity_penalty += 0.15  # Missing MAL score penalty
+        elif item_mal_score < 7.0:
+            # Strong penalty for low-rated items: MAL 6.0 -> 0.20, MAL 5.0 -> 0.40
+            obscurity_penalty += max(0.0, 0.20 * (7.0 - item_mal_score))
+        score_before = score_before - obscurity_penalty
 
         score_after = float(score_before)
         quality_prior = 0.0
