@@ -17,7 +17,7 @@ How to use:
 
 **Current phase:** Phase 5
 
-**Last updated:** 2026-02-01
+**Last updated:** 2026-02-03
 
 **Current blockers (if any):**
 - None (app now fails loudly if artifacts are missing/invalid).
@@ -37,8 +37,88 @@ How to use:
 - Latest neural run (with forced-neural diagnostics): [reports/phase4_golden_queries_20260201155513.md](reports/phase4_golden_queries_20260201155513.md) and [reports/artifacts/phase4_golden_queries_20260201155513.json](reports/artifacts/phase4_golden_queries_20260201155513.json).
 - Safety check: total `violation_count` remained **0** (baseline artifact [reports/artifacts/phase4_golden_queries_20260201013913.json](reports/artifacts/phase4_golden_queries_20260201013913.json) vs override artifact above).
 
+- Phase 5 experiment: implemented **seed-based Stage 2 gated content-first scoring** (neural-first only when CF coverage is missing/weak).
+  - Centralized policy + scoring in [src/app/stage2_overrides.py](src/app/stage2_overrides.py):
+    - `should_use_content_first(...)` gate
+    - `content_first_final_score(...)` (positive-only additive delta)
+    - `quality_prior_bonus(...)` (tiny capped prior; uses existing metadata only)
+  - Centralized tunables in [src/app/constants.py](src/app/constants.py):
+    - `CONTENT_FIRST_ALPHA` (default 0.70)
+    - `CONTENT_FIRST_HYBRID_EPS` (default 0.0)
+    - `CONTENT_FIRST_NEURAL_MIN_SIM` (default 0.55)
+    - `QUALITY_PRIOR_COEF` (default 0.03; capped to <= 0.05)
+  - Wired into the two seed-based Stage 2 implementations:
+    - Streamlit app: [app/main.py](app/main.py)
+    - Golden harness: [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py)
+  - Key bug fix: gate uses **CF-only** coverage score (`hybrid_cf_score = 0.93*mf + 0.07*knn`, pop excluded) so popularity can’t mask missing MF/KNN.
+  - Key safety fix: content-first is **additive** (never decreases an item’s existing Stage 2 score).
+
+- Latest golden evidence run (content-first + tightened gate):
+  - [reports/phase4_golden_queries_20260201214503.md](reports/phase4_golden_queries_20260201214503.md)
+  - [reports/artifacts/phase4_golden_queries_20260201214503.json](reports/artifacts/phase4_golden_queries_20260201214503.json)
+  - Evidence snapshots:
+    - `one_piece`: high-neural franchise neighbors move into top-20 (e.g., “One Piece Fan Letter” rank 54→5; “One Piece: Stampede” rank 75→12).
+    - `tokyo_ghoul`: content-first does **not** activate in top-20; `violation_count` remains 0.
+
+- Phase 5 follow-up: implemented **seed ranking goal modes** for seed-based ranked recommendations:
+  - `completion` (default): preserve current behavior (no post-filtering).
+  - `discovery`: apply a deterministic **franchise-cap** as a post-score selection step to reduce franchise dominance without changing scores.
+  - Core implementation: [src/app/franchise_cap.py](src/app/franchise_cap.py) (`apply_franchise_cap`).
+  - Central config (env overrideable): [src/app/constants.py](src/app/constants.py)
+    - `SEED_RANKING_MODE` (`completion|discovery`)
+    - `FRANCHISE_TITLE_OVERLAP_THRESHOLD` (default 0.50)
+    - `FRANCHISE_CAP_TOP20` (default 6)
+    - `FRANCHISE_CAP_TOP50` (default 15)
+  - Streamlit wiring (seed-based only; Browse untouched): [app/main.py](app/main.py) sidebar radio “Goal: Completion vs Discovery”.
+  - Golden harness wiring: [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py) supports `--seed-ranking-mode` and reports per-query cap diagnostics.
+
+- Latest golden evidence runs (franchise-cap goal modes; Balanced weights):
+  - Completion: [reports/phase4_golden_queries_20260202004406.md](reports/phase4_golden_queries_20260202004406.md)
+  - Discovery: [reports/phase4_golden_queries_20260202004755.md](reports/phase4_golden_queries_20260202004755.md)
+  - Result: `violation_count` remained **0** in both runs.
+  - Follow-up: upgraded the Discovery-only franchise classifier to add a high-precision **phrase containment** rule (in addition to `title_overlap`).
+    - New env-tunable knobs in [src/app/constants.py](src/app/constants.py):
+      - `FRANCHISE_STRONG_MATCH_ENABLED` (default true)
+      - `FRANCHISE_STRONG_MATCH_MIN_SEED_LEN` (default 5)
+    - Implementation in [src/app/franchise_cap.py](src/app/franchise_cap.py):
+      - Discovery mode: `strong_match` (normalized `startswith` / boundary substring match) OR fallback `overlap`.
+      - Completion mode: overlap only (no behavior change).
+      - Diagnostics now include per-item `reason` and example/audit tables.
+  - Note: In the latest golden runs, the franchise cap still does **not** drop for `one_piece` or `tokyo_ghoul` because the *ranked top-20/top-50 is not franchise-dominated*.
+    - Example (`one_piece`, discovery): `top20_franchise_like(before/after)=2/2`, `top50_franchise_like(before/after)=3/3`, `dropped(top20/top50/all)=0/0/0`.
+    - The report’s “Forced-neural neighbors” table shows additional One Piece films exist but are currently ranked beyond top-50, so the cap never encounters enough franchise-like items early to trigger.
+
 **Next action (single sentence):**
-- Investigate why `one_piece` strong in-franchise neural neighbors remain mostly outside top-20 despite being present in the shortlist (likely a Stage 2 scoring/penalty balance issue, not Stage 1 admission).
+- With Stage 0 now semantic-first and fully instrumented, use the “why not scored” breakdown to decide whether the next lever is **Stage 1 admission/shortlist** vs **Stage 2 scoring**.
+
+### Phase 5 — Stage 0 enforcement + diagnostics (seed-ranked)
+
+- Phase 5: Implemented **hard Stage 0 enforcement** (seed-based ranked only) by constructing an explicit candidate universe (`candidate_ids` / `candidate_df`) and ensuring Stage 1 admission + Stage 2 scoring iterate only over that universe.
+  - Streamlit: [app/main.py](app/main.py)
+  - Golden harness: [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py)
+- Added debug-only defensive guardrail: assert if scored candidates exceeds `STAGE0_POOL_CAP + STAGE0_ENFORCEMENT_BUFFER`.
+  - Config knob: [src/app/constants.py](src/app/constants.py) (`STAGE0_ENFORCEMENT_BUFFER`)
+- Added mandatory Stage 0 diagnostics (raw vs post-hygiene/cap) + downstream enforcement proof (`stage1_universe`, `scored`, `top20_in_stage0`, `top50_in_stage0`).
+  - Stage 0 diagnostics struct: [src/app/stage0_candidates.py](src/app/stage0_candidates.py)
+- Phase 5: Upgraded Stage 0 candidate generation to **semantic-first (Option 1)** with deterministic tiers A/B/C (neural → strict metadata overlap → popularity backfill) and strict thresholds.
+  - Stage 0 builder: [src/app/stage0_candidates.py](src/app/stage0_candidates.py)
+  - Config knobs: [src/app/constants.py](src/app/constants.py) (`STAGE0_NEURAL_TOPK`, `STAGE0_META_MIN_GENRE_OVERLAP`, `STAGE0_META_MIN_THEME_OVERLAP`, `STAGE0_POPULARITY_BACKFILL`, `STAGE0_POOL_CAP`)
+- Phase 5: Added deterministic **“why not scored”** accounting (first-applicable reason; totals sum to Stage 0 universe).
+  - Reason labels: [src/app/why_not_scored.py](src/app/why_not_scored.py)
+  - Harness output: [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py)
+
+- Latest golden evidence run (Balanced):
+  - Report: [reports/phase4_golden_queries_20260203055720.md](reports/phase4_golden_queries_20260203055720.md)
+  - Artifact: [reports/artifacts/phase4_golden_queries_20260203055720.json](reports/artifacts/phase4_golden_queries_20260203055720.json)
+  - Baseline for comparison: [reports/phase4_golden_queries_20260203050937.md](reports/phase4_golden_queries_20260203050937.md)
+  - Evidence snapshots (Stage 0 audit + why-not-scored tables in the report):
+    - `cowboy_bebop`: `stage0_after_cap=2337` (was 3000), `scored=544` (flat). Why-not-scored is dominated by `not_in_stage1_shortlist` (~50%).
+    - `steins_gate`: `stage0_after_cap=2119` (was 3000), `scored=511` (was 507). Why-not-scored is split across `not_in_stage1_shortlist` (~34%) and `blocked_low_overlap` (~16%).
+    - `death_note`: `stage0_after_cap=2294` (was 1973), `scored=551` (flat). Why-not-scored is primarily `not_in_stage1_shortlist` (~34%) and `blocked_low_overlap` (~16%).
+  - Ranking deltas (top-10):
+    - `steins_gate`: unchanged.
+    - `cowboy_bebop`: unchanged.
+    - `death_note`: 2/10 changed (rank 5 and 10) between the two reports.
 
 ---
 
@@ -492,11 +572,24 @@ Notes:
 - [ ] `APP_IMPORT_LIGHT=1` import path still works for tests (Medium)
 - [ ] No silent fallback to dummy arrays remains (High)
 - [ ] `python -m pytest -q` passes (pytest should only collect `tests/` via `pytest.ini`) (High)
+- [ ] `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50` runs and produces a new `reports/phase4_golden_queries_<ts>.md` + JSON artifact (High)
 - [ ] Manual negative test: set `APP_MF_MODEL_STEM=__bad__` and confirm UI fails loudly + disables recommendations (High)
 
 ---
 
 ## 6) Decision Log (Keep This Short)
+
+### 2026-02-02 — Phase 5: Stage 0 Seed-Conditioned Candidate Generation (ranked seed-only)
+
+- **Decision:** Add a bounded **Stage 0** candidate generation step for **seed-based ranked recommendations only** so Stage 1/Stage 2 score only over a seed-conditioned pool, reducing full-catalog noise.
+- **Stage 0 definition:** deterministic union of:
+  - (A) top-K neural semantic neighbors (cosine over L2-normalized vectors)
+  - (B) metadata overlap: ≥1 shared seed `genres` OR ≥1 shared seed `themes`
+  - (C) optional popularity backfill
+  Then: dedupe by `anime_id`, apply ranked hygiene + seed/watched exclusions, and cap the pool with stable truncation.
+- **Config:** `STAGE0_NEURAL_TOPK` (default 1000), `STAGE0_POPULARITY_BACKFILL` (default 200), `STAGE0_POOL_CAP` (default 3000) in [src/app/constants.py](src/app/constants.py).
+- **Where implemented:** shared pool builder [src/app/stage0_candidates.py](src/app/stage0_candidates.py) and a neural helper in [src/app/synopsis_neural_embeddings.py](src/app/synopsis_neural_embeddings.py). Wired into ranked seed-based paths in [app/main.py](app/main.py) and [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py). **Browse mode bypasses Stage 0.**
+- **Evidence:** Golden report prints per-query pool sizes, source counts, and provenance in [reports/phase4_golden_queries_20260203003643.md](reports/phase4_golden_queries_20260203003643.md), including a Stage 0 audit table for Attack on Titan and Cowboy Bebop.
 
 ### 2026-02-01 — Phase 5: Stage 1 Recall via Forced Neural Neighbors
 
@@ -505,6 +598,14 @@ Notes:
 - **Where implemented:** Shared helper [src/app/stage1_shortlist.py](src/app/stage1_shortlist.py), wired into [app/main.py](app/main.py) and [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
 - **Guardrails:** Still applies ranked hygiene exclusions (disallowed types + recap/summary regex); excludes seeds/watched; deterministic ordering by (similarity desc, anime_id asc).
 - **Evidence:** Golden report includes `forced_neural_*` diagnostics and a One Piece forced-neighbor table in [reports/phase4_golden_queries_20260201155513.md](reports/phase4_golden_queries_20260201155513.md).
+
+### 2026-02-01 — Phase 5: Stage 2 “high-sim penalty relax” (neural ranked-only)
+
+- **Decision:** In ranked seed-based scoring, when `semantic_mode == "neural"` and neural similarity is extremely high (default threshold 0.60), relax *only* the Stage 2 off-type/short-form penalty term (never bypass ranked hygiene, never add a new explicit bonus).
+- **Config:** `HIGH_SIM_OVERRIDE_THRESHOLD` and `HIGH_SIM_OVERRIDE_MODE` in [src/app/constants.py](src/app/constants.py).
+- **Where implemented:** Shared helper [src/app/stage2_overrides.py](src/app/stage2_overrides.py), wired into both [app/main.py](app/main.py) and [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
+- **Diagnostics:** Golden report now includes `high_sim_override_fired(top20/top50/all)` plus an One Piece audit table with `score`, `hybrid`, `neural_bonus`, `penalty_before/after`, and `Δ_to_top20_cutoff` in [reports/phase4_golden_queries_20260201174141.md](reports/phase4_golden_queries_20260201174141.md).
+- **Finding:** For One Piece, the relaxed penalty is tiny (≈0.01) and the best forced-neural neighbors are still ~0.22–0.35 score behind the top-20 cutoff; the dominant gap is low/zero `hybrid` contribution (cold-start / weak CF support), not the off-type penalty.
 
 ### 2025-12-29 — Phase 4 / Chunk A2: Ranked candidate hygiene
 
@@ -589,6 +690,14 @@ Record decisions that future sessions must not re-litigate.
 
 ## 7) Session Log (Tiny, but consistent)
 
+### Session 2026-02-02 (Phase 5 — Stage 0 seed-conditioned candidate pool)
+
+- **Goal:** Ensure seed-based ranked scoring is not iterating over the full metadata table by introducing a deterministic Stage 0 candidate pool.
+- **Key files changed:** [src/app/stage0_candidates.py](src/app/stage0_candidates.py), [src/app/synopsis_neural_embeddings.py](src/app/synopsis_neural_embeddings.py), [src/app/constants.py](src/app/constants.py), [app/main.py](app/main.py), [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).
+- **Validation:** `python -m pytest -q` passes.
+- **Golden run:** `python scripts/evaluate_phase4_golden.py --k 10 --sample-users 50` produced [reports/phase4_golden_queries_20260203003643.md](reports/phase4_golden_queries_20260203003643.md) + [reports/artifacts/phase4_golden_queries_20260203003643.json](reports/artifacts/phase4_golden_queries_20260203003643.json); `violation_count` remains 0 across the golden set.
+- **Before/after notes:** For Cowboy Bebop and Steins;Gate, top-10 membership is unchanged vs the prior run [reports/phase4_golden_queries_20260202004755.md](reports/phase4_golden_queries_20260202004755.md); the first top-20 difference occurs late (rank 20 for Cowboy Bebop; rank 18 for Steins;Gate). This indicates Stage 0 is constraining the candidate universe and providing provenance diagnostics, but top-N quality is still dominated by downstream scoring signals.
+
 ### Session 2026-02-01 (Phase 5 — Stage 1 demographic-aware semantic admission override: shounen-only)
 
 - **Problem:** For some long-running shounen seeds (notably One Piece), neural semantic neighbors could be effectively inert in Stage 1 because genre-overlap gates blocked plausible candidates. This was intended to protect dark/horror seeds (Tokyo Ghoul) from off-theme shorts, so we needed a conservative, deterministic exception.
@@ -616,7 +725,7 @@ Record decisions that future sessions must not re-litigate.
   - **Tokyo Ghoul:** `seed_has_shounen_demo=False` (`[seinen]`); override unused (`demo_override_* = 0`); no safety regressions.
   - **One Piece:** `seed_has_shounen_demo=True` (`[shounen]`); override admits candidates into Stage 1 (`demo_override_admitted_count=18`) and reaches the final top-20 (`demo_override_used_in_top20_count=1`), but the overall top-20 quality remains poor and likely needs separate diagnosis (seed conditioning / metadata hygiene / weighting).
   - **Top-20 before/after diff (helper):**
-    - `python scripts/compare_golden_top20.py --before reports/artifacts/phase4_golden_queries_20260201013913.json --after reports/artifacts/phase4_golden_queries_20260201021802.json --query one_piece --query tokyo_ghoul --k 20`
+    - `python scripts/compare_phase4_golden_topk.py --before reports/artifacts/phase4_golden_queries_20260201013913.json --after reports/artifacts/phase4_golden_queries_20260201021802.json --query one_piece --query tokyo_ghoul --k 20 --side-by-side`
 
 - **Phase 5 diagnostics — raw neural neighbors (One Piece; pre-admission/ranking):**
   - **Command:** `python scripts/sanity_check_neural_neighbors.py --anime-id 21 --topk 50`

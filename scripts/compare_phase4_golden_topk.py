@@ -4,7 +4,13 @@ Usage:
   python scripts/compare_phase4_golden_topk.py \
     --before reports/artifacts/phase4_golden_queries_YYYYMMDDHHMMSS.json \
     --after  reports/artifacts/phase4_golden_queries_YYYYMMDDHHMMSS.json \
-    --query one_piece --query tokyo_ghoul --k 20
+        --query one_piece --query tokyo_ghoul --k 20
+
+To print a clean side-by-side diff table:
+    python scripts/compare_phase4_golden_topk.py \
+        --before reports/artifacts/phase4_golden_queries_YYYYMMDDHHMMSS.json \
+        --after  reports/artifacts/phase4_golden_queries_YYYYMMDDHHMMSS.json \
+        --query cowboy_bebop --k 10 --side-by-side
 """
 
 from __future__ import annotations
@@ -104,6 +110,11 @@ def main() -> int:
     ap.add_argument("--query", action="append", required=True)
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument(
+        "--side-by-side",
+        action="store_true",
+        help="Print a rank-aligned before/after table (clean diff view).",
+    )
+    ap.add_argument(
         "--metadata",
         default="data/processed/anime_metadata.parquet",
         help="Path to processed anime metadata parquet for title/type lookup.",
@@ -128,6 +139,43 @@ def main() -> int:
         print(f"\n=== {qid} ===")
         print(f"before violation_count: {_get_violation_count(qb)} mode: {_get_semantic_mode(qb)}")
         print(f"after  violation_count: {_get_violation_count(qa)} mode: {_get_semantic_mode(qa)}")
+
+        if args.side_by_side:
+            b = _extract_topk(qb, args.k)
+            a = _extract_topk(qa, args.k)
+            rows: list[dict[str, Any]] = []
+            for i in range(args.k):
+                rb = b[i] if i < len(b) else {}
+                ra = a[i] if i < len(a) else {}
+
+                bid = rb.get("anime_id")
+                aid = ra.get("anime_id")
+
+                bid_int = int(bid) if bid is not None else None
+                aid_int = int(aid) if aid is not None else None
+
+                btitle = rb.get("title") or (title_map.get(bid_int) if bid_int is not None else None)
+                atitle = ra.get("title") or (title_map.get(aid_int) if aid_int is not None else None)
+                btype = rb.get("type") or (type_map.get(bid_int) if bid_int is not None else None)
+                atype = ra.get("type") or (type_map.get(aid_int) if aid_int is not None else None)
+
+                rows.append(
+                    {
+                        "rank": i + 1,
+                        "before_id": bid,
+                        "before_type": btype,
+                        "before_title": btitle,
+                        "after_id": aid,
+                        "after_type": atype,
+                        "after_title": atitle,
+                        "changed": bool(bid != aid),
+                    }
+                )
+
+            df = pd.DataFrame(rows)
+            print("\n-- side-by-side top{k} --".format(k=args.k))
+            print(df.to_string(index=False))
+            continue
 
         print("\n-- before top{k} --".format(k=args.k))
         for r in _extract_topk(qb, args.k):

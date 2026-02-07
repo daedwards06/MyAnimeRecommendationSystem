@@ -52,9 +52,10 @@ SYNOPSIS_NEURAL_MIN_EPISODES: int = 12
 # same-type TV remains preferred unless similarity is genuinely strong.
 SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY: float = 0.01
 
-# Additive rerank coefficients (kept small; Stage 1 shortlist is the main effect).
-SYNOPSIS_NEURAL_COLD_START_COEF: float = 0.35
-SYNOPSIS_NEURAL_TRAINED_COEF: float = 0.15
+# Additive rerank coefficients (dramatically increased to make neural signal dominant).
+# Phase 5 fix: previous values (0.35/0.15) were too small to compete with genre overlap.
+SYNOPSIS_NEURAL_COLD_START_COEF: float = 2.5
+SYNOPSIS_NEURAL_TRAINED_COEF: float = 1.5
 
 # Conservative short-form penalty when the base gate fails.
 SYNOPSIS_NEURAL_OFFTYPE_SHORT_PENALTY_BASE: float = 0.60
@@ -207,6 +208,74 @@ def compute_seed_similarity_map(
         if fs >= thr:
             out[int(aid)] = fs
     return out
+
+
+def compute_seed_topk_neighbors(
+    artifact: Any,
+    *,
+    seed_ids: Iterable[int],
+    topk: int,
+) -> list[tuple[int, float]]:
+    """Return [(anime_id, sim)] for the top-K neural neighbors to the seed(s).
+
+    Similarity is cosine on L2-normalized embeddings: dot(E[i], E[seed]).
+
+    Notes:
+    - Deterministic ordering: sim desc, anime_id asc.
+    - Seed items themselves are excluded from selection.
+    - No min_sim threshold is applied here; callers can filter if desired.
+    """
+
+    art = validate_synopsis_neural_embeddings_artifact(artifact)
+    seeds = [int(x) for x in seed_ids]
+    k = max(0, int(topk))
+    if not seeds or k <= 0:
+        return []
+
+    seed_rows: list[int] = []
+    for sid in seeds:
+        r = art.anime_id_to_row.get(int(sid))
+        if r is not None:
+            seed_rows.append(int(r))
+    if not seed_rows:
+        return []
+
+    E = art.embeddings
+    S = E[np.asarray(seed_rows, dtype=np.int32)]
+    if S.ndim != 2 or S.shape[0] <= 0:
+        return []
+
+    sims = E @ S.T
+    max_sims = np.max(sims, axis=1)
+
+    # Exclude seeds from the neighbor list.
+    for r in seed_rows:
+        if 0 <= int(r) < int(max_sims.shape[0]):
+            max_sims[int(r)] = -np.inf
+
+    n_items = int(max_sims.shape[0])
+    if n_items <= 0:
+        return []
+
+    if k >= n_items:
+        idx = np.arange(n_items, dtype=np.int32)
+    else:
+        # Partial selection for efficiency.
+        idx = np.argpartition(max_sims, -k)[-k:]
+
+    pairs: list[tuple[int, float]] = []
+    for i in idx.tolist():
+        try:
+            aid = int(art.anime_ids[int(i)])
+            sim = float(max_sims[int(i)])
+        except Exception:
+            continue
+        if not np.isfinite(sim):
+            continue
+        pairs.append((aid, sim))
+
+    pairs.sort(key=lambda x: (-float(x[1]), int(x[0])))
+    return pairs[:k]
 
 
 def build_artifact_from_embeddings(
