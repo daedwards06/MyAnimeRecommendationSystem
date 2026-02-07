@@ -172,8 +172,9 @@ CONTENT_FIRST_HYBRID_EPS: float = _env_float("CONTENT_FIRST_HYBRID_EPS", 0.0)
 # Phase 5 fix: lowered from 0.55 to 0.30 so content-first fires more often.
 CONTENT_FIRST_NEURAL_MIN_SIM: float = _env_float("CONTENT_FIRST_NEURAL_MIN_SIM", 0.30)
 
-# Small stability prior (must remain tiny). Uses existing metadata signals.
-QUALITY_PRIOR_COEF: float = min(0.05, max(0.0, _env_float("QUALITY_PRIOR_COEF", 0.03)))
+# Quality prior coefficient - increased from 0.03 to 0.15 to weight quality more heavily
+# in content-first scoring. Capped at 0.20 to avoid dominating other signals.
+QUALITY_PRIOR_COEF: float = min(0.20, max(0.0, _env_float("QUALITY_PRIOR_COEF", 0.15)))
 
 
 # ---------------------------------------------------------------------------

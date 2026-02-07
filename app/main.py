@@ -2227,17 +2227,37 @@ else:
 
                         s1 = float(c.get("stage1_score", 0.0))
 
+                        # Retrieve MAL score and members count for quality scaling.
+                        try:
+                            item_mal_score = None if pd.isna(mrow.get("mal_score")) else float(mrow.get("mal_score"))
+                        except Exception:
+                            item_mal_score = None
+                        try:
+                            item_members_count = None if pd.isna(mrow.get("members_count")) else int(mrow.get("members_count"))
+                        except Exception:
+                            item_members_count = None
+
+                        # Phase 5 fix: Quality-scaled neural contribution.
+                        # Scale neural_sim by quality factor: MAL 5.0->0.15, 7.0->0.5, 9.0->1.0
+                        # Items with missing MAL score get quality_factor=0.3 (conservative default).
+                        if item_mal_score is not None and item_mal_score > 0:
+                            quality_factor = max(0.15, min(1.0, (item_mal_score - 5.0) / 4.0))
+                        else:
+                            quality_factor = 0.3  # Conservative default for missing scores
+
+                        neural_contribution = 1.5 * float(synopsis_neural_sim) * quality_factor
+
                         # Phase 5 fix: rebalanced weights to make neural similarity dominant.
                         # - Reduced genre overlap (0.5 -> 0.3) and seed coverage (0.2 -> 0.1)
                         # - Reduced hybrid CF weight (0.25 -> 0.15)
-                        # - Added DIRECT neural similarity contribution (1.5 * neural_sim)
+                        # - Added QUALITY-SCALED neural similarity contribution
                         score_before = (
                             (0.3 * weighted_overlap)
                             + (0.1 * seed_coverage)
                             + (0.15 * float(hybrid_val_for_scoring))
                             + (0.05 * popularity_boost)
                             + (0.10 * float(s1))
-                            + (1.5 * float(synopsis_neural_sim))  # Direct neural contribution
+                            + neural_contribution  # Quality-scaled neural contribution
                             + meta_bonus
                             + synopsis_tfidf_adjustment
                             + synopsis_embed_adjustment
@@ -2246,25 +2266,28 @@ else:
                             + float(theme_bonus)
                         )
 
+                        # Phase 5 fix: Obscurity/quality penalty for low-quality/unknown items.
+                        # Penalize items with low member counts, low MAL scores, or missing data.
+                        obscurity_penalty = 0.0
+                        if item_members_count is not None and item_members_count < 50000:
+                            obscurity_penalty += 0.25  # Low member count penalty (aggressive)
+                        if item_mal_score is None:
+                            obscurity_penalty += 0.15  # Missing MAL score penalty
+                        elif item_mal_score < 7.0:
+                            # Strong penalty for low-rated items: MAL 6.0 -> 0.20, MAL 5.0 -> 0.40
+                            obscurity_penalty += max(0.0, 0.20 * (7.0 - item_mal_score))
+                        score_before = score_before - obscurity_penalty
+
                         score_after = float(score_before)
                         if bool(content_first_active):
-                            try:
-                                mal_score = None if pd.isna(mrow.get("mal_score")) else float(mrow.get("mal_score"))
-                            except Exception:
-                                mal_score = None
-                            # Some metadata builds use members_count; treat missing as None.
-                            try:
-                                members_count = None if pd.isna(mrow.get("members_count")) else int(mrow.get("members_count"))
-                            except Exception:
-                                members_count = None
-
+                            # Reuse mal_score and members_count already retrieved above.
                             score_after = float(
                                 content_first_final_score(
                                     score_before=float(score_before),
                                     neural_sim=float(synopsis_neural_sim),
                                     hybrid_cf_score=float(hybrid_cf_score),
-                                    mal_score=mal_score,
-                                    members_count=members_count,
+                                    mal_score=item_mal_score,
+                                    members_count=item_members_count,
                                 )
                             )
 
