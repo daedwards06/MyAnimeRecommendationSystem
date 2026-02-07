@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import logging
 import os
 import sys
 from pathlib import Path
@@ -34,6 +35,23 @@ from src.app.components.help import render_help_panel
 from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
+from src.app.franchise_cap import apply_franchise_cap
+from src.app.constants import (
+    STAGE0_META_MIN_GENRE_OVERLAP,
+    STAGE0_META_MIN_THEME_OVERLAP,
+    SEED_RANKING_MODE,
+    FRANCHISE_TITLE_OVERLAP_THRESHOLD,
+    FRANCHISE_CAP_TOP20,
+    FRANCHISE_CAP_TOP50,
+    STAGE0_NEURAL_TOPK,
+    STAGE0_POPULARITY_BACKFILL,
+    STAGE0_POOL_CAP,
+    STAGE0_ENFORCEMENT_BUFFER,
+)
+from src.app.stage0_candidates import build_stage0_seed_candidate_pool
+
+
+logger = logging.getLogger(__name__)
 from src.app.metadata_features import (
     METADATA_AFFINITY_COLD_START_COEF,
     METADATA_AFFINITY_TRAINED_COEF,
@@ -71,12 +89,14 @@ from src.app.synopsis_neural_embeddings import (
     synopsis_neural_bonus_for_candidate,
     synopsis_neural_penalty_for_candidate,
 )
+from src.app.stage2_overrides import content_first_final_score, relax_off_type_penalty, should_use_content_first
 from src.app.theme import get_theme
 from src.app.constants import (
     DEFAULT_TOP_N,
     PERSONAS_JSON,
     FORCE_NEURAL_TOPK,
     FORCE_NEURAL_MIN_SIM,
+    CONTENT_FIRST_ALPHA,
 )
 
 from src.app.stage1_shortlist import build_stage1_shortlist, force_neural_enabled, select_forced_neural_pairs
@@ -893,6 +913,29 @@ else:
         ),
     )
 
+    # Phase 5 follow-up: Seed-based ranking goal (Completion vs Discovery).
+    # Keep Browse unchanged; only show when Seed-based is the active top-level mode.
+    if str(st.session_state.get("ui_mode", "Seed-based")) == "Seed-based":
+        _goal_opts = [
+            "Goal: Completion (more from franchise)",
+            "Goal: Discovery (similar vibes)",
+        ]
+        _mode_default = str(st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE) or SEED_RANKING_MODE)
+        _mode_default = _mode_default.strip().lower()
+        _goal_index = 0 if _mode_default != "discovery" else 1
+        _goal_label = st.sidebar.radio(
+            "Seed goal",
+            _goal_opts,
+            index=_goal_index,
+            horizontal=False,
+            key="seed_goal_ui",
+            help=(
+                "Completion lets sequels/spin-offs surface freely. "
+                "Discovery limits franchise dominance in top results using a deterministic title-overlap cap."
+            ),
+        )
+        st.session_state["seed_ranking_mode"] = "discovery" if "Discovery" in str(_goal_label) else "completion"
+
 # ============================================================================
 # SIDEBAR: FILTERS & DISPLAY (Section 4)
 # ============================================================================
@@ -1562,6 +1605,77 @@ else:
                     if st.session_state["active_profile"]:
                         watched_ids_set = {int(x) for x in (st.session_state["active_profile"].get("watched_ids", []) or [])}
 
+                    # ------------------------------------------------------------------
+                    # Stage 0 (Phase 5 final fix): Seed-conditioned candidate pool
+                    #
+                    # Constrain the universe BEFORE Stage 1 admission / Stage 2 scoring.
+                    # Browse mode bypasses this entirely.
+                    # ------------------------------------------------------------------
+                    stage0_ids, stage0_flags_by_id, stage0_diag = build_stage0_seed_candidate_pool(
+                        metadata=metadata,
+                        seed_ids=list(selected_seed_ids),
+                        ranked_hygiene_exclude_ids=set(ranked_hygiene_exclude_ids),
+                        watched_ids=set(watched_ids_set),
+                        neural_artifact=synopsis_neural_artifact,
+                        neural_topk=int(STAGE0_NEURAL_TOPK),
+                        meta_min_genre_overlap=float(STAGE0_META_MIN_GENRE_OVERLAP),
+                        meta_min_theme_overlap=float(STAGE0_META_MIN_THEME_OVERLAP),
+                        popularity_backfill=int(STAGE0_POPULARITY_BACKFILL),
+                        pool_cap=int(STAGE0_POOL_CAP),
+                        pop_item_ids=(components.item_ids if components is not None else None),
+                        pop_scores=(components.pop if components is not None else None),
+                    )
+
+                    # Diagnostics only: keep in session_state (no UI changes required).
+                    st.session_state["last_stage0"] = {
+                        "stage0_pool_raw": int(stage0_diag.stage0_pool_raw),
+                        "stage0_raw_counts_by_tier": {
+                            "stage0_from_neural": int(stage0_diag.stage0_from_neural_raw),
+                            "stage0_from_meta_strict": int(stage0_diag.stage0_from_meta_strict_raw),
+                            "stage0_from_popularity": int(stage0_diag.stage0_from_popularity_raw),
+                        },
+                        "stage0_after_hygiene": int(stage0_diag.stage0_after_hygiene),
+                        "stage0_after_cap": int(stage0_diag.stage0_after_cap),
+                        "stage0_after_cap_counts_by_tier": {
+                            "stage0_from_neural": int(stage0_diag.stage0_from_neural),
+                            "stage0_from_meta_strict": int(stage0_diag.stage0_from_meta_strict),
+                            "stage0_from_popularity": int(stage0_diag.stage0_from_popularity),
+                        },
+                        "stage0_overlap_counts": {
+                            "stage0_neural_only": int(stage0_diag.stage0_neural_only),
+                            "stage0_meta_only": int(stage0_diag.stage0_meta_only),
+                            "stage0_pop_only": int(stage0_diag.stage0_pop_only),
+                            "stage0_neural_and_meta": int(stage0_diag.stage0_neural_and_meta),
+                        },
+                    }
+
+                    # Stage 0 enforcement: this is the ONLY candidate universe.
+                    candidate_ids = [int(x) for x in (stage0_ids or []) if int(x) > 0]
+                    candidate_id_set = {int(x) for x in candidate_ids}
+
+                    # Stable order: preserve metadata's existing order.
+                    if candidate_id_set:
+                        try:
+                            candidate_df = metadata.loc[metadata["anime_id"].astype(int).isin(candidate_id_set)]
+                        except Exception:
+                            candidate_df = metadata
+                    else:
+                        candidate_df = metadata.iloc[0:0]
+
+                    logger.info(
+                        "Stage0(seed-based) pool_raw=%s after_hygiene=%s after_cap=%s src_raw(neural/meta_strict/pop)=%s/%s/%s overlap(neural_only/meta_only/pop_only/neural_and_meta)=%s/%s/%s/%s",
+                        int(stage0_diag.stage0_pool_raw),
+                        int(stage0_diag.stage0_after_hygiene),
+                        int(stage0_diag.stage0_after_cap),
+                        int(stage0_diag.stage0_from_neural_raw),
+                        int(stage0_diag.stage0_from_meta_strict_raw),
+                        int(stage0_diag.stage0_from_popularity_raw),
+                        int(stage0_diag.stage0_neural_only),
+                        int(stage0_diag.stage0_meta_only),
+                        int(stage0_diag.stage0_pop_only),
+                        int(stage0_diag.stage0_neural_and_meta),
+                    )
+
                     stage1_embed_pool: list[dict] = []
                     stage1_tfidf_pool: list[dict] = []
                     stage1_neural_pool: list[dict] = []
@@ -1589,7 +1703,8 @@ else:
                         )
                         forced_neural_ids = {int(aid) for aid, _ in forced_neural_pairs}
 
-                    for _, mrow in metadata.iterrows():
+                    # Stage 1 operates ONLY over Stage 0 candidates.
+                    for _, mrow in candidate_df.iterrows():
                         aid = int(mrow["anime_id"])
                         if aid in selected_seed_ids:
                             continue
@@ -1905,6 +2020,13 @@ else:
                         forced_first=stage1_forced_neural_pool,
                     )
 
+                    # Enforcement diagnostics: Stage 1 must never expand beyond Stage 0.
+                    st.session_state["last_stage0_enforcement"] = {
+                        "stage0_after_hygiene_size": int(stage0_diag.stage0_after_hygiene_size),
+                        "stage1_iterated_candidate_count": int(len(candidate_df)),
+                        "shortlist_size": int(len(shortlist)),
+                    }
+
                     # Stage 2: rerank shortlist using existing hybrid + pop + bonuses.
                     try:
                         blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
@@ -1930,6 +2052,34 @@ else:
                             hybrid_val = float(blended_scores[id_to_index[aid]])
                         else:
                             hybrid_val = 0.0
+
+                        # Compute CF-only hybrid score (mf/knn only; pop excluded) for content-first blend.
+                        # NOTE: We use this for gating because blended hybrid_val can be dominated by popularity.
+                        hybrid_cf_score = 0.0
+                        if aid in id_to_index:
+                            idx = int(id_to_index[aid])
+                            try:
+                                mf_base = float(components.mf[user_index, idx]) if components.mf is not None else 0.0
+                            except Exception:
+                                mf_base = 0.0
+                            try:
+                                knn_base = float(components.knn[user_index, idx]) if components.knn is not None else 0.0
+                            except Exception:
+                                knn_base = 0.0
+
+                            # Match the spec's CF stabilizer weights.
+                            hybrid_cf_score = float((0.93 * mf_base) + (0.07 * knn_base))
+
+                        # Phase 5 experiment: gated content-first scoring for seed-based rerank.
+                        # Conservative trigger: neural mode + semantic confidence high + CF coverage near-zero.
+                        content_first_active = bool(
+                            should_use_content_first(
+                                float(hybrid_cf_score),
+                                semantic_mode=str(semantic_mode),
+                                sem_conf=str(semantic_conf_tier),
+                                neural_sim=float(synopsis_neural_sim),
+                            )
+                        )
 
                         meta_affinity = float(c.get("metadata_affinity", 0.0))
                         meta_bonus = 0.0
@@ -2043,6 +2193,17 @@ else:
                                         candidate_episodes=cand_eps,
                                     )
                                 )
+
+                            # Phase 5 Stage 2 refinement: for extremely high-sim neural
+                            # neighbors, relax only the off-type/short-form penalty term.
+                            synopsis_neural_penalty = float(
+                                relax_off_type_penalty(
+                                    penalty=float(synopsis_neural_penalty),
+                                    neural_sim=float(synopsis_neural_sim),
+                                    semantic_mode=str(semantic_mode),
+                                    browse_mode=False,
+                                )
+                            )
                             synopsis_neural_adjustment = float(synopsis_neural_bonus + synopsis_neural_penalty)
 
                         # Optional tiny tie-breaker: demographics overlap (Stage 2 only; never gates).
@@ -2066,12 +2227,17 @@ else:
 
                         s1 = float(c.get("stage1_score", 0.0))
 
-                        score = (
-                            (0.5 * weighted_overlap)
-                            + (0.2 * seed_coverage)
-                            + (0.25 * float(hybrid_val_for_scoring))
+                        # Phase 5 fix: rebalanced weights to make neural similarity dominant.
+                        # - Reduced genre overlap (0.5 -> 0.3) and seed coverage (0.2 -> 0.1)
+                        # - Reduced hybrid CF weight (0.25 -> 0.15)
+                        # - Added DIRECT neural similarity contribution (1.5 * neural_sim)
+                        score_before = (
+                            (0.3 * weighted_overlap)
+                            + (0.1 * seed_coverage)
+                            + (0.15 * float(hybrid_val_for_scoring))
                             + (0.05 * popularity_boost)
                             + (0.10 * float(s1))
+                            + (1.5 * float(synopsis_neural_sim))  # Direct neural contribution
                             + meta_bonus
                             + synopsis_tfidf_adjustment
                             + synopsis_embed_adjustment
@@ -2079,6 +2245,30 @@ else:
                             + float(demo_bonus)
                             + float(theme_bonus)
                         )
+
+                        score_after = float(score_before)
+                        if bool(content_first_active):
+                            try:
+                                mal_score = None if pd.isna(mrow.get("mal_score")) else float(mrow.get("mal_score"))
+                            except Exception:
+                                mal_score = None
+                            # Some metadata builds use members_count; treat missing as None.
+                            try:
+                                members_count = None if pd.isna(mrow.get("members_count")) else int(mrow.get("members_count"))
+                            except Exception:
+                                members_count = None
+
+                            score_after = float(
+                                content_first_final_score(
+                                    score_before=float(score_before),
+                                    neural_sim=float(synopsis_neural_sim),
+                                    hybrid_cf_score=float(hybrid_cf_score),
+                                    mal_score=mal_score,
+                                    members_count=members_count,
+                                )
+                            )
+
+                        score = float(score_after)
                         if score <= 0:
                             continue
 
@@ -2122,6 +2312,7 @@ else:
                             "common_genres": list(all_seed_genres & item_genres),
                             "metadata_affinity": float(meta_affinity),
                             "metadata_bonus": float(meta_bonus),
+                            "title_overlap": float(c.get("title_overlap", 0.0)),
                             "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
                             "synopsis_tfidf_bonus": float(synopsis_tfidf_bonus),
                             "synopsis_tfidf_penalty": float(synopsis_tfidf_penalty),
@@ -2133,11 +2324,19 @@ else:
                             "synopsis_embed_penalty": float(synopsis_embed_penalty),
                             "synopsis_embed_adjustment": float(synopsis_embed_adjustment),
                             "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
+                            "synopsis_neural_sim": float(synopsis_neural_sim),
                             "demographics_overlap_bonus": float(demo_bonus),
                             "theme_overlap": None if theme_overlap is None else float(theme_overlap),
                             "theme_stage2_bonus": float(theme_bonus),
                             "stage1_score": float(s1),
                             "shortlist_size": int(len(shortlist)),
+                            # Phase 5 experiment: gated content-first scoring diagnostics.
+                            "content_first_active": bool(content_first_active),
+                            "content_first_alpha": float(CONTENT_FIRST_ALPHA),
+                            "content_first_hybrid_cf_score": float(hybrid_cf_score),
+                            "hybrid_val": float(hybrid_val),
+                            "score_before": float(score_before),
+                            "score_after": float(score_after),
                         }
                         explanation.update(shares)
 
@@ -2145,6 +2344,9 @@ else:
                             "anime_id": aid,
                             "score": score,
                             "explanation": explanation,
+                            "_title_display": str(mrow.get("title_display") or mrow.get("title_primary") or ""),
+                            "_title_overlap": float(c.get("title_overlap", 0.0)),
+                            "_synopsis_neural_sim": float(synopsis_neural_sim),
                             "_raw_components": raw_components,
                             "_used_components": used_components,
                             "_explanation_meta": {
@@ -2154,7 +2356,78 @@ else:
                         })
 
                     scored.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
-                    recs = scored[:n_requested]
+
+                    # Debug-only guardrail: once Stage 0 is enforced, we should never be
+                    # scoring a universe that looks like the full catalog.
+                    final_scored_candidate_count = int(len(scored))
+                    if __debug__:
+                        if int(final_scored_candidate_count) > int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER):
+                            logger.warning(
+                                "Stage0 enforcement violated: scored=%s > cap+buf=%s (cap=%s buf=%s)",
+                                int(final_scored_candidate_count),
+                                int(int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER)),
+                                int(STAGE0_POOL_CAP),
+                                int(STAGE0_ENFORCEMENT_BUFFER),
+                            )
+                            assert int(final_scored_candidate_count) <= int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER)
+
+                    # Phase 5 follow-up: Discovery mode franchise-cap (post-score selection only).
+                    seed_ranking_mode = str(st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE) or SEED_RANKING_MODE)
+                    seed_ranking_mode = seed_ranking_mode.strip().lower()
+                    if seed_ranking_mode == "discovery":
+                        scored_capped, cap_diag = apply_franchise_cap(
+                            scored,
+                            n=int(n_requested),
+                            seed_ranking_mode=str(seed_ranking_mode),
+                            seed_titles=list(selected_seed_titles or []),
+                            threshold=float(FRANCHISE_TITLE_OVERLAP_THRESHOLD),
+                            cap_top20=int(FRANCHISE_CAP_TOP20),
+                            cap_top50=int(FRANCHISE_CAP_TOP50),
+                            title_overlap=lambda r: float(r.get("_title_overlap", 0.0)),
+                            title=lambda r: str(r.get("_title_display", "")),
+                            anime_id=lambda r: int(r.get("anime_id", 0)),
+                            neural_sim=lambda r: float(r.get("_synopsis_neural_sim", 0.0)),
+                        )
+                        st.session_state["last_franchise_cap"] = {
+                            "seed_ranking_mode": cap_diag.seed_ranking_mode,
+                            "franchise_cap_threshold": cap_diag.franchise_cap_threshold,
+                            "franchise_cap_top20": cap_diag.franchise_cap_top20,
+                            "franchise_cap_top50": cap_diag.franchise_cap_top50,
+                            "top20_franchise_like_count_before": cap_diag.top20_franchise_like_count_before,
+                            "top20_franchise_like_count_after": cap_diag.top20_franchise_like_count_after,
+                            "top50_franchise_like_count_before": cap_diag.top50_franchise_like_count_before,
+                            "top50_franchise_like_count_after": cap_diag.top50_franchise_like_count_after,
+                            "franchise_items_dropped_count": cap_diag.franchise_items_dropped_count,
+                            "franchise_items_dropped_count_top20": cap_diag.franchise_items_dropped_count_top20,
+                            "franchise_items_dropped_count_top50": cap_diag.franchise_items_dropped_count_top50,
+                            "franchise_items_dropped_examples_top5": cap_diag.franchise_items_dropped_examples_top5,
+                        }
+                        recs = scored_capped
+                    else:
+                        recs = scored[:n_requested]
+
+                    # Downstream enforcement diagnostics: final ranked items must all be from Stage 0.
+                    try:
+                        top20 = recs[:20]
+                        top50 = recs[:50]
+                        top20_in_stage0 = sum(1 for r in top20 if int(r.get("anime_id", 0)) in candidate_id_set)
+                        top50_in_stage0 = sum(1 for r in top50 if int(r.get("anime_id", 0)) in candidate_id_set)
+                    except Exception:
+                        top20_in_stage0 = 0
+                        top50_in_stage0 = 0
+
+                    try:
+                        enr = st.session_state.get("last_stage0_enforcement") or {}
+                        enr.update(
+                            {
+                                "final_scored_candidate_count": int(final_scored_candidate_count),
+                                "top20_in_stage0_count": int(top20_in_stage0),
+                                "top50_in_stage0_count": int(top50_in_stage0),
+                            }
+                        )
+                        st.session_state["last_stage0_enforcement"] = enr
+                    except Exception:
+                        pass
                 else:
                     # Default: seed-based recommendations
                     recs = recommender.get_top_n_for_user(
