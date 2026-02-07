@@ -2022,7 +2022,7 @@ else:
 
                     # Enforcement diagnostics: Stage 1 must never expand beyond Stage 0.
                     st.session_state["last_stage0_enforcement"] = {
-                        "stage0_after_hygiene_size": int(stage0_diag.stage0_after_hygiene_size),
+                        "stage0_after_hygiene_size": int(stage0_diag.stage0_after_hygiene),
                         "stage1_iterated_candidate_count": int(len(candidate_df)),
                         "shortlist_size": int(len(shortlist)),
                     }
