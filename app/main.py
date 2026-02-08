@@ -1727,6 +1727,9 @@ if recs:
     # Extract all raw scores for percentile-based display
     all_raw_scores = [rec.get("score") for rec in recs if has_match_score(rec.get("score"))]
     
+    # Create indexed lookup for O(1) access (performance optimization)
+    metadata_by_id = metadata.set_index("anime_id", drop=False)
+    
     if view_mode_state == "grid":
         # Grid layout: 3 columns
         # Process in batches of 3 for grid layout
@@ -1736,9 +1739,10 @@ if recs:
                 if i + j < len(recs):
                     rec = recs[i + j]
                     anime_id = rec["anime_id"]
-                    row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-                    if not row_df.empty:
-                        row = row_df.iloc[0]
+                    try:
+                        row = metadata_by_id.loc[anime_id]
+                        if isinstance(row, pd.DataFrame):
+                            row = row.iloc[0]
                         pop_pct = _pop_pct_for_anime_id(int(anime_id))
                         with col:
                             render_card_grid(
@@ -1746,14 +1750,18 @@ if recs:
                                 is_in_training=_is_in_training(int(anime_id)),
                                 all_raw_scores=all_raw_scores
                             )
+                    except KeyError:
+                        pass
     else:
         # List layout: standard cards
         for rec in recs:
             anime_id = rec["anime_id"]
-            row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-            if row_df.empty:
+            try:
+                row = metadata_by_id.loc[anime_id]
+                if isinstance(row, pd.DataFrame):
+                    row = row.iloc[0]
+            except KeyError:
                 continue
-            row = row_df.iloc[0]
             pop_pct = _pop_pct_for_anime_id(int(anime_id))
             render_card(
                 row, rec, pop_pct,

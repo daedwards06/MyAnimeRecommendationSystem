@@ -542,10 +542,17 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     all_seed_genres: set[str] = set()
     genre_weights: dict[str, int] = {}
 
+    # Create indexed lookup for O(1) access (performance optimization)
+    metadata_by_id = metadata.set_index("anime_id", drop=False)
+
     for seed_id, seed_title in zip(selected_seed_ids, selected_seed_titles):
-        seed_row = metadata.loc[metadata["anime_id"] == seed_id].head(1)
-        if not seed_row.empty:
-            row_genres = seed_row.iloc[0].get("genres")
+        try:
+            seed_row = metadata_by_id.loc[seed_id]
+            row_genres = seed_row.get("genres") if isinstance(seed_row, pd.Series) else None
+        except KeyError:
+            continue
+        
+        if row_genres is not None:
             if isinstance(row_genres, str):
                 seed_genres = {g.strip() for g in row_genres.split("|") if g.strip()}
             elif hasattr(row_genres, "__iter__") and not isinstance(row_genres, str):
