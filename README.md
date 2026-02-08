@@ -1,5 +1,7 @@
 # MyAnimeRecommendationSystem (MARS)
 
+![CI](https://github.com/daedwards06/MyAnimeRecommendationSystem/actions/workflows/ci.yml/badge.svg)
+
 **Portfolio-grade hybrid anime recommender system** with personalized collaborative filtering, explainability, and rich metadata integration.
 
 ## ✨ Key Features

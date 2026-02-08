@@ -23,6 +23,10 @@ venv-all: venv-minimal venv-kernel
 test:
 	. .venv/Scripts/activate && pytest -q
 
+# Run tests with CI configuration (mirrors GitHub Actions)
+ci:
+	. .venv/Scripts/activate && APP_IMPORT_LIGHT=1 pytest -x -q --tb=short
+
 app:
 	. .venv/Scripts/activate && streamlit run app/app.py
 

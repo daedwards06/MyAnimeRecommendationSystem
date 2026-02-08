@@ -140,12 +140,12 @@ REQUIREMENTS:
 **Why:** A green CI badge is instant portfolio credibility. It proves tests pass, and prevents regressions.
 
 **Checklist:**
-- [ ] Create `.github/workflows/ci.yml`
-- [ ] Configure: Python 3.11, pip install from requirements.txt, run `pytest -x -q`
-- [ ] Set `APP_IMPORT_LIGHT=1` environment variable (avoids loading real model artifacts in CI)
-- [ ] Add pytest badge to README.md
-- [ ] Verify all 64+ existing tests pass in CI
-- [ ] Add a `make ci` target to Makefile that mirrors the CI steps locally
+- [x] Create `.github/workflows/ci.yml`
+- [x] Configure: Python 3.11, pip install from requirements.txt, run `pytest -x -q`
+- [x] Set `APP_IMPORT_LIGHT=1` environment variable (avoids loading real model artifacts in CI)
+- [x] Add pytest badge to README.md
+- [x] Verify all 64+ existing tests pass in CI
+- [x] Add a `make ci` target to Makefile that mirrors the CI steps locally
 
 **Prompt for Claude Sonnet 4.5:**
 
