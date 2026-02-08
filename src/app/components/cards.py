@@ -5,7 +5,12 @@ import pandas as pd
 from src.app.badges import badge_payload
 from src.app.components.tooltips import format_badge_tooltip
 from src.app.components.rating import render_quick_rating_buttons
-from src.app.score_semantics import SCORE_LABEL_SHORT, format_match_score, has_match_score
+from src.app.score_semantics import (
+    SCORE_LABEL_SHORT,
+    format_match_score,
+    has_match_score,
+    format_user_friendly_score,
+)
 
 
 def _get_user_genre_hist_from_session() -> dict:
@@ -83,8 +88,18 @@ def _render_image_streamlit(thumb_rel: str | None, title_display: str):
     if debug:
         st.caption(f"[img missing] {img_path}")
 
-def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
-    """Render a compact grid card version."""
+def render_card_grid(
+    row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
+):
+    """Render a compact grid card version.
+    
+    Args:
+        row: Metadata row for the anime
+        rec: Recommendation dict with score
+        pop_pct: Popularity percentile
+        is_in_training: Whether anime was in training set
+        all_raw_scores: All scores in result set for percentile calculation (optional)
+    """
     # Extract anime_id early (needed for button keys)
     anime_id = int(row.get("anime_id"))
     
@@ -136,11 +151,21 @@ def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         score = rec.get("score")
         score_badge = ""
         if has_match_score(score):
-            score_str = format_match_score(float(score))
-            score_badge = (
-                f"<span style='background: #3498DB20; color: #3498DB; padding: 2px 6px; "
-                f"border-radius: 8px; font-weight: 600;'>{SCORE_LABEL_SHORT}: {score_str}</span>"
-            )
+            # Use user-friendly format if all scores available, else raw format
+            if all_raw_scores:
+                user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
+                score_str = user_friendly
+                score_badge = (
+                    f"<span style='background: {color}20; color: {color}; padding: 2px 6px; "
+                    f"border-radius: 8px; font-weight: 600;' title='{tooltip}'>{score_str}</span>"
+                )
+            else:
+                # Fallback to raw score display
+                score_str = format_match_score(float(score))
+                score_badge = (
+                    f"<span style='background: #3498DB20; color: #3498DB; padding: 2px 6px; "
+                    f"border-radius: 8px; font-weight: 600;'>{SCORE_LABEL_SHORT}: {score_str}</span>"
+                )
 
         st.markdown(
             f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>",
@@ -222,7 +247,18 @@ def render_card_grid(row, rec: dict, pop_pct: float, *, is_in_training: bool):
             st.markdown("---")
             render_quick_rating_buttons(anime_id, title_display, current_rating)
 
-def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
+def render_card(
+    row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
+):
+    """Render a detailed list card.
+    
+    Args:
+        row: Metadata row for the anime
+        rec: Recommendation dict with score
+        pop_pct: Popularity percentile
+        is_in_training: Whether anime was in training set
+        all_raw_scores: All scores in result set for percentile calculation (optional)
+    """
     raw_genres = row.get("genres")
     genres = coerce_genres(raw_genres)
     item_genres = [g for g in genres.split("|") if g]
@@ -297,11 +333,24 @@ def render_card(row, rec: dict, pop_pct: float, *, is_in_training: bool):
         score_badge = ""
         badge_color = "#3498DB"
         if has_match_score(score):
-            score_str = format_match_score(float(score))
-            score_badge = (
-                f"<span style=\"background: {badge_color}20; color: {badge_color}; padding: 2px 8px; "
-                f"border-radius: 12px; font-size: 0.85rem; font-weight: 600;\">{SCORE_LABEL_SHORT}: {score_str}</span>"
-            )
+            # Use user-friendly format if all scores available, else raw format
+            if all_raw_scores:
+                user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
+                badge_color = color
+                score_badge = (
+                    f"<span style=\"background: {badge_color}20; color: {badge_color}; padding: 2px 8px; "
+                    f"border-radius: 12px; font-size: 0.85rem; font-weight: 600;\" title=\"{tooltip}\">{user_friendly}</span>"
+                )
+                # Show raw score in smaller text below for technical users
+                raw_score_text = format_match_score(float(score))
+                score_badge += f"<br><span style='font-size: 0.7rem; color: #95A5A6;'>({SCORE_LABEL_SHORT}: {raw_score_text})</span>"
+            else:
+                # Fallback to raw score display
+                score_str = format_match_score(float(score))
+                score_badge = (
+                    f"<span style=\"background: {badge_color}20; color: {badge_color}; padding: 2px 8px; "
+                    f"border-radius: 12px; font-size: 0.85rem; font-weight: 600;\">{SCORE_LABEL_SHORT}: {score_str}</span>"
+                )
 
         if score_badge:
             st.markdown(

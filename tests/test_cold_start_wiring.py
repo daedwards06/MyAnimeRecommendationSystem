@@ -38,5 +38,7 @@ def test_cards_require_explicit_is_in_training_flag():
     cards_py = _read_repo_file("src/app/components/cards.py")
 
     # Ensure the new kw-only parameter exists in both renderers.
-    assert re.search(r"def\s+render_card_grid\(.*\*,\s*is_in_training:\s*bool\)\s*:", cards_py) is not None
-    assert re.search(r"def\s+render_card\(.*\*,\s*is_in_training:\s*bool\)\s*:", cards_py) is not None
+    # Allow for additional parameters after is_in_training (with comma)
+    # Use DOTALL to handle multi-line function signatures
+    assert re.search(r"def\s+render_card_grid\(.*\*,\s*is_in_training:\s*bool(?:,|\))", cards_py, re.DOTALL) is not None
+    assert re.search(r"def\s+render_card\(.*\*,\s*is_in_training:\s*bool(?:,|\))", cards_py, re.DOTALL) is not None

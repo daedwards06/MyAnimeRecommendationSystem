@@ -34,6 +34,7 @@ from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
 from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
+from src.app.score_semantics import has_match_score
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
 from src.app.franchise_cap import apply_franchise_cap
 from src.app.constants import (
@@ -1739,6 +1740,9 @@ if recs:
 if recs:
     view_mode_state = st.session_state.get("view_mode", "list")
     
+    # Extract all raw scores for percentile-based display
+    all_raw_scores = [rec.get("score") for rec in recs if has_match_score(rec.get("score"))]
+    
     if view_mode_state == "grid":
         # Grid layout: 3 columns
         # Process in batches of 3 for grid layout
@@ -1753,7 +1757,11 @@ if recs:
                         row = row_df.iloc[0]
                         pop_pct = _pop_pct_for_anime_id(int(anime_id))
                         with col:
-                            render_card_grid(row, rec, pop_pct, is_in_training=_is_in_training(int(anime_id)))
+                            render_card_grid(
+                                row, rec, pop_pct,
+                                is_in_training=_is_in_training(int(anime_id)),
+                                all_raw_scores=all_raw_scores
+                            )
     else:
         # List layout: standard cards
         for rec in recs:
@@ -1763,7 +1771,11 @@ if recs:
                 continue
             row = row_df.iloc[0]
             pop_pct = _pop_pct_for_anime_id(int(anime_id))
-            render_card(row, rec, pop_pct, is_in_training=_is_in_training(int(anime_id)))
+            render_card(
+                row, rec, pop_pct,
+                is_in_training=_is_in_training(int(anime_id)),
+                all_raw_scores=all_raw_scores
+            )
 else:
     if (browse_mode or active_scoring_path == "Ranked modes disabled"):
         st.markdown(f"**Active scoring path:** {active_scoring_path}")

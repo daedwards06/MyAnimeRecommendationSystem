@@ -573,11 +573,11 @@ REQUIREMENTS:
 **Why:** "Match score: 0.847" is meaningless to end users. A 5-star or percentage representation communicates quality instantly.
 
 **Checklist:**
-- [ ] Add a `format_user_score(raw_score: float, all_scores: list[float]) -> str` function that converts to percentile within the current result set
-- [ ] Display as "95% Match" or "★★★★☆" instead of raw decimal
-- [ ] Keep the raw score available in an expander/tooltip for technical users
-- [ ] Update both list and grid card views
-- [ ] Update `src/app/score_semantics.py` with the new display logic
+- [x] Add a `format_user_score(raw_score: float, all_scores: list[float]) -> str` function that converts to percentile within the current result set
+- [x] Display as "95% Match" or "★★★★☆" instead of raw decimal
+- [x] Keep the raw score available in an expander/tooltip for technical users
+- [x] Update both list and grid card views
+- [x] Update `src/app/score_semantics.py` with the new display logic
 
 **Prompt for Claude Sonnet 4.5:**
 
