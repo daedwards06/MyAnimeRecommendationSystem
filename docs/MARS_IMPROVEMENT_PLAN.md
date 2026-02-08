@@ -254,12 +254,12 @@ REQUIREMENTS:
 **Why:** When no personalization is active, the system uses `P[0]` (the first user in the MF training set) as the collaborative filtering signal. This means "collaborative filtering contribution" in seed-based mode is actually one random stranger's preferences. A reviewer who understands CF will immediately question this.
 
 **Checklist:**
-- [ ] Compute `mean_user_vector = P.mean(axis=0)` during artifact loading in `src/app/artifacts_loader.py`
-- [ ] Store as `bundle["models"]["mf_mean_user"]`
-- [ ] In the scoring pipeline, use the mean-user vector when `personalization_enabled=False`
-- [ ] Add a constant `USE_MEAN_USER_CF = True` to constants.py (allows toggling back)
+- [x] Compute `mean_user_vector = P.mean(axis=0)` during artifact loading in `src/app/artifacts_loader.py`
+- [x] Store as `bundle["models"]["mf_mean_user"]`
+- [x] In the scoring pipeline, use the mean-user vector when `personalization_enabled=False`
+- [x] Add a constant `USE_MEAN_USER_CF = True` to constants.py (allows toggling back)
 - [ ] Compare seed-based recommendations before/after on 5 golden queries — document any changes in a brief note
-- [ ] Update the `HybridRecommender._blend()` docstring to note the mean-user approach
+- [x] Update the `HybridRecommender._blend()` docstring to note the mean-user approach
 - [ ] Verify MF share percentages in explanation badges still sum to 100% and make sense
 
 **Prompt for Claude Sonnet 4.5:**

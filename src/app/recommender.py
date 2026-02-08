@@ -65,6 +65,13 @@ class HybridRecommender:
             self.c.pop = self.c.pop.astype(np.float32, copy=False)
 
     def _blend(self, user_index: int, weights: Dict[str, float]) -> np.ndarray:
+        """Blend MF, kNN, and popularity scores for a given user.
+        
+        NOTE (Phase 2, Task 2.1): In seed-based (non-personalized) mode, the
+        scoring pipeline may substitute mean-user CF scores instead of using
+        user_index=0, to represent average community preferences rather than
+        one arbitrary training user's taste. See USE_MEAN_USER_CF in constants.
+        """
         mf_part = 0.0
         knn_part = 0.0
         pop_part = 0.0

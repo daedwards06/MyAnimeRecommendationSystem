@@ -298,6 +298,21 @@ def build_artifacts(
     models["mf"] = mf_model
     models["_mf_stem"] = mf_stem
 
+    # Compute mean-user vector for seed-based CF baseline (Phase 2, Task 2.1)
+    # When no personalization is active, use the mean of all training user vectors
+    # instead of a single arbitrary user (index 0). This makes CF contribution
+    # represent average community preferences rather than one user's taste.
+    if hasattr(mf_model, "P") and mf_model.P is not None:
+        mean_user_P = np.mean(mf_model.P, axis=0)  # shape: [n_factors]
+        models["mf_mean_user_vector"] = mean_user_P
+        # Precompute mean-user scores for all items for efficiency
+        global_mean = getattr(mf_model, "global_mean", 0.0)
+        mean_user_scores = float(global_mean) + (mean_user_P @ mf_model.Q.T)  # shape: [n_items]
+        models["mf_mean_user_scores"] = mean_user_scores.astype(np.float32)
+    else:
+        models["mf_mean_user_vector"] = None
+        models["mf_mean_user_scores"] = None
+
     # Optional: kNN model alias (only if unambiguous or explicitly chosen)
     knn_candidates = sorted([k for k in models.keys() if k.startswith("item_knn") or k.startswith("knn")])
     try:
