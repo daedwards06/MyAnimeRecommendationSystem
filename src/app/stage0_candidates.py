@@ -32,6 +32,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
+from src.utils import parse_pipe_set
 
 from src.app.synopsis_neural_embeddings import compute_seed_topk_neighbors
 
@@ -63,38 +64,7 @@ class Stage0Diagnostics:
     stage0_neural_and_meta: int
 
 
-def _parse_pipe_set(val: object) -> set[str]:
-    if val is None:
-        return set()
-    try:
-        if pd.isna(val):
-            return set()
-    except Exception:
-        pass
-
-    if isinstance(val, str):
-        s = val.strip()
-        if not s:
-            return set()
-        if "|" in s:
-            return {x.strip() for x in s.split("|") if x and x.strip()}
-        return {s}
-
-    if hasattr(val, "__iter__") and not isinstance(val, str):
-        out: set[str] = set()
-        try:
-            for x in val:  # type: ignore[assignment]
-                if not x:
-                    continue
-                sx = str(x).strip()
-                if sx:
-                    out.add(sx)
-        except Exception:
-            return set()
-        return out
-
-    s = str(val).strip()
-    return {s} if s else set()
+# Removed _parse_pipe_set - now using canonical version from src.utils.parsing as parse_pipe_set
 
 
 def _seed_union_set(metadata: pd.DataFrame, *, seed_ids: Sequence[int], col: str) -> set[str]:
@@ -109,7 +79,7 @@ def _seed_union_set(metadata: pd.DataFrame, *, seed_ids: Sequence[int], col: str
     except Exception:
         return set()
     for v in df[col].tolist():
-        out.update(_parse_pipe_set(v))
+        out.update(parse_pipe_set(v))
     return out
 
 
@@ -227,7 +197,7 @@ def build_stage0_seed_candidate_pool(
             seed_rows = None
         if seed_rows is not None and not getattr(seed_rows, "empty", True):
             for v in seed_rows["genres"].tolist():
-                for g in _parse_pipe_set(v):
+                for g in parse_pipe_set(v):
                     if g:
                         seed_genre_weights[g] = int(seed_genre_weights.get(g, 0) + 1)
 
@@ -265,7 +235,7 @@ def build_stage0_seed_candidate_pool(
             # Genre weighted overlap: never penalize missing genres; it just can't help.
             if has_genres and seed_genres and denom > 0.0:
                 try:
-                    gset = _parse_pipe_set(getattr(row, "genres"))
+                    gset = parse_pipe_set(getattr(row, "genres"))
                     raw = 0
                     for g in gset:
                         raw += int(seed_genre_weights.get(g, 0))
@@ -277,7 +247,7 @@ def build_stage0_seed_candidate_pool(
             # Theme overlap ratio: missing themes never penalize; only helps when present.
             if has_themes and seed_themes:
                 try:
-                    tset = _parse_pipe_set(getattr(row, "themes"))
+                    tset = parse_pipe_set(getattr(row, "themes"))
                     tr = _theme_overlap_ratio(seed_themes, tset)
                     t_ok = bool(tr is not None and float(tr) >= float(min_t))
                 except Exception:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 from src.app.diversity import coverage, genre_exposure_ratio, average_novelty
-from .cards import coerce_genres
+from src.utils import coerce_genres
 
 
 def render_diversity_panel(recs: list[dict], metadata: pd.DataFrame, *, is_browse: bool = False) -> None:

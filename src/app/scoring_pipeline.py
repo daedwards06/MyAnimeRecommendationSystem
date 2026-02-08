@@ -142,6 +142,7 @@ from src.app.synopsis_tfidf import (
 )
 from src.app.explanations import format_explanation
 from src.app.badges import badge_payload
+from src.utils import parse_pipe_set
 
 logger = logging.getLogger(__name__)
 
@@ -163,34 +164,7 @@ def _title_tokens(s: str) -> set[str]:
     toks = [t for t in cleaned.split() if len(t) >= 3 and t not in _TITLE_STOP]
     return set(toks)
 
-
-def _parse_str_set(val: object) -> set[str]:
-    """Parse a value that might be pipe-delimited, list, set, or None into a set."""
-    if val is None:
-        return set()
-    try:
-        if pd.isna(val):
-            return set()
-    except Exception:
-        pass
-    if isinstance(val, str):
-        s = val.strip()
-        if not s:
-            return set()
-        if "|" in s:
-            return {x.strip() for x in s.split("|") if x and x.strip()}
-        return {s}
-    if hasattr(val, "__iter__") and not isinstance(val, str):
-        out: set[str] = set()
-        for x in val:
-            if not x:
-                continue
-            sx = str(x).strip()
-            if sx:
-                out.add(sx)
-        return out
-    s = str(val).strip()
-    return {s} if s else set()
+# Removed _parse_str_set - now using canonical version from src.utils.parsing as parse_pipe_set
 
 
 @dataclass
@@ -773,7 +747,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         else:
             item_genres = set()
 
-        item_themes = _parse_str_set(mrow.get("themes"))
+        item_themes = parse_pipe_set(mrow.get("themes"))
 
         raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
         max_possible_overlap = len(all_seed_genres) * num_seeds

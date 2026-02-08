@@ -11,6 +11,7 @@ from src.app.score_semantics import (
     has_match_score,
     format_user_friendly_score,
 )
+from src.utils import coerce_genres
 
 
 def _get_user_genre_hist_from_session() -> dict:
@@ -20,20 +21,7 @@ def _get_user_genre_hist_from_session() -> dict:
     except Exception:  # pragma: no cover
         return {}
 
-def coerce_genres(value) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, (list, tuple, set)):
-        return "|".join(str(v) for v in value if v)
-    try:  # numpy array handling
-        import numpy as _np  # type: ignore
-        if isinstance(value, _np.ndarray):
-            return "|".join(str(v) for v in value.tolist() if v)
-    except Exception:  # pragma: no cover
-        pass
-    return str(value)
+# Removed coerce_genres - now using canonical version from src.utils.parsing
 
 def _render_placeholder_box(label: str):
     st.markdown(
