@@ -328,6 +328,73 @@ QUALITY_FACTOR_MIN: float = 0.15
 QUALITY_FACTOR_MAX: float = 1.0
 QUALITY_FACTOR_DEFAULT_MISSING_MAL: float = 0.3
 
+# Quality Factor Mode: Controls how MAL score affects neural similarity scaling.
+#
+# Three modes available:
+# - "mal_scaled" (default): quality = clamp((MAL - 5) / 4, 0.15, 1.0)
+#   Favors high-MAL titles; penalizes niche anime with MAL 6-7.
+#   A niche anime with MAL 6.5 gets quality_factor=0.375, reducing its
+#   neural similarity contribution by 62%.
+#
+# - "binary": quality = 1.0 if MAL >= 6.0 else 0.5
+#   Mild penalty only for very low-rated titles; gentler gate that allows
+#   niche gems (MAL 6-7) to compete on relevance.
+#
+# - "disabled": quality = 1.0 always
+#   Pure relevance mode - trusts semantic similarity fully without quality
+#   gating. May surface more niche/obscure titles.
+#
+# Tradeoff: mal_scaled favors community-validated titles but biases against
+# niche; binary is a gentler gate; disabled trusts semantic similarity fully.
+QUALITY_FACTOR_MODE: str = _env_str("QUALITY_FACTOR_MODE", "mal_scaled")
+
+
+def compute_quality_factor(mal_score: float | None, mode: str | None = None) -> float:
+    """Compute quality factor for neural similarity scaling.
+
+    Args:
+        mal_score: MAL rating (1-10 scale), or None if missing
+        mode: Quality factor mode - "mal_scaled", "binary", or "disabled".
+              If None, uses QUALITY_FACTOR_MODE constant.
+
+    Returns:
+        Quality factor in [0.15, 1.0] (mal_scaled) or [0.5, 1.0] (binary)
+        or 1.0 (disabled)
+
+    Notes:
+        - mal_scaled: Scales linearly from MAL 5->9 to quality 0.15->1.0
+        - binary: Simple threshold - 1.0 if MAL>=6.0, else 0.5
+        - disabled: Always 1.0 (no quality gating)
+        - Missing MAL scores use QUALITY_FACTOR_DEFAULT_MISSING_MAL in
+          mal_scaled mode, 0.5 in binary mode, 1.0 in disabled mode
+    """
+    if mode is None:
+        mode = QUALITY_FACTOR_MODE
+
+    mode = str(mode).strip().lower()
+
+    # Handle missing MAL score
+    if mal_score is None or mal_score <= 0:
+        if mode == "disabled":
+            return 1.0
+        elif mode == "binary":
+            return 0.5
+        else:  # mal_scaled (default)
+            return QUALITY_FACTOR_DEFAULT_MISSING_MAL
+
+    # Mode-specific logic
+    if mode == "disabled":
+        return 1.0
+
+    elif mode == "binary":
+        return 1.0 if mal_score >= 6.0 else 0.5
+
+    else:  # mal_scaled (default)
+        return max(
+            QUALITY_FACTOR_MIN,
+            min(QUALITY_FACTOR_MAX, (mal_score - QUALITY_FACTOR_MAL_FLOOR) / QUALITY_FACTOR_MAL_RANGE),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Obscurity Penalty

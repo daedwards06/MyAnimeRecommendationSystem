@@ -58,12 +58,9 @@ from src.app.constants import (
     OBSCURITY_LOW_MEMBERS_PENALTY,
     OBSCURITY_MEMBERS_THRESHOLD,
     OBSCURITY_MISSING_MAL_PENALTY,
-    QUALITY_FACTOR_DEFAULT_MISSING_MAL,
-    QUALITY_FACTOR_MAL_FLOOR,
-    QUALITY_FACTOR_MAL_RANGE,
-    QUALITY_FACTOR_MAX,
-    QUALITY_FACTOR_MIN,
+    QUALITY_FACTOR_MODE,
     SEED_RANKING_MODE,
+    compute_quality_factor,
     STAGE0_ENFORCEMENT_BUFFER,
     STAGE0_META_MIN_GENRE_OVERLAP,
     STAGE0_META_MIN_THEME_OVERLAP,
@@ -1272,13 +1269,8 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         except Exception:
             item_members_count = None
 
-        if item_mal_score is not None and item_mal_score > 0:
-            quality_factor = max(
-                QUALITY_FACTOR_MIN,
-                min(QUALITY_FACTOR_MAX, (item_mal_score - QUALITY_FACTOR_MAL_FLOOR) / QUALITY_FACTOR_MAL_RANGE),
-            )
-        else:
-            quality_factor = QUALITY_FACTOR_DEFAULT_MISSING_MAL
+        # Compute quality factor using configurable mode
+        quality_factor = compute_quality_factor(item_mal_score, mode=QUALITY_FACTOR_MODE)
 
         neural_contribution = STAGE2_NEURAL_SIM_WEIGHT * float(synopsis_neural_sim) * quality_factor
 
