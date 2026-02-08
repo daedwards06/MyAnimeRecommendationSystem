@@ -105,6 +105,20 @@ def _normalize_seed_ranking_mode(val: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Phase 2, Task 2.1: Mean-user CF baseline for seed-based mode
+#
+# When True, seed-based (non-personalized) mode uses the mean of all training
+# user vectors for the collaborative filtering contribution, rather than a
+# single demo user (index 0). This makes the CF signal represent average
+# community preferences instead of one arbitrary user's taste.
+#
+# This addresses a quality issue where "MF 93%" in seed-based explanations
+# was actually reflecting one random stranger's preferences.
+# ---------------------------------------------------------------------------
+USE_MEAN_USER_CF: bool = _env_bool("USE_MEAN_USER_CF", True)
+
+
+# ---------------------------------------------------------------------------
 # Phase 5 refinement: Force-include top-K neural neighbors into Stage 1 shortlist
 #
 # Motivation:

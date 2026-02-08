@@ -80,6 +80,7 @@ from src.app.constants import (
     STAGE2_RAW_KNN_STAGE1_WEIGHT,
     STAGE2_SEED_COVERAGE_WEIGHT,
     STAGE2_STAGE1_SCORE_WEIGHT,
+    USE_MEAN_USER_CF,
     force_neural_enable_for_semantic_mode,
 )
 from src.app.franchise_cap import apply_franchise_cap
@@ -1044,8 +1045,35 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     # Stage 2: Rerank shortlist
     # ------------------------------------------------------------------
     t_s2 = time.monotonic()
+    
+    # Determine which user vector to use for CF scoring (Phase 2, Task 2.1)
+    # If personalization is disabled and USE_MEAN_USER_CF is True, use mean-user scores
+    # to represent community preferences instead of one arbitrary training user.
+    use_mean_user = bool(USE_MEAN_USER_CF) and not ctx.personalization_enabled
+    mf_mean_user_scores = ctx.bundle.get("models", {}).get("mf_mean_user_scores")
+    
     try:
-        blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
+        if use_mean_user and mf_mean_user_scores is not None:
+            # Build hybrid scores using mean-user MF component
+            blended_scores = np.zeros(components.num_items, dtype=np.float32)
+            
+            # MF component: use precomputed mean-user scores
+            if components.mf is not None:
+                w_mf = weights.get("mf", 0.0)
+                blended_scores += w_mf * mf_mean_user_scores
+            
+            # kNN component: still uses user_index (typically 0 for seed-based)
+            if components.knn is not None:
+                w_knn = weights.get("knn", 0.0)
+                blended_scores += w_knn * components.knn[user_index]
+            
+            # Popularity component: broadcast across items
+            if components.pop is not None:
+                w_pop = weights.get("pop", 0.0)
+                blended_scores += w_pop * components.pop
+        else:
+            # Use standard blend with user_index (preserves current behavior)
+            blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
     except Exception:
         blended_scores = None
 
@@ -1074,7 +1102,11 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         if aid in id_to_index:
             idx = int(id_to_index[aid])
             try:
-                mf_base = float(components.mf[user_index, idx]) if components.mf is not None else 0.0
+                # Use mean-user MF scores if enabled, otherwise use user_index
+                if use_mean_user and mf_mean_user_scores is not None:
+                    mf_base = float(mf_mean_user_scores[idx]) if idx < len(mf_mean_user_scores) else 0.0
+                else:
+                    mf_base = float(components.mf[user_index, idx]) if components.mf is not None else 0.0
             except Exception:
                 mf_base = 0.0
             try:
