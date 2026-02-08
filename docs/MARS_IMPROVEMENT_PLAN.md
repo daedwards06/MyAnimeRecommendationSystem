@@ -530,11 +530,11 @@ REQUIREMENTS:
 **Why:** A portfolio reviewer will launch the app and have 60 seconds of patience. The first screen should show recommendations immediately, not an empty state requiring them to figure out seeds.
 
 **Checklist:**
-- [ ] Auto-populate a default seed (e.g., "Fullmetal Alchemist: Brotherhood") on first load
-- [ ] Show recommendations immediately without requiring any user action
-- [ ] Add a prominent "Try These" section with 4-6 popular anime as one-click seed buttons
-- [ ] Ensure the onboarding text explains what they're seeing in one sentence
-- [ ] Test: fresh session load should show recommendations within 3 seconds
+- [x] Auto-populate a default seed (e.g., "Fullmetal Alchemist: Brotherhood") on first load
+- [x] Show recommendations immediately without requiring any user action
+- [x] Add a prominent "Try These" section with 4-6 popular anime as one-click seed buttons
+- [x] Ensure the onboarding text explains what they're seeing in one sentence
+- [x] Test: fresh session load should show recommendations within 3 seconds
 
 **Prompt for Claude Sonnet 4.5:**
 

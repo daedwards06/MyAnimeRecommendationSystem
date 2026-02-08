@@ -23,8 +23,8 @@ def _steps_for_mode(ui_mode: str) -> list[str]:
         ]
     # Seed-based (default)
     return [
-        "Choose **Seed-based** mode in the sidebar.",
-        "Pick 1–5 seed titles in **Search & Seeds** (or use the sample buttons) to get ranked results.",
+        "On first visit, you'll see recommendations for **Fullmetal Alchemist: Brotherhood** — a great starting point!",
+        "Change the seed anytime: Pick 1–5 seed titles in **Search & Seeds** (or use the sample buttons).",
         "Adjust Hybrid Weights + filters (genre/type/year) to steer discovery.",
     ]
 
