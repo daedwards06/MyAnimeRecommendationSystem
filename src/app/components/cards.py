@@ -25,7 +25,7 @@ def _get_user_genre_hist_from_session() -> dict:
 
 def _render_placeholder_box(label: str):
     st.markdown(
-        f'<div style="width:180px;height:260px;background:#2A2F36;display:flex;align-items:center;justify-content:center;border:1px solid #3A3F47;border-radius:4px;font-size:12px;color:#A5AFB9;">{label}</div>',
+        f'<div style="width:180px;height:260px;background:#F0F2F6;display:flex;align-items:center;justify-content:center;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;color:#A0AEC0;">{label}</div>',
         unsafe_allow_html=True,
     )
 
@@ -124,65 +124,59 @@ def render_card_grid(
         except Exception:
             pass
     
-    card_color = "#3498DB" if not badges['cold_start'] else "#E67E22"
+    card_color = "#6C63FF" if not badges['cold_start'] else "#ECC94B"
     
-    # Use Streamlit container instead of manual HTML div
-    # Manual divs don't work with st.image() - it renders outside the div
     container = st.container(border=True)
     with container:
         # Image
         _render_image_streamlit(thumb, title_display)
         
-        # Title (truncated for grid) with match score badge (relative)
+        # Title + score
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
 
         score = rec.get("score")
         score_badge = ""
         if has_match_score(score):
-            # Use user-friendly format if all scores available, else raw format
             if all_raw_scores:
                 user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
-                score_str = user_friendly
                 score_badge = (
-                    f"<span style='background: {color}20; color: {color}; padding: 2px 6px; "
-                    f"border-radius: 8px; font-weight: 600;' title='{tooltip}'>{score_str}</span>"
+                    f"<span style='background:{color}15; color:{color}; padding:2px 8px; "
+                    f"border-radius:16px; font-weight:700; font-size:0.78rem;' title='{tooltip}'>{user_friendly}</span>"
                 )
             else:
-                # Fallback to raw score display
                 score_str = format_match_score(float(score))
                 score_badge = (
-                    f"<span style='background: #3498DB20; color: #3498DB; padding: 2px 6px; "
-                    f"border-radius: 8px; font-weight: 600;'>{SCORE_LABEL_SHORT}: {score_str}</span>"
+                    f"<span style='background:#6C63FF15; color:#6C63FF; padding:2px 8px; "
+                    f"border-radius:16px; font-weight:700; font-size:0.78rem;'>{SCORE_LABEL_SHORT}: {score_str}</span>"
                 )
 
         st.markdown(
-            f"<p style='font-weight: 600; font-size: 0.95rem; color: #2C3E50; margin: 8px 0 4px 0;'>{truncated_title}</p>",
+            f"<p style='font-weight:700; font-size:0.95rem; color:#1A1A2E; margin:8px 0 4px 0;'>{truncated_title}</p>",
             unsafe_allow_html=True,
         )
         if score_badge:
-            st.markdown(f"<p style='font-size: 0.75rem; margin: 2px 0;'>{score_badge}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='margin:2px 0;'>{score_badge}</p>", unsafe_allow_html=True)
         
-        # Personalized explanation (if available)
+        # Personalized explanation
         explanation = rec.get("explanation")
         if explanation:
-            st.markdown(f"<p style='font-size: 0.7rem; color: #7F8C8D; margin: 4px 0; font-style: italic;'>{explanation}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:0.72rem; color:#4A5568; margin:4px 0; font-style:italic;'>{explanation}</p>", unsafe_allow_html=True)
         
-        # Score, type, and year
+        # Metadata chips
         meta_parts = []
         if mal_score:
-            score_color = "#27AE60" if mal_score >= 8.0 else "#3498DB" if mal_score >= 7.0 else "#95A5A6"
-            meta_parts.append(f'<span style="color: {score_color}; font-weight: 600;">⭐ {mal_score:.1f}</span>')
+            sc = "#48BB78" if mal_score >= 8.0 else "#6C63FF" if mal_score >= 7.0 else "#A0AEC0"
+            meta_parts.append(f'<span style="color:{sc}; font-weight:700;">★ {mal_score:.1f}</span>')
         
-        # Type (TV, Movie, OVA, etc.)
         anime_type = row.get("type")
         if anime_type and pd.notna(anime_type):
-            meta_parts.append(f'<span style="color: #9B59B6; font-weight: 600;">🎬 {anime_type}</span>')
+            meta_parts.append(f'<span style="color:#B794F4; font-weight:600;">{anime_type}</span>')
         
         if year:
-            meta_parts.append(f'<span style="color: #7F8C8D;">📅 {year}</span>')
+            meta_parts.append(f'<span style="color:#A0AEC0;">{year}</span>')
         
         if meta_parts:
-            st.markdown(f"<p style='font-size: 0.8rem; margin: 4px 0;'>{' • '.join(meta_parts)}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:0.82rem; margin:4px 0;'>{' · '.join(meta_parts)}</p>", unsafe_allow_html=True)
         
         # Genres (first 3) - clickable
         if genres:
@@ -238,7 +232,7 @@ def render_card_grid(
 def render_card(
     row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
 ):
-    """Render a detailed list card.
+    """Render a detailed list card with image left / content right layout.
     
     Args:
         row: Metadata row for the anime
@@ -260,10 +254,9 @@ def render_card(
     rec["badges"] = badges
     thumb = row.get("poster_thumb_url")
     
-    # Extract anime_id early (needed for button keys)
     anime_id = int(row.get("anime_id"))
     
-    # Primary title: prefer English, fallback to display/primary/Japanese
+    # Title selection
     title_candidates = [
         row.get("title_english"),
         row.get("title_display"),
@@ -273,30 +266,28 @@ def render_card(
     ]
     title_display = next((t for t in title_candidates if isinstance(t, str) and t.strip()), "Anime")
     
-    # Secondary title for reference (show Japanese or primary if different from main title)
     alt_title = None
     if row.get("title_japanese") and row.get("title_japanese") != title_display:
         alt_title = row.get("title_japanese")
     elif row.get("title_primary") and row.get("title_primary") != title_display:
         alt_title = row.get("title_primary")
     
-    # Get synopsis - try full synopsis first, then snippet
+    # Synopsis
     synopsis_val = row.get("synopsis") if "synopsis" in row else row.get("synopsis_snippet")
-    # Handle pandas NaN/None values
+    display_synopsis = ""
     if synopsis_val is not None and pd.notna(synopsis_val) and str(synopsis_val).strip():
         display_synopsis = str(synopsis_val).strip()
-    else:
-        display_synopsis = ""
     
-    # Extract metadata fields
+    # Metadata fields
     mal_score = row.get("mal_score")
     episodes = row.get("episodes")
     status = row.get("status")
     studios_raw = row.get("studios", [])
     studios = studios_raw if isinstance(studios_raw, list) else []
     source = row.get("source_material")
+    anime_type = row.get("type")
     
-    # Extract year from aired_from
+    # Year
     year = None
     aired_from = row.get("aired_from")
     if aired_from:
@@ -306,201 +297,192 @@ def render_card(
         except Exception:
             pass
     
-    # Visual card container with modern design
-    card_color = "#3498DB" if not badges['cold_start'] else "#E67E22"
-    
-    # Use Streamlit container instead of manual HTML div
-    # Manual divs don't work with st.image() - it renders outside the div
     container = st.container(border=True)
     with container:
-        # Render image using Streamlit's native image component to avoid HTML rendering issues
-        _render_image_streamlit(thumb, title_display)
+        # Two-column layout: image | content
+        col_img, col_content = st.columns([1, 3])
         
-        # Recommendation score display (single semantic: Match score (relative))
-        score = rec.get("score")
-        score_badge = ""
-        badge_color = "#3498DB"
-        if has_match_score(score):
-            # Use user-friendly format if all scores available, else raw format
-            if all_raw_scores:
-                user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
-                badge_color = color
-                score_badge = (
-                    f"<span style=\"background: {badge_color}20; color: {badge_color}; padding: 2px 8px; "
-                    f"border-radius: 12px; font-size: 0.85rem; font-weight: 600;\" title=\"{tooltip}\">{user_friendly}</span>"
-                )
-                # Show raw score in smaller text below for technical users
-                raw_score_text = format_match_score(float(score))
-                score_badge += f"<br><span style='font-size: 0.7rem; color: #95A5A6;'>({SCORE_LABEL_SHORT}: {raw_score_text})</span>"
-            else:
-                # Fallback to raw score display
-                score_str = format_match_score(float(score))
-                score_badge = (
-                    f"<span style=\"background: {badge_color}20; color: {badge_color}; padding: 2px 8px; "
-                    f"border-radius: 12px; font-size: 0.85rem; font-weight: 600;\">{SCORE_LABEL_SHORT}: {score_str}</span>"
-                )
+        with col_img:
+            _render_image_streamlit(thumb, title_display)
+        
+        with col_content:
+            # Title + match score on same line
+            score = rec.get("score")
+            score_html = ""
+            badge_color = "#6C63FF"
+            if has_match_score(score):
+                if all_raw_scores:
+                    user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
+                    badge_color = color
+                    score_html = (
+                        f"<span style='background:{badge_color}15; color:{badge_color}; padding:2px 10px; "
+                        f"border-radius:20px; font-size:0.82rem; font-weight:700; margin-left:8px;' "
+                        f"title='{tooltip}'>{user_friendly}</span>"
+                    )
+                else:
+                    score_str = format_match_score(float(score))
+                    score_html = (
+                        f"<span style='background:{badge_color}15; color:{badge_color}; padding:2px 10px; "
+                        f"border-radius:20px; font-size:0.82rem; font-weight:700; margin-left:8px;'>"
+                        f"{SCORE_LABEL_SHORT}: {score_str}</span>"
+                    )
 
-        if score_badge:
             st.markdown(
-                f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display} {score_badge}</h3>",
+                f"<h3 style='margin:0; font-size:1.15rem; color:#1A1A2E; font-weight:700;'>"
+                f"{title_display}{score_html}</h3>",
                 unsafe_allow_html=True,
             )
-        else:
+            if alt_title:
+                st.markdown(
+                    f"<p style='color:#A0AEC0; font-style:italic; font-size:0.85rem; margin:2px 0 0 0;'>{alt_title}</p>",
+                    unsafe_allow_html=True,
+                )
+            
+            # Personalized explanation
+            explanation = rec.get("explanation")
+            if explanation:
+                st.markdown(
+                    f"<div style='background:#F0EFFF; padding:6px 12px; border-radius:6px; margin:6px 0; "
+                    f"border-left:3px solid #6C63FF;'>"
+                    f"<span style='font-size:0.82rem; color:#4A5568;'>{explanation}</span></div>",
+                    unsafe_allow_html=True,
+                )
+            
+            # Metadata chips
+            meta_parts = []
+            if mal_score:
+                sc = "#48BB78" if mal_score >= 8.0 else "#6C63FF" if mal_score >= 7.0 else "#A0AEC0"
+                meta_parts.append(f'<span style="color:{sc}; font-weight:700;">★ {mal_score:.2f}</span>')
+            if anime_type and pd.notna(anime_type):
+                meta_parts.append(f'<span style="color:#B794F4; font-weight:600;">{anime_type}</span>')
+            if episodes:
+                meta_parts.append(f'<span style="color:#A0AEC0;">{episodes} eps</span>')
+            if year:
+                meta_parts.append(f'<span style="color:#A0AEC0;">{year}</span>')
+            if status:
+                sc = "#48BB78" if status == "Finished Airing" else "#ECC94B" if "Airing" in str(status) else "#63B3ED"
+                meta_parts.append(f'<span style="color:{sc}; font-weight:500;">{status}</span>')
+            if meta_parts:
+                st.markdown(
+                    f"<div style='margin:6px 0; font-size:0.88rem;'>{' &nbsp;·&nbsp; '.join(meta_parts)}</div>",
+                    unsafe_allow_html=True,
+                )
+            
+            # Studio / source
+            if studios:
+                studio_str = ", ".join(studios[:2])
+                if len(studios) > 2:
+                    studio_str += f" +{len(studios)-2}"
+                extra = f" · {source}" if source else ""
+                st.markdown(
+                    f"<p style='color:#A0AEC0; font-size:0.82rem; margin:4px 0;'>{studio_str}{extra}</p>",
+                    unsafe_allow_html=True,
+                )
+            elif source:
+                st.markdown(
+                    f"<p style='color:#A0AEC0; font-size:0.82rem; margin:4px 0;'>{source}</p>",
+                    unsafe_allow_html=True,
+                )
+            
+            # Genres as pills
+            if genres:
+                genre_list = [g.strip() for g in genres.split('|') if g.strip()]
+                cols = st.columns([1] * min(len(genre_list[:5]), 5) + [max(0, 5 - len(genre_list[:5]))] if len(genre_list[:5]) < 5 else [1] * 5)
+                for idx, genre in enumerate(genre_list[:5]):
+                    with cols[idx]:
+                        if st.button(
+                            genre, key=f"genre_{anime_id}_{genre}",
+                            help=f"Browse {genre} anime", type="secondary",
+                            use_container_width=True,
+                        ):
+                            st.session_state["ui_mode"] = "Browse"
+                            st.session_state["browse_mode"] = True
+                            st.session_state["genre_filter"] = [genre]
+                            st.session_state["selected_seed_ids"] = []
+                            st.session_state["selected_seed_titles"] = []
+                            st.rerun()
+        
+        # Synopsis in full width below columns
+        if display_synopsis:
+            truncated = display_synopsis[:280] + "..." if len(display_synopsis) > 280 else display_synopsis
             st.markdown(
-                f"<h3 style='margin: 0; padding: 0; font-size: 1.25rem; color: #2C3E50;'>{title_display}</h3>",
+                f"<p style='color:#4A5568; font-size:0.88rem; line-height:1.6; margin:4px 0 8px 0;'>{truncated}</p>",
                 unsafe_allow_html=True,
             )
         
-        # Alternative title (Japanese/original)
-        if alt_title:
-            st.markdown(f"<p style='color: #95A5A6; font-style: italic; font-size: 0.9rem; margin-top: 2px;'>{alt_title}</p>", unsafe_allow_html=True)
-        
-        # Personalized explanation (if available)
-        explanation = rec.get("explanation")
-        if explanation:
-            st.markdown(f"<div style='background: #ECF0F1; padding: 8px 12px; border-radius: 6px; margin: 8px 0; border-left: 3px solid {badge_color};'><p style='font-size: 0.85rem; color: #34495E; margin: 0;'>{explanation}</p></div>", unsafe_allow_html=True)
-        
-        # Metadata row: Score, Type, Episodes, Year, Status
-        meta_parts = []
-        if mal_score:
-            score_color = "#27AE60" if mal_score >= 8.0 else "#3498DB" if mal_score >= 7.0 else "#95A5A6"
-            meta_parts.append(f'<span style="background: {score_color}20; color: {score_color}; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85rem;">⭐ {mal_score:.2f}</span>')
-        
-        # Type (TV, Movie, OVA, etc.)
-        anime_type = row.get("type")
-        if anime_type and pd.notna(anime_type):
-            meta_parts.append(f'<span style="color: #9B59B6; font-size: 0.9rem; font-weight: 600;">🎬 {anime_type}</span>')
-        
-        if episodes:
-            meta_parts.append(f'<span style="color: #7F8C8D; font-size: 0.9rem;">📺 {episodes} eps</span>')
-        if year:
-            meta_parts.append(f'<span style="color: #7F8C8D; font-size: 0.9rem;">📅 {year}</span>')
-        if status:
-            status_icon = "✅" if status == "Finished Airing" else "🟢" if "Airing" in str(status) else "🔵"
-            status_color = "#27AE60" if status == "Finished Airing" else "#E67E22" if "Airing" in str(status) else "#3498DB"
-            meta_parts.append(f'<span style="color: {status_color}; font-size: 0.9rem; font-weight: 500;">{status_icon} {status}</span>')
-        
-        if meta_parts:
-            st.markdown(f"<div style='margin: 12px 0;'>{' &nbsp;•&nbsp; '.join(meta_parts)}</div>", unsafe_allow_html=True)        # Studio and source
-        if studios:
-            studio_str = ", ".join(studios[:2])  # Show up to 2 studios
-            if len(studios) > 2:
-                studio_str += f" +{len(studios)-2} more"
-            st.markdown(f"<p style='color: #7F8C8D; font-size: 0.85rem; margin: 8px 0;'>🎬 <strong>{studio_str}</strong>" + (f" • {source}" if source else "") + "</p>", unsafe_allow_html=True)
-        elif source:
-            st.markdown(f"<p style='color: #7F8C8D; font-size: 0.85rem; margin: 8px 0;'>{source}</p>", unsafe_allow_html=True)
-        
-        # Genre tags with clickable pill styling
-        if genres:
-            genre_list = [g.strip() for g in genres.split('|') if g.strip()]
-            st.markdown("<div style='margin: 8px 0;'>", unsafe_allow_html=True)
-            cols = st.columns([1] * min(len(genre_list[:5]), 5))
-            for idx, genre in enumerate(genre_list[:5]):
-                with cols[idx]:
-                    if st.button(
-                        genre,
-                        key=f"genre_{anime_id}_{genre}",
-                        help=f"Browse more {genre} anime",
-                        type="secondary",
-                        use_container_width=True
-                    ):
-                        # Enable browse mode and set genre filter
-                        st.session_state["ui_mode"] = "Browse"
-                        st.session_state["browse_mode"] = True
-                        st.session_state["genre_filter"] = [genre]
-                        st.session_state["selected_seed_ids"] = []
-                        st.session_state["selected_seed_titles"] = []
-                        st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Badge pills inline
-        cols = st.columns([1, 1, 1])
-        with cols[0]:
-            cs_icon = "🆕" if badges['cold_start'] else "✓"
-            st.markdown(f"{cs_icon} {'Cold-start' if badges['cold_start'] else 'Trained'}")
-        with cols[1]:
-            pop_icon = "🔥" if "Top" in badges['popularity_band'] else "📊"
-            st.markdown(f"{pop_icon} {badges['popularity_band']}")
-        with cols[2]:
+        # Badges row - compact
+        badge_cols = st.columns([1, 1, 1, 2])
+        with badge_cols[0]:
+            lbl = "Cold-start" if badges['cold_start'] else "Trained"
+            color = "#ECC94B" if badges['cold_start'] else "#48BB78"
+            st.markdown(f"<span style='font-size:0.75rem; color:{color}; font-weight:600;'>{lbl}</span>", unsafe_allow_html=True)
+        with badge_cols[1]:
+            st.markdown(f"<span style='font-size:0.75rem; color:#63B3ED; font-weight:600;'>{badges['popularity_band']}</span>", unsafe_allow_html=True)
+        with badge_cols[2]:
             nov_val = badges.get('novelty_ratio')
             if nov_val is None:
-                st.markdown("— Novelty NA")
+                st.markdown("<span style='font-size:0.75rem; color:#A0AEC0;'>Novelty NA</span>", unsafe_allow_html=True)
             else:
-                nov_icon = "🌟" if float(nov_val) > 0.6 else "🎯"
-                st.markdown(f"{nov_icon} Novelty {float(nov_val):.2f}")
-        
-        # Synopsis - show full text directly
-        if display_synopsis:
-            st.caption(f"📝 {display_synopsis}")
-        
-        # Streaming platforms (if available)
-        streaming = row.get("streaming")
-        # Handle both list and pandas Series/numpy array
-        streaming_list = []
-        try:
-            # Check for None or NaN first (avoid ambiguous truth value)
-            if streaming is None:
-                streaming_list = []
-            elif isinstance(streaming, float) and pd.isna(streaming):
-                streaming_list = []
-            elif isinstance(streaming, list):
-                streaming_list = streaming
-            elif isinstance(streaming, str):
-                streaming_list = []  # Skip string values
-            elif hasattr(streaming, 'tolist'):  # pandas Series or numpy array
-                streaming_list = streaming.tolist()
+                nc = "#B794F4" if float(nov_val) > 0.6 else "#6C63FF"
+                st.markdown(f"<span style='font-size:0.75rem; color:{nc}; font-weight:600;'>Novelty {float(nov_val):.2f}</span>", unsafe_allow_html=True)
+        with badge_cols[3]:
+            # "Add to Seeds" or "Already in seeds"
+            current_ids = st.session_state.get("selected_seed_ids", [])
+            current_titles = st.session_state.get("selected_seed_titles", [])
+            if anime_id in current_ids:
+                st.markdown("<span style='font-size:0.75rem; color:#48BB78;'>In seeds</span>", unsafe_allow_html=True)
+            elif len(current_ids) >= 5:
+                st.markdown("<span style='font-size:0.75rem; color:#A0AEC0;'>Max 5 seeds</span>", unsafe_allow_html=True)
             else:
-                streaming_list = []
-        except Exception:
+                if st.button("+ Add to Seeds", key=f"more_like_{anime_id}", use_container_width=True):
+                    current_ids.append(anime_id)
+                    current_titles.append(title_display)
+                    st.session_state["selected_seed_ids"] = current_ids
+                    st.session_state["selected_seed_titles"] = current_titles
+                    st.rerun()
+        
+        # Expandable details
+        with st.expander("More details", expanded=False):
+            # Streaming
+            streaming = row.get("streaming")
             streaming_list = []
-        
-        if len(streaming_list) > 0:
-            st.markdown("**🎬 Watch on:**")
-            # Display as clickable badges
-            stream_html = " ".join([
-                f'<a href="{s["url"]}" target="_blank" style="display:inline-block;background:#3498DB;color:white;padding:4px 8px;margin:2px;border-radius:4px;text-decoration:none;font-size:11px;">{s["name"]}</a>'
-                for s in streaming_list if isinstance(s, dict) and s.get("name") and s.get("url")
-            ])
-            if stream_html:
-                st.markdown(stream_html, unsafe_allow_html=True)        # Detailed tooltips in expander
-        with st.expander("ℹ️ Details", expanded=False):
+            try:
+                if streaming is None:
+                    streaming_list = []
+                elif isinstance(streaming, float) and pd.isna(streaming):
+                    streaming_list = []
+                elif isinstance(streaming, list):
+                    streaming_list = streaming
+                elif hasattr(streaming, 'tolist'):
+                    streaming_list = streaming.tolist()
+            except Exception:
+                streaming_list = []
+
+            if streaming_list:
+                stream_html = " ".join([
+                    f'<a href="{s["url"]}" target="_blank" style="display:inline-block;background:#6C63FF;color:white;padding:3px 10px;margin:2px;border-radius:16px;text-decoration:none;font-size:0.75rem;font-weight:600;">{s["name"]}</a>'
+                    for s in streaming_list if isinstance(s, dict) and s.get("name") and s.get("url")
+                ])
+                if stream_html:
+                    st.markdown(f"**Watch on:** {stream_html}", unsafe_allow_html=True)
+            
+            # Badge tooltips
             cs_tooltip = format_badge_tooltip("cold_start", badges['cold_start'])
             pop_tooltip = format_badge_tooltip("popularity_band", badges['popularity_band'])
             nov_tooltip = format_badge_tooltip("novelty_ratio", badges.get('novelty_ratio'))
-            
             st.caption(cs_tooltip)
             st.caption(pop_tooltip)
             st.caption(nov_tooltip)
-        
-        # "More Like This" button - adds to seed list (up to 5)
-        # anime_id already extracted at top of function
-        current_ids = st.session_state.get("selected_seed_ids", [])
-        current_titles = st.session_state.get("selected_seed_titles", [])
-        
-        if anime_id in current_ids:
-            st.caption("✓ Already in seeds")
-        elif len(current_ids) >= 5:
-            st.caption("⚠️ Max 5 seeds (clear some first)")
-        else:
-            if st.button(
-                "🔄 Add to Seeds",
-                key=f"more_like_{anime_id}",
-                help="Add as a seed (up to 5) for Seed-based ranking",
-                use_container_width=True,
-            ):
-                current_ids.append(anime_id)
-                current_titles.append(title_display)
-                st.session_state["selected_seed_ids"] = current_ids
-                st.session_state["selected_seed_titles"] = current_titles
-                st.rerun()
-        
-        st.markdown("---")
-        
-        # Rating section (if profile loaded)
-        profile = st.session_state.get("active_profile")
-        if profile:
-            current_rating = profile.get("ratings", {}).get(str(anime_id))
-            st.markdown("**Rate This Anime**")
-            render_quick_rating_buttons(anime_id, title_display, current_rating)
-        else:
-            st.caption("💡 Load a profile to rate anime")
+            
+            # Full synopsis if truncated
+            if display_synopsis and len(display_synopsis) > 280:
+                st.markdown(f"**Full synopsis:** {display_synopsis}")
+            
+            # Rating
+            profile = st.session_state.get("active_profile")
+            if profile:
+                current_rating = profile.get("ratings", {}).get(str(anime_id))
+                st.markdown("**Rate this anime**")
+                render_quick_rating_buttons(anime_id, title_display, current_rating)
+            else:
+                st.caption("Load a profile to rate anime")

@@ -3,10 +3,10 @@ headless = true
 runOnSave = true
 
 [theme]
-primaryColor = "#005F73"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F1FAEE"
-textColor = "#0B0B0B"
+primaryColor = "#6C63FF"
+backgroundColor = "#FAFBFC"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#1A1A2E"
 font = "sans serif"
 
 [client]

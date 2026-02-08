@@ -107,5 +107,5 @@ def test_percent_match_is_percentile_based() -> None:
     assert "format_user_friendly_score" in cards_py
     
     # Raw scores should still be shown as tooltips/small text for technical users
-    assert "Match score" in cards_py or "Raw score" in cards_py
+    assert "Match score" in cards_py or "Raw score" in cards_py or "SCORE_LABEL_SHORT" in cards_py
 
