@@ -34,7 +34,6 @@ from src.app.artifacts_loader import build_artifacts, ArtifactContractError
 from src.app.components.cards import render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
-from src.app.components.skeletons import render_card_skeleton  # retained import (may repurpose later)
 from src.app.components.instructions import render_onboarding
 from src.app.score_semantics import has_match_score
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids

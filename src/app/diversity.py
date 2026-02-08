@@ -14,7 +14,6 @@ from typing import Iterable, List, Dict, Any, Optional, Mapping
 import numpy as np
 import pandas as pd
 from src.utils import coerce_genres
-from src.utils import coerce_genres
 
 
 def compute_popularity_percentiles(pop_scores: np.ndarray) -> np.ndarray:

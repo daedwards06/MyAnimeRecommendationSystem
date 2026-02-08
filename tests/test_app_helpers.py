@@ -13,7 +13,7 @@ def test_normalize_title():
 
 def test_format_explanation():
     s = format_explanation({"mf": 0.75, "knn": 0.2, "pop": 0.05})
-    assert "mf" in s and "%" in s
+    assert "CF" in s and "%" in s
 
 
 def test_badge_payload():

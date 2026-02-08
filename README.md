@@ -1,8 +1,9 @@
 # MARS — My Anime Recommendation System
 
 ![CI](https://github.com/daedwards06/MyAnimeRecommendationSystem/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem/graph/badge.svg)](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem)
 
-A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and 202 automated tests.
+A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and 210 automated tests.
 
 <!-- To update: run the app (streamlit run app/main.py), search for a popular title, take a screenshot, save to app/assets/demo_screenshot.png -->
 ![MARS Demo](app/assets/demo_screenshot.png)
@@ -16,7 +17,7 @@ A **hybrid recommendation engine** that combines collaborative filtering, conten
 - **Hybrid collaborative filtering** — FunkSVD matrix factorization (93%) + item-kNN (7%), trained on 73K users and 310K+ ratings
 - **Multi-modal content signals** — TF-IDF, SVD embeddings, and neural sentence embeddings (all-MiniLM-L6-v2) for synopsis-level semantic matching
 - **Personalization** — import your MyAnimeList profile; blend seed-based and CF-based recommendations 0–100% with a slider
-- **Explainability** — every recommendation shows signal breakdown (MF/kNN/content shares), genre overlap, and match confidence
+- **Explainability** — every recommendation shows signal breakdown (CF / Content / Popularity shares), genre overlap, and match confidence
 - **Diversity controls** — franchise capping, configurable quality factor modes, coverage and Gini tracking
 
 ## Results
@@ -112,7 +113,7 @@ The app loads with a default seed and shows recommendations immediately — no s
 │   ├── eval/                    # Metrics (NDCG, MAP, coverage, Gini, graded relevance)
 │   ├── features/                # Feature engineering, embeddings, scaling
 │   └── data/                    # Data loading, MAL parser, user profiles
-├── tests/                       # 202 tests across 22 files
+├── tests/                       # 210 tests across 22 files
 ├── reports/                     # Evaluation reports, ablation studies
 ├── models/                      # Trained model artifacts (.joblib, .gitignored)
 └── data/                        # Raw, interim, processed data (.gitignored)

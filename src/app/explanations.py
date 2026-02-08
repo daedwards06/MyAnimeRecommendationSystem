@@ -1,8 +1,33 @@
-"""Formatting utilities for per-item hybrid contribution explanations."""
+"""Formatting utilities for per-item hybrid contribution explanations.
+
+User-facing labels
+------------------
+Internal component keys map to display labels as follows:
+
+- ``mf``  → **CF** — collaborative filtering (FunkSVD matrix factorization)
+- ``knn`` → **Content** — content-based signals (genre/theme overlap,
+  metadata affinity, synopsis similarity, seed coverage, plus a small
+  item-kNN collaborative contribution)
+- ``pop`` → **Popularity** — popularity boost signal
+
+The ``knn`` bucket aggregates both item-kNN collaborative scores and the
+majority of content/metadata signals in the Stage 2 reranking formula.
+Labeling it "Content" is more accurate for the user-facing explanation
+because content signals dominate this component (~75%+ of its value).
+"""
 
 from __future__ import annotations
 
 from typing import Dict, Any
+
+# User-facing display labels for internal component keys.
+# Keep internal keys unchanged for backward compatibility with tests,
+# serialized explanations, and the recommender module.
+_DISPLAY_LABELS: Dict[str, str] = {
+    "mf": "CF",
+    "knn": "Content",
+    "pop": "Popularity",
+}
 
 
 def format_explanation(contributions: Dict[str, Any]) -> str:
@@ -12,7 +37,7 @@ def format_explanation(contributions: Dict[str, Any]) -> str:
     """
     parts = []
     
-    # Hybrid model contributions (MF, kNN, Popularity)
+    # Hybrid model contributions (CF, Content, Popularity)
     used = contributions.get("_used")
     if isinstance(used, (list, tuple)) and used:
         keys = [k for k in ("mf", "knn", "pop") if k in set(used)]
@@ -21,7 +46,8 @@ def format_explanation(contributions: Dict[str, Any]) -> str:
 
     for key in keys:
         val = contributions.get(key, 0.0) * 100.0
-        parts.append(f"{key} {val:.1f}%")
+        label = _DISPLAY_LABELS.get(key, key)
+        parts.append(f"{label} {val:.1f}%")
     
     base_explanation = " | ".join(parts)
     

@@ -1,0 +1,31 @@
+# Ruff linter configuration for MARS
+# https://docs.astral.sh/ruff/
+
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B905",   # zip without strict= (Python 3.10+)
+    "SIM108", # ternary operator (readability preference)
+    "RUF012", # mutable class variable (dataclass pattern)
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["B011"]  # assert True in tests is fine
+"scripts/*" = ["E402"] # late imports OK in scripts
+"app/main.py" = ["E402"] # Streamlit requires specific import ordering
+
+[lint.isort]
+known-first-party = ["src"]

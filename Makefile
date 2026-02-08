@@ -40,10 +40,13 @@ discover-new:
 	. .venv/Scripts/activate && python scripts/discover_new_ids.py --baseline data/raw/anime.csv --out data/raw/new_anime_ids_$$(date +%Y%m%d).txt --sources seasons_now seasons_upcoming top --top-pages 5
 
 lint:
-	@echo "Add ruff/black later"
+	ruff check src/ tests/
 
 fmt:
-	@echo "Add ruff/black later"
+	ruff format src/ tests/
+
+fmt-check:
+	ruff format --check src/ tests/
 
 # Regenerate Phase 4 evaluation artifacts (metrics curves, ablation, explanations, diversity/novelty)
 phase4-artifacts:

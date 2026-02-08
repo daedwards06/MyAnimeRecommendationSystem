@@ -59,22 +59,24 @@ def generate_user_embedding(
     
     # Generate embedding based on method
     if method == "weighted_average":
-        # Normalize ratings to 0-1 range for weighting
+        # Use mean-centered ratings as weights, with a positive floor.
+        # This avoids the min-max normalization pitfall where a user who
+        # rates everything 8-10 would have their 8/10 anime mapped to
+        # weight 0.0 (losing their positive signal entirely).
+        #
+        # Formula: weight = max(rating - user_mean + 1.0, 0.1)
+        # The +1.0 shift ensures items at the user's mean still contribute
+        # positively. The 0.1 floor prevents any rated item from being
+        # completely ignored.
         ratings_array = np.array(list(valid_ratings.values()), dtype=np.float32)
-        min_rating = ratings_array.min()
-        max_rating = ratings_array.max()
-        
-        if max_rating > min_rating:
-            normalized_ratings = (ratings_array - min_rating) / (max_rating - min_rating)
-        else:
-            # All ratings are the same - use uniform weights
-            normalized_ratings = np.ones(len(ratings_array), dtype=np.float32)
+        user_mean = float(np.mean(ratings_array))
+        weights_array = np.maximum(ratings_array - user_mean + 1.0, 0.1)
         
         # Weighted sum of item factors
         embedding = np.zeros(n_factors, dtype=np.float32)
         weight_sum = 0.0
         
-        for (anime_id, _), weight in zip(valid_ratings.items(), normalized_ratings):
+        for (anime_id, _), weight in zip(valid_ratings.items(), weights_array):
             item_idx = item_to_index[anime_id]
             embedding += weight * Q[item_idx]
             weight_sum += weight
