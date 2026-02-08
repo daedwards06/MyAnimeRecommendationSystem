@@ -123,10 +123,28 @@ class HybridRecommender:
         n: int = 10,
         weights: Optional[Dict[str, float]] = None,
         exclude_item_ids: Optional[Sequence[int]] = None,
+        override_mf_scores: Optional[np.ndarray] = None,
     ) -> List[Dict[str, float]]:
-        """Compute top-N recommendations for a user index."""
+        """Compute top-N recommendations for a user index.
+
+        Parameters
+        ----------
+        override_mf_scores : optional ndarray
+            If provided, replaces the MF component in the blend with these
+            pre-computed scores (e.g. mean-user community baseline).  Shape
+            must match ``self.c.item_ids``.
+        """
         w = weights or BALANCED_WEIGHTS
-        scores = self._blend(user_index, w)
+        if override_mf_scores is not None:
+            # Build blended scores manually, swapping in the override MF component.
+            scores = np.zeros(len(self.c.item_ids), dtype=np.float32)
+            scores += float(w.get("mf", 0.0)) * override_mf_scores
+            if self.c.knn is not None:
+                scores += float(w.get("knn", 0.0)) * self.c.knn[user_index]
+            if self.c.pop is not None:
+                scores += float(w.get("pop", 0.0)) * self.c.pop
+        else:
+            scores = self._blend(user_index, w)
         if exclude_item_ids:
             mask = np.isin(self.c.item_ids, np.asarray(exclude_item_ids))
             scores = scores.copy()
