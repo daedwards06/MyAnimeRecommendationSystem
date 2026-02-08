@@ -1,15 +1,14 @@
 from __future__ import annotations
+
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-from typing import Optional
-from datetime import datetime
 
 
 def flag_cold_start(
     enriched_meta: pd.DataFrame,
     kaggle_anime: pd.DataFrame,
     interactions: pd.DataFrame,
-    snapshot_cutoff_date: Optional[str] = None,
+    snapshot_cutoff_date: str | None = None,
     low_interaction_threshold: int = 5,
 ) -> pd.DataFrame:
     """Mark items as cold-start and provide reasons.

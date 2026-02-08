@@ -3,6 +3,7 @@
 Provides a compact, dismissible panel so first-time users understand the UX.
 """
 from __future__ import annotations
+
 import streamlit as st
 
 _MODE_STEPS: dict[str, list[str]] = {

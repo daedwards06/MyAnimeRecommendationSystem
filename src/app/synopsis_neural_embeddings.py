@@ -26,13 +26,13 @@ and a stable anime_id -> row index mapping.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Centralized constants (Phase 5 neural embeddings)
@@ -63,7 +63,7 @@ SYNOPSIS_NEURAL_OFFTYPE_SHORT_PENALTY_SIM_RELIEF: float = 1.0
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _sha256_hex(data: bytes) -> str:
@@ -340,14 +340,14 @@ def build_artifact_from_embeddings(
 
 
 __all__ = [
-    "SynopsisNeuralEmbeddingsArtifact",
     "SYNOPSIS_NEURAL_EMBEDDINGS_SCHEMA",
-    "SYNOPSIS_NEURAL_MIN_SIM",
     "SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD",
+    "SYNOPSIS_NEURAL_MIN_SIM",
     "SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY",
+    "SynopsisNeuralEmbeddingsArtifact",
+    "build_artifact_from_embeddings",
+    "compute_seed_similarity_map",
     "synopsis_neural_bonus_for_candidate",
     "synopsis_neural_penalty_for_candidate",
     "validate_synopsis_neural_embeddings_artifact",
-    "compute_seed_similarity_map",
-    "build_artifact_from_embeddings",
 ]

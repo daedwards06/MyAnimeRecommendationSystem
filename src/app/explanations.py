@@ -18,25 +18,25 @@ because content signals dominate this component (~75%+ of its value).
 
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Any
 
 # User-facing display labels for internal component keys.
 # Keep internal keys unchanged for backward compatibility with tests,
 # serialized explanations, and the recommender module.
-_DISPLAY_LABELS: Dict[str, str] = {
+_DISPLAY_LABELS: dict[str, str] = {
     "mf": "CF",
     "knn": "Content",
     "pop": "Popularity",
 }
 
 
-def format_explanation(contributions: Dict[str, Any]) -> str:
+def format_explanation(contributions: dict[str, Any]) -> str:
     """Format explanation dict to human-readable string.
-    
+
     Handles both single-seed and multi-seed explanations.
     """
     parts = []
-    
+
     # Hybrid model contributions (CF, Content, Popularity)
     used = contributions.get("_used")
     if isinstance(used, (list, tuple)) and used:
@@ -48,33 +48,33 @@ def format_explanation(contributions: Dict[str, Any]) -> str:
         val = contributions.get(key, 0.0) * 100.0
         label = _DISPLAY_LABELS.get(key, key)
         parts.append(f"{label} {val:.1f}%")
-    
+
     base_explanation = " | ".join(parts)
-    
+
     # Multi-seed specific info
     if "seed_titles" in contributions and len(contributions.get("seed_titles", [])) > 1:
         num_matched = contributions.get("seeds_matched", 0)
         total_seeds = len(contributions["seed_titles"])
         seed_info = f" | Matches {num_matched}/{total_seeds} seeds"
         return base_explanation + seed_info
-    
+
     return base_explanation
 
 
-def format_seed_explanation(contributions: Dict[str, Any]) -> str:
+def format_seed_explanation(contributions: dict[str, Any]) -> str:
     """Format detailed seed-specific explanation for multi-seed recommendations."""
     if "overlap_per_seed" not in contributions:
         return ""
-    
+
     overlap = contributions["overlap_per_seed"]
     lines = []
     for seed_title, count in overlap.items():
         if count > 0:
             lines.append(f"• {seed_title}: {count} genre{'s' if count > 1 else ''} match")
-    
+
     if not lines:
         return "No direct genre overlap"
-    
+
     return "\n".join(lines)
 
 

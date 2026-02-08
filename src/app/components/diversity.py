@@ -1,8 +1,10 @@
 """Diversity & novelty panel component."""
 from __future__ import annotations
-import streamlit as st
+
 import pandas as pd
-from src.app.diversity import coverage, genre_exposure_ratio, average_novelty
+import streamlit as st
+
+from src.app.diversity import average_novelty, coverage, genre_exposure_ratio
 from src.utils import coerce_genres
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 from pathlib import Path
-from typing import Dict, Tuple
+
 import pandas as pd
 
 
@@ -42,7 +43,7 @@ def load_users(base_dir: Path) -> pd.DataFrame:
     return pd.read_parquet(path) if path.exists() else pd.DataFrame()
 
 
-def build_id_maps(interactions: pd.DataFrame) -> Tuple[Dict[int, int], Dict[int, int]]:
+def build_id_maps(interactions: pd.DataFrame) -> tuple[dict[int, int], dict[int, int]]:
     user_ids = interactions["user_id"].unique()
     item_ids = interactions["anime_id"].unique()
     return ({u: i for i, u in enumerate(user_ids)}, {a: j for j, a in enumerate(item_ids)})

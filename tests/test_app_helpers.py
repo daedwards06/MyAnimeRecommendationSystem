@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from src.app.search import fuzzy_search, normalize_title
 from src.app.badges import badge_payload
 from src.app.explanations import format_explanation
+from src.app.search import fuzzy_search, normalize_title
 
 
 def test_normalize_title():

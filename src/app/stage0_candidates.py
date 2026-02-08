@@ -27,14 +27,15 @@ This module is shared by Streamlit and the golden harness.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from src.utils import parse_pipe_set
 
 from src.app.synopsis_neural_embeddings import compute_seed_topk_neighbors
+from src.utils import parse_pipe_set
 
 
 @dataclass(frozen=True)
@@ -223,7 +224,7 @@ def build_stage0_seed_candidate_pool(
 
         for row in metadata.itertuples(index=False):
             try:
-                aid = int(getattr(row, "anime_id"))
+                aid = int(row.anime_id)
             except Exception:
                 continue
             if aid <= 0:
@@ -235,7 +236,7 @@ def build_stage0_seed_candidate_pool(
             # Genre weighted overlap: never penalize missing genres; it just can't help.
             if has_genres and seed_genres and denom > 0.0:
                 try:
-                    gset = parse_pipe_set(getattr(row, "genres"))
+                    gset = parse_pipe_set(row.genres)
                     raw = 0
                     for g in gset:
                         raw += int(seed_genre_weights.get(g, 0))
@@ -247,7 +248,7 @@ def build_stage0_seed_candidate_pool(
             # Theme overlap ratio: missing themes never penalize; only helps when present.
             if has_themes and seed_themes:
                 try:
-                    tset = parse_pipe_set(getattr(row, "themes"))
+                    tset = parse_pipe_set(row.themes)
                     tr = _theme_overlap_ratio(seed_themes, tset)
                     t_ok = bool(tr is not None and float(tr) >= float(min_t))
                 except Exception:
@@ -290,14 +291,14 @@ def build_stage0_seed_candidate_pool(
     raw_union.update({int(x) for x in neural_set if int(x) > 0})
     raw_union.update({int(x) for x in meta_strict_match if int(x) > 0})
     raw_union.update({int(x) for x in pop_ids if int(x) > 0})
-    raw_union_size = int(len(raw_union))
+    raw_union_size = len(raw_union)
 
     # After-hygiene universe (before cap): union of tiers, then hygiene exclusions.
     after_hygiene_set: set[int] = set()
     after_hygiene_set.update({int(x) for x in neural_set if int(x) > 0 and int(x) not in blocked})
     after_hygiene_set.update({int(x) for x in meta_strict_match if int(x) > 0 and int(x) not in blocked})
     after_hygiene_set.update({int(x) for x in pop_ids if int(x) > 0 and int(x) not in blocked})
-    after_hygiene_size = int(len(after_hygiene_set))
+    after_hygiene_size = len(after_hygiene_set)
 
     # Stable union + truncation: A -> B -> C priority.
     cap = max(0, int(pool_cap))
@@ -333,7 +334,7 @@ def build_stage0_seed_candidate_pool(
         if cap and len(final_ids) >= cap:
             break
 
-    after_cap_size = int(len(final_ids))
+    after_cap_size = len(final_ids)
 
     # Compute diagnostics over the final pool.
     from_neural = 0
@@ -368,9 +369,9 @@ def build_stage0_seed_candidate_pool(
 
     diag = Stage0Diagnostics(
         stage0_pool_raw=int(raw_union_size),
-        stage0_from_neural_raw=int(len(neural_set)),
-        stage0_from_meta_strict_raw=int(len(meta_strict_match)),
-        stage0_from_popularity_raw=int(len({int(x) for x in pop_ids if int(x) > 0})),
+        stage0_from_neural_raw=len(neural_set),
+        stage0_from_meta_strict_raw=len(meta_strict_match),
+        stage0_from_popularity_raw=len({int(x) for x in pop_ids if int(x) > 0}),
         stage0_after_hygiene=int(after_hygiene_size),
         stage0_after_cap=int(after_cap_size),
         stage0_from_neural=int(from_neural),

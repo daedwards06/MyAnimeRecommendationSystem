@@ -9,9 +9,10 @@ This module provides a small, testable surface for:
 Implementations are conservative and avoid heavy dependencies.
 """
 from __future__ import annotations
+
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, Iterable
 
 import numpy as np
 import pandas as pd
@@ -21,7 +22,7 @@ import pandas as pd
 class SplitConfig:
     val_ratio: float = 0.1
     test_ratio: float = 0.1
-    time_col: Optional[str] = None  # if provided, do time-aware split
+    time_col: str | None = None  # if provided, do time-aware split
     user_col: str = "user_id"
     item_col: str = "anime_id"
 
@@ -132,7 +133,7 @@ def normalize_metadata(df: pd.DataFrame) -> pd.DataFrame:
 
 # ---------- Splitting ----------
 
-def user_based_split(df: pd.DataFrame, cfg: SplitConfig) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def user_based_split(df: pd.DataFrame, cfg: SplitConfig) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Per-user split: for each user, assign interactions to train/val/test.
     If time_col is provided, sort per user by time before splitting to reduce leakage.
     """
@@ -168,9 +169,9 @@ def user_based_split(df: pd.DataFrame, cfg: SplitConfig) -> Tuple[pd.DataFrame, 
 
 __all__ = [
     "SplitConfig",
-    "load_ratings",
-    "load_anime",
     "clean_interactions",
+    "load_anime",
+    "load_ratings",
     "normalize_metadata",
     "user_based_split",
 ]

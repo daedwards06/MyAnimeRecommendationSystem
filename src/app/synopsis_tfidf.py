@@ -13,16 +13,14 @@ Design constraints
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
 from sklearn.feature_extraction.text import TfidfVectorizer
-
 
 # ---------------------------------------------------------------------------
 # Centralized, conservative TF-IDF settings (deterministic).
@@ -73,7 +71,7 @@ SYNOPSIS_TFIDF_OFFTYPE_SHORT_PENALTY_SIM_RELIEF: float = 1.0
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _is_blank_text(val: Any) -> bool:
@@ -103,7 +101,7 @@ def choose_synopsis_text(row: Mapping[str, Any]) -> str:
     return ""
 
 
-def _most_common_type(metadata: pd.DataFrame, seed_ids: Iterable[int]) -> Optional[str]:
+def _most_common_type(metadata: pd.DataFrame, seed_ids: Iterable[int]) -> str | None:
     if metadata is None or metadata.empty or "anime_id" not in metadata.columns:
         return None
     if "type" not in metadata.columns:
@@ -132,8 +130,8 @@ def _most_common_type(metadata: pd.DataFrame, seed_ids: Iterable[int]) -> Option
 
 def synopsis_gate_passes(
     *,
-    seed_type: Optional[str],
-    candidate_type: Optional[str],
+    seed_type: str | None,
+    candidate_type: str | None,
     candidate_episodes: Any,
     min_episodes: int = SYNOPSIS_TFIDF_MIN_EPISODES,
 ) -> bool:
@@ -279,7 +277,7 @@ def build_synopsis_tfidf_artifact(
         tfidf_matrix=X,
         anime_ids=anime_ids,
         anime_id_to_row=anime_id_to_row,
-        vocab_size=int(len(vec.get_feature_names_out())),
+        vocab_size=len(vec.get_feature_names_out()),
         vectorizer_params=params,
     )
 
@@ -374,7 +372,7 @@ def apply_synopsis_tfidf_bonus(
     return out, diagnostics
 
 
-def most_common_seed_type(metadata: pd.DataFrame, seed_ids: list[int]) -> Optional[str]:
+def most_common_seed_type(metadata: pd.DataFrame, seed_ids: list[int]) -> str | None:
     return _most_common_type(metadata, seed_ids)
 
 
@@ -392,30 +390,30 @@ def personalized_synopsis_tfidf_bonus_for_candidate(sim: float) -> float:
 
 
 __all__ = [
-    "SYNOPSIS_TFIDF_SCHEMA",
-    "SYNOPSIS_TFIDF_MAX_FEATURES",
-    "SYNOPSIS_TFIDF_NGRAM_RANGE",
-    "SYNOPSIS_TFIDF_MIN_DF",
-    "SYNOPSIS_TFIDF_MAX_DF",
-    "SYNOPSIS_TFIDF_STOP_WORDS",
-    "SYNOPSIS_TFIDF_TOKEN_PATTERN",
-    "SYNOPSIS_TFIDF_MIN_SIM",
-    "SYNOPSIS_TFIDF_MIN_EPISODES",
-    "SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD",
-    "SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY",
     "SYNOPSIS_TFIDF_COLD_START_COEF",
-    "SYNOPSIS_TFIDF_TRAINED_COEF",
-    "SYNOPSIS_TFIDF_PERSONALIZED_COEF",
+    "SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD",
+    "SYNOPSIS_TFIDF_MAX_DF",
+    "SYNOPSIS_TFIDF_MAX_FEATURES",
+    "SYNOPSIS_TFIDF_MIN_DF",
+    "SYNOPSIS_TFIDF_MIN_EPISODES",
+    "SYNOPSIS_TFIDF_MIN_SIM",
+    "SYNOPSIS_TFIDF_NGRAM_RANGE",
+    "SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY",
     "SYNOPSIS_TFIDF_OFFTYPE_SHORT_PENALTY_BASE",
     "SYNOPSIS_TFIDF_OFFTYPE_SHORT_PENALTY_SIM_RELIEF",
+    "SYNOPSIS_TFIDF_PERSONALIZED_COEF",
+    "SYNOPSIS_TFIDF_SCHEMA",
+    "SYNOPSIS_TFIDF_STOP_WORDS",
+    "SYNOPSIS_TFIDF_TOKEN_PATTERN",
+    "SYNOPSIS_TFIDF_TRAINED_COEF",
     "SynopsisTfidfArtifact",
     "build_synopsis_tfidf_artifact",
-    "validate_synopsis_tfidf_artifact",
     "choose_synopsis_text",
     "compute_seed_similarity_map",
     "most_common_seed_type",
-    "synopsis_gate_passes",
-    "synopsis_tfidf_penalty_for_candidate",
-    "synopsis_tfidf_bonus_for_candidate",
     "personalized_synopsis_tfidf_bonus_for_candidate",
+    "synopsis_gate_passes",
+    "synopsis_tfidf_bonus_for_candidate",
+    "synopsis_tfidf_penalty_for_candidate",
+    "validate_synopsis_tfidf_artifact",
 ]

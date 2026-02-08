@@ -8,12 +8,12 @@ from __future__ import annotations
 
 def explain_cold_start(is_cold_start: bool) -> str:
     """Return explanation text for cold-start badge.
-    
+
     Parameters
     ----------
     is_cold_start : bool
         Whether the item is flagged as cold-start (no training interactions).
-    
+
     Returns
     -------
     str
@@ -32,12 +32,12 @@ def explain_cold_start(is_cold_start: bool) -> str:
 
 def explain_popularity_band(band: str) -> str:
     """Return explanation text for popularity percentile band.
-    
+
     Parameters
     ----------
     band : str
         Popularity band label (e.g., 'Top 25%', 'Mid 50%', 'Long-tail').
-    
+
     Returns
     -------
     str
@@ -65,12 +65,12 @@ def explain_popularity_band(band: str) -> str:
 
 def explain_novelty_ratio(ratio: float) -> str:
     """Return explanation text for genre novelty ratio.
-    
+
     Parameters
     ----------
     ratio : float
         Novelty ratio (0..1 scale); higher means more genre diversity vs user history.
-    
+
     Returns
     -------
     str
@@ -85,7 +85,7 @@ def explain_novelty_ratio(ratio: float) -> str:
     else:
         level = "Low"
         desc = "stays close to genres you've already enjoyed—comfort zone pick."
-    
+
     return (
         f"**Genre Novelty: {level} ({ratio:.2f})**: This recommendation {desc} "
         f"Novelty is measured as the proportion of item genres not heavily represented in your profile."
@@ -94,14 +94,14 @@ def explain_novelty_ratio(ratio: float) -> str:
 
 def format_badge_tooltip(badge_key: str, badge_value) -> str:
     """Dispatch badge key to appropriate explanation function.
-    
+
     Parameters
     ----------
     badge_key : str
         Key identifying badge type ('cold_start', 'popularity_band', 'novelty_ratio').
     badge_value
         Value of the badge (bool for cold_start, str for band, float for novelty).
-    
+
     Returns
     -------
     str
@@ -123,7 +123,7 @@ def format_badge_tooltip(badge_key: str, badge_value) -> str:
 
 __all__ = [
     "explain_cold_start",
-    "explain_popularity_band",
     "explain_novelty_ratio",
+    "explain_popularity_band",
     "format_badge_tooltip",
 ]

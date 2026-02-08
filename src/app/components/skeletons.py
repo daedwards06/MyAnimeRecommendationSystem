@@ -1,5 +1,6 @@
 """Skeleton loading components for perceived performance."""
 from __future__ import annotations
+
 import streamlit as st
 
 # Simple CSS shimmer style (can be expanded later)

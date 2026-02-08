@@ -10,13 +10,15 @@ constructing placeholder score arrays for missing artifacts.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Dict, List, Optional, Sequence, Tuple
+
 import numpy as np
 
-from .constants import BALANCED_WEIGHTS, DIVERSITY_EMPHASIZED_WEIGHTS
 from src.models.user_embedding import compute_personalized_scores
+
+from .constants import BALANCED_WEIGHTS, DIVERSITY_EMPHASIZED_WEIGHTS
 
 
 @dataclass
@@ -35,9 +37,9 @@ class HybridComponents:
         Mapping from column index -> external anime_id.
     """
 
-    mf: Optional[np.ndarray]
-    knn: Optional[np.ndarray]
-    pop: Optional[np.ndarray]
+    mf: np.ndarray | None
+    knn: np.ndarray | None
+    pop: np.ndarray | None
     item_ids: np.ndarray
 
     @property
@@ -64,9 +66,9 @@ class HybridRecommender:
         if self.c.pop is not None:
             self.c.pop = self.c.pop.astype(np.float32, copy=False)
 
-    def _blend(self, user_index: int, weights: Dict[str, float]) -> np.ndarray:
+    def _blend(self, user_index: int, weights: dict[str, float]) -> np.ndarray:
         """Blend MF, kNN, and popularity scores for a given user.
-        
+
         NOTE (Phase 2, Task 2.1): In seed-based (non-personalized) mode, the
         scoring pipeline may substitute mean-user CF scores instead of using
         user_index=0, to represent average community preferences rather than
@@ -83,7 +85,7 @@ class HybridRecommender:
             pop_part = weights.get("pop", 0.0) * self.c.pop
         return mf_part + knn_part + pop_part
 
-    def used_components_for_weights(self, weights: Dict[str, float]) -> list[str]:
+    def used_components_for_weights(self, weights: dict[str, float]) -> list[str]:
         """Which components are actually active for this run (artifact present and weight != 0)."""
         used: list[str] = []
         if self.c.mf is not None and float(weights.get("mf", 0.0)) != 0.0:
@@ -94,7 +96,7 @@ class HybridRecommender:
             used.append("pop")
         return used
 
-    def raw_components_for_item(self, user_index: int, item_index: int, weights: Dict[str, float]) -> Dict[str, float]:
+    def raw_components_for_item(self, user_index: int, item_index: int, weights: dict[str, float]) -> dict[str, float]:
         """Return the raw weighted component contributions for a single item."""
         mf_val = 0.0
         knn_val = 0.0
@@ -107,7 +109,7 @@ class HybridRecommender:
             pop_val = float(weights.get("pop", 0.0)) * float(self.c.pop[item_index])
         return {"mf": mf_val, "knn": knn_val, "pop": pop_val}
 
-    def explain_item(self, user_index: int, item_index: int, weights: Dict[str, float]) -> Dict[str, float]:
+    def explain_item(self, user_index: int, item_index: int, weights: dict[str, float]) -> dict[str, float]:
         """Return normalized source contribution shares for a specific user-item.
 
         Shares are computed from the *actual weighted raw contributions* used for that item.
@@ -121,10 +123,10 @@ class HybridRecommender:
         self,
         user_index: int,
         n: int = 10,
-        weights: Optional[Dict[str, float]] = None,
-        exclude_item_ids: Optional[Sequence[int]] = None,
-        override_mf_scores: Optional[np.ndarray] = None,
-    ) -> List[Dict[str, float]]:
+        weights: dict[str, float] | None = None,
+        exclude_item_ids: Sequence[int] | None = None,
+        override_mf_scores: np.ndarray | None = None,
+    ) -> list[dict[str, float]]:
         """Compute top-N recommendations for a user index.
 
         Parameters
@@ -152,7 +154,7 @@ class HybridRecommender:
         # Efficient partial selection
         top_idx = np.argpartition(scores, -n)[-n:]
         ordered = top_idx[np.argsort(scores[top_idx])[::-1]]
-        result: List[Dict[str, float]] = []
+        result: list[dict[str, float]] = []
         used = self.used_components_for_weights(w)
         for i in ordered:
             raw = self.raw_components_for_item(user_index, int(i), w)
@@ -172,9 +174,9 @@ class HybridRecommender:
         user_embedding: np.ndarray,
         mf_model,
         n: int = 10,
-        weights: Optional[Dict[str, float]] = None,
-        exclude_item_ids: Optional[Sequence[int]] = None,
-    ) -> List[Dict[str, float]]:
+        weights: dict[str, float] | None = None,
+        exclude_item_ids: Sequence[int] | None = None,
+    ) -> list[dict[str, float]]:
         """Compute top-N personalized recommendations using user embedding."""
         w = weights or BALANCED_WEIGHTS
 
@@ -215,7 +217,7 @@ class HybridRecommender:
         top_idx = np.argpartition(scores, -n)[-n:]
         ordered = top_idx[np.argsort(scores[top_idx])[::-1]]
 
-        result: List[Dict[str, float]] = []
+        result: list[dict[str, float]] = []
         used: list[str] = []
         if float(w.get("mf", 0.0)) != 0.0:
             used.append("mf")
@@ -244,11 +246,11 @@ COMPONENT_ORDER: tuple[str, ...] = ("mf", "knn", "pop")
 
 
 def compute_component_shares(
-    raw_components: Dict[str, float],
+    raw_components: dict[str, float],
     *,
-    used_components: Optional[Sequence[str]] = None,
+    used_components: Sequence[str] | None = None,
     clamp_negative_to_zero: bool = True,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Convert raw component contributions into normalized shares.
 
     Rules:
@@ -270,7 +272,7 @@ def compute_component_shares(
         contrib[k] = v
     total = float(sum(contrib.values()))
 
-    out: Dict[str, float] = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
+    out: dict[str, float] = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
     if total > 0.0:
         for k in used_ordered:
             out[k] = contrib[k] / total
@@ -286,7 +288,7 @@ def compute_dense_similarity(
     seed_index: int,
     feature_matrix: np.ndarray,
     top_k: int,
-) -> List[int]:
+) -> list[int]:
     """Return top-k similar item indices using dense dot-product similarity.
 
     Assumes rows correspond to items. Excludes the seed item.
@@ -304,7 +306,7 @@ def get_content_only_recs_for_new_item(
     item_index: int,
     tfidf_matrix: np.ndarray,
     top_k: int = 10,
-) -> List[int]:
+) -> list[int]:
     """Content-only TF-IDF similarity path for cold-start items."""
     seed_vec = tfidf_matrix[item_index]
     sims = tfidf_matrix @ seed_vec
@@ -313,7 +315,7 @@ def get_content_only_recs_for_new_item(
     return top[np.argsort(sims[top])[::-1]].tolist()
 
 
-def choose_weights(mode: str) -> Dict[str, float]:
+def choose_weights(mode: str) -> dict[str, float]:
     """Return weight preset by mode string ('balanced' or 'diversity')."""
     mode_norm = mode.strip().lower()
     if mode_norm.startswith("div"):
@@ -324,8 +326,8 @@ def choose_weights(mode: str) -> Dict[str, float]:
 __all__ = [
     "HybridComponents",
     "HybridRecommender",
+    "choose_weights",
     "compute_component_shares",
     "compute_dense_similarity",
     "get_content_only_recs_for_new_item",
-    "choose_weights",
 ]

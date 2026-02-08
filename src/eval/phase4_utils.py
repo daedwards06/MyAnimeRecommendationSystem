@@ -1,6 +1,9 @@
 """Phase 4 utility helpers (lift computation, JSON sanitization)."""
 from __future__ import annotations
-from typing import Any, Iterable
+
+from collections.abc import Iterable
+from typing import Any
+
 import numpy as np
 import pandas as pd
 

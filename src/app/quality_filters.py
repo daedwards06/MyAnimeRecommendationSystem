@@ -7,10 +7,11 @@ This module provides filtering logic to exclude:
 """
 
 from __future__ import annotations
+
 import logging
 import re
+
 import pandas as pd
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ def passes_quality_filter(
     require_synopsis: bool = False  # Changed to False - some good anime have missing synopsis
 ) -> bool:
     """Check if an anime passes quality thresholds for recommendation.
-    
+
     Parameters
     ----------
     row : pd.Series
@@ -110,39 +111,39 @@ def passes_quality_filter(
         Maximum popularity rank (higher = more obscure)
     require_synopsis : bool
         Whether to require a non-empty synopsis
-        
+
     Returns
     -------
     bool
         True if passes all filters
     """
     anime_id = int(row.get('anime_id', -1))
-    
+
     # Blacklist check
     if anime_id in BLACKLIST_IDS:
         return False
-    
+
     # Members count check
     members = row.get('members_count')
     if pd.isna(members) or members < min_members:
         return False
-    
+
     # MAL score check (allow NaN for cold-start, but if present must be >= threshold)
     mal_score = row.get('mal_score')
     if pd.notna(mal_score) and mal_score < min_score:
         return False
-    
+
     # Popularity rank check (lower rank = more popular, so must be below threshold)
     pop_rank = row.get('mal_popularity')
     if pd.notna(pop_rank) and pop_rank > max_pop_rank:
         return False
-    
+
     # Synopsis check
     if require_synopsis:
         synopsis = row.get('synopsis')
         if pd.isna(synopsis) or not str(synopsis).strip():
             return False
-    
+
     return True
 
 
@@ -152,7 +153,7 @@ def apply_quality_filters(
     verbose: bool = False
 ) -> list[dict]:
     """Filter recommendation list to remove low-quality matches.
-    
+
     Parameters
     ----------
     recommendations : list[dict]
@@ -161,7 +162,7 @@ def apply_quality_filters(
         Full metadata DataFrame
     verbose : bool
         Whether to print filtering stats
-        
+
     Returns
     -------
     list[dict]
@@ -170,18 +171,18 @@ def apply_quality_filters(
     filtered = []
     removed_count = 0
     removed_reasons = {}
-    
+
     for rec in recommendations:
         anime_id = rec['anime_id']
         row = metadata[metadata['anime_id'] == anime_id]
-        
+
         if row.empty:
             removed_count += 1
             removed_reasons['not_in_metadata'] = removed_reasons.get('not_in_metadata', 0) + 1
             continue
-        
+
         row = row.iloc[0]
-        
+
         if passes_quality_filter(row):
             filtered.append(rec)
         else:
@@ -197,20 +198,20 @@ def apply_quality_filters(
                 removed_reasons['too_obscure'] = removed_reasons.get('too_obscure', 0) + 1
             else:
                 removed_reasons['missing_synopsis'] = removed_reasons.get('missing_synopsis', 0) + 1
-    
+
     if verbose and removed_count > 0:
         logger.debug(f"Quality filter removed {removed_count} recommendations:")
         for reason, count in removed_reasons.items():
             logger.debug(f"  - {reason}: {count}")
-    
+
     return filtered
 
 
 __all__ = [
-    'passes_quality_filter',
-    'apply_quality_filters',
     'BLACKLIST_IDS',
-    'RANKED_HYGIENE_DISALLOW_TYPES',
     'RANKED_HYGIENE_BAD_TITLE_REGEX',
+    'RANKED_HYGIENE_DISALLOW_TYPES',
+    'apply_quality_filters',
     'build_ranked_candidate_hygiene_exclude_ids',
+    'passes_quality_filter',
 ]

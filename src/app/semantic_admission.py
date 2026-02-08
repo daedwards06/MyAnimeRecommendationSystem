@@ -29,10 +29,10 @@ For multi-seed queries, adaptive_low_genre_overlap defaults to HIGH.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Literal
-
 import unicodedata
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any, Literal
 
 STAGE1_TITLE_OVERLAP_ALWAYS_ADMIT: float = 0.50
 
@@ -114,7 +114,7 @@ def normalize_demographics_tokens(val: Any) -> set[str]:
     except Exception:
         pass
 
-    def _norm_one(x: Any) -> Optional[str]:
+    def _norm_one(x: Any) -> str | None:
         if x is None:
             return None
         s = str(x).strip()
@@ -131,7 +131,7 @@ def normalize_demographics_tokens(val: Any) -> set[str]:
         s = " ".join(s.split()).lower()
 
         # Canonicalize common romanizations.
-        if s in {"shounen", "shonen", "shonen"}:
+        if s in {"shounen", "shonen"}:
             return STAGE1_DEMO_SHOUNEN_TOKEN
         if s in {"shoujo", "shojo"}:
             return "shoujo"
@@ -190,7 +190,7 @@ def adaptive_low_genre_overlap(seed_genres_count: int, *, min_floor: float = STA
 def theme_overlap_ratio(
     seed_themes: frozenset[str] | set[str],
     candidate_themes: set[str],
-) -> Optional[float]:
+) -> float | None:
     if not seed_themes or not candidate_themes:
         return None
     denom = len(seed_themes)
@@ -208,10 +208,10 @@ def stage1_semantic_admission(
     title_overlap: float,
     seed_genres_count: int,
     num_seeds: int,
-    theme_overlap: Optional[float],
+    theme_overlap: float | None,
     seed_demographics: Any = None,
     candidate_demographics: Any = None,
-    demo_shounen_min_sim: Optional[float] = None,
+    demo_shounen_min_sim: float | None = None,
     high_genre_overlap: float = STAGE1_HIGH_GENRE_OVERLAP,
     theme_min_overlap: float = STAGE1_THEME_MIN_OVERLAP,
     title_always_admit: float = STAGE1_TITLE_OVERLAP_ALWAYS_ADMIT,

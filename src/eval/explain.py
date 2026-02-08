@@ -1,18 +1,17 @@
 from __future__ import annotations
-from typing import Dict, List
 
 
 def blend_explanations(
-    top_items: List[int],
-    sources: Dict[str, Dict[int, float]],
-    weights: Dict[str, float],
-) -> Dict[int, Dict[str, float]]:
+    top_items: list[int],
+    sources: dict[str, dict[int, float]],
+    weights: dict[str, float],
+) -> dict[int, dict[str, float]]:
     """Return per-item contribution breakdown for a blended recommendation list.
 
     For each item in top_items, compute contribution = weight[source] * source_score[item].
     Missing scores default to 0.
     """
-    out: Dict[int, Dict[str, float]] = {}
+    out: dict[int, dict[str, float]] = {}
     for it in top_items:
         contrib = {}
         total = 0.0

@@ -1,6 +1,7 @@
 """PyTest configuration: ensure project root is on sys.path so `import src` works.
 """
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 

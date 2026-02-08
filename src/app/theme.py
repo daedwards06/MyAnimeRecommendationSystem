@@ -83,4 +83,4 @@ def get_theme() -> dict:
         "mode": "light",
     }
 
-__all__ = ["get_theme", "COLORS", "SPACING", "TYPE_SCALE", "ELEVATION"]
+__all__ = ["COLORS", "ELEVATION", "SPACING", "TYPE_SCALE", "get_theme"]

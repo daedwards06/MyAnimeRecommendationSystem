@@ -4,23 +4,23 @@ User Embedding Generation from Ratings
 Generates personalized user embeddings from rating history using the MF model's item factors.
 """
 
-import numpy as np
-from typing import Dict, Optional
 import logging
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
 def generate_user_embedding(
-    ratings_dict: Dict[int, float],
+    ratings_dict: dict[int, float],
     mf_model,
     method: str = "weighted_average",
-    default_rating: Optional[float] = None,
+    default_rating: float | None = None,
     normalize: bool = True
 ) -> np.ndarray:
     """
     Generate a user embedding vector from their rating history.
-    
+
     Args:
         ratings_dict: Dictionary mapping anime_id -> rating (1-10 scale)
         mf_model: Trained MF model with Q (item factors) and item_to_index mapping
@@ -29,34 +29,34 @@ def generate_user_embedding(
             - "simple_average": Unweighted average of item factors
         default_rating: If provided, use this rating for items without explicit ratings
         normalize: Whether to L2-normalize the final embedding
-    
+
     Returns:
         User embedding vector (same dimensions as item factors)
     """
     if not hasattr(mf_model, 'Q') or not hasattr(mf_model, 'item_to_index'):
         raise ValueError("MF model must have 'Q' (item factors) and 'item_to_index' attributes")
-    
+
     Q = mf_model.Q  # Item factors matrix (num_items, n_factors)
     item_to_index = mf_model.item_to_index
     n_factors = Q.shape[1]
-    
+
     # Filter ratings to only include items in the training set
     valid_ratings = {}
     missing_count = 0
-    
+
     for anime_id, rating in ratings_dict.items():
         if anime_id in item_to_index:
             valid_ratings[anime_id] = rating
         else:
             missing_count += 1
-    
+
     if missing_count > 0:
         logger.info(f"Skipped {missing_count} items not in MF training set")
-    
+
     if not valid_ratings:
         logger.warning("No valid ratings found in training set - returning zero embedding")
         return np.zeros(n_factors, dtype=np.float32)
-    
+
     # Generate embedding based on method
     if method == "weighted_average":
         # Use mean-centered ratings as weights, with a positive floor.
@@ -71,91 +71,91 @@ def generate_user_embedding(
         ratings_array = np.array(list(valid_ratings.values()), dtype=np.float32)
         user_mean = float(np.mean(ratings_array))
         weights_array = np.maximum(ratings_array - user_mean + 1.0, 0.1)
-        
+
         # Weighted sum of item factors
         embedding = np.zeros(n_factors, dtype=np.float32)
         weight_sum = 0.0
-        
+
         for (anime_id, _), weight in zip(valid_ratings.items(), weights_array):
             item_idx = item_to_index[anime_id]
             embedding += weight * Q[item_idx]
             weight_sum += weight
-        
+
         if weight_sum > 0:
             embedding /= weight_sum
-    
+
     elif method == "simple_average":
         # Unweighted average of item factors
         embedding = np.zeros(n_factors, dtype=np.float32)
-        
-        for anime_id in valid_ratings.keys():
+
+        for anime_id in valid_ratings:
             item_idx = item_to_index[anime_id]
             embedding += Q[item_idx]
-        
+
         embedding /= len(valid_ratings)
-    
+
     else:
         raise ValueError(f"Unknown method: {method}. Use 'weighted_average' or 'simple_average'")
-    
+
     # Optional L2 normalization
     if normalize:
         norm = np.linalg.norm(embedding)
         if norm > 0:
             embedding /= norm
-    
+
     logger.info(f"Generated user embedding from {len(valid_ratings)} ratings using {method}")
-    
+
     return embedding
 
 
 def compute_personalized_scores(
     user_embedding: np.ndarray,
     mf_model,
-    exclude_anime_ids: Optional[set] = None
-) -> Dict[int, float]:
+    exclude_anime_ids: set | None = None
+) -> dict[int, float]:
     """
     Compute personalized recommendation scores for all items using user embedding.
-    
+
     Args:
         user_embedding: User factor vector (n_factors,)
         mf_model: Trained MF model with Q (item factors) and index_to_item mapping
         exclude_anime_ids: Set of anime_ids to exclude from scoring
-    
+
     Returns:
         Dictionary mapping anime_id -> predicted score
     """
     if not hasattr(mf_model, 'Q') or not hasattr(mf_model, 'index_to_item'):
         raise ValueError("MF model must have 'Q' (item factors) and 'index_to_item' attributes")
-    
+
     Q = mf_model.Q  # Item factors matrix (num_items, n_factors)
     index_to_item = mf_model.index_to_item
-    
+
     # Compute scores: dot product of user embedding with all item factors
     scores = user_embedding @ Q.T  # (n_factors,) @ (num_items, n_factors).T -> (num_items,)
-    
+
     # Build result dictionary
     result = {}
     for idx, anime_id in index_to_item.items():
         if exclude_anime_ids and anime_id in exclude_anime_ids:
             continue
         result[anime_id] = float(scores[idx])
-    
+
     return result
 
 
 def get_user_taste_profile(
-    ratings_dict: Dict[int, float],
+    ratings_dict: dict[int, float],
     metadata_df,
     top_n_genres: int = 5
-) -> Dict:
+) -> dict:
     """
     Analyze user's taste profile from their ratings.
-    
+
     Args:
         ratings_dict: Dictionary mapping anime_id -> rating
         metadata_df: DataFrame with anime metadata (must have anime_id, genres columns)
         top_n_genres: Number of top genres to return
-    
+
     Returns:
         Dictionary with taste statistics:
         - avg_rating: Overall average rating
@@ -170,20 +170,20 @@ def get_user_taste_profile(
             'top_genres': [],
             'rating_distribution': {}
         }
-    
+
     # Overall average
     avg_rating = np.mean(list(ratings_dict.values()))
-    
+
     # Genre-based analysis
     genre_ratings = {}
     genre_counts = {}
-    
+
     for anime_id, rating in ratings_dict.items():
         # Find metadata row
         row = metadata_df[metadata_df['anime_id'] == anime_id]
         if row.empty:
             continue
-        
+
         # Parse genres
         genres_val = row.iloc[0].get('genres')
         if isinstance(genres_val, str):
@@ -192,7 +192,7 @@ def get_user_taste_profile(
             genres = [str(g).strip() for g in genres_val if g]
         else:
             genres = []
-        
+
         # Accumulate ratings per genre
         for genre in genres:
             if genre not in genre_ratings:
@@ -200,14 +200,14 @@ def get_user_taste_profile(
                 genre_counts[genre] = 0
             genre_ratings[genre] += rating
             genre_counts[genre] += 1
-    
+
     # Average ratings per genre
     for genre in genre_ratings:
         genre_ratings[genre] /= genre_counts[genre]
-    
+
     # Sort by average rating
     top_genres = sorted(genre_ratings.items(), key=lambda x: x[1], reverse=True)[:top_n_genres]
-    
+
     # Rating distribution
     rating_distribution = {
         '9-10': sum(1 for r in ratings_dict.values() if r >= 9),
@@ -215,7 +215,7 @@ def get_user_taste_profile(
         '5-6': sum(1 for r in ratings_dict.values() if 5 <= r < 7),
         '1-4': sum(1 for r in ratings_dict.values() if r < 5),
     }
-    
+
     return {
         'avg_rating': round(avg_rating, 2),
         'genre_ratings': {k: round(v, 2) for k, v in genre_ratings.items()},
@@ -225,7 +225,7 @@ def get_user_taste_profile(
 
 
 __all__ = [
-    'generate_user_embedding',
     'compute_personalized_scores',
+    'generate_user_embedding',
     'get_user_taste_profile',
 ]

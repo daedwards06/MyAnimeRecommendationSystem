@@ -1,11 +1,13 @@
 from __future__ import annotations
-from pathlib import Path
-from typing import Iterable, Any, Tuple
 
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-import numpy as np
-import joblib
 
 
 def _to_token_list(x: Any) -> list[str]:
@@ -114,7 +116,7 @@ def build_tfidf_and_vectorizer(
     tag_cols: Iterable[str] = ("genres_list", "themes_list"),
     max_features: int = 10000,
     ngram_range: tuple[int, int] = (1, 2),
-) -> Tuple[pd.DataFrame, TfidfVectorizer]:
+) -> tuple[pd.DataFrame, TfidfVectorizer]:
     """Build TF-IDF matrix and return both DataFrame and fitted vectorizer."""
     df = build_tfidf_from_tags(
         meta, id_col=id_col, tag_cols=tag_cols, max_features=max_features, ngram_range=ngram_range

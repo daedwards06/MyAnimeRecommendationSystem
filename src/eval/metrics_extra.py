@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Dict, List
+
 import numpy as np
 
 
-def item_coverage(recommendations: Dict[int, List[int]], total_items: int) -> float:
+def item_coverage(recommendations: dict[int, list[int]], total_items: int) -> float:
     """Fraction of catalog that appears at least once across all users' top-K lists."""
     rec_items = set()
     for items in recommendations.values():
@@ -13,7 +13,7 @@ def item_coverage(recommendations: Dict[int, List[int]], total_items: int) -> fl
     return float(len(rec_items)) / float(total_items)
 
 
-def gini_index(recommendations: Dict[int, List[int]]) -> float:
+def gini_index(recommendations: dict[int, list[int]]) -> float:
     """Gini index over item recommendation frequencies (higher => more inequality).
 
     If no recommendations, return 0. Uses the standard Gini formula over positive counts.
