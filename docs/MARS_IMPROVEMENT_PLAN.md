@@ -851,12 +851,12 @@ REQUIREMENTS:
 **Why:** `src/app/artifacts_loader.py` (~380 lines) handles model selection, validation, and the fail-loud contract — and has zero tests. A bad artifact load silently breaks the entire app.
 
 **Checklist:**
-- [ ] Create `tests/test_artifacts_loader.py`
-- [ ] Test: missing metadata file → raises `ArtifactContractError`
-- [ ] Test: missing MF model → raises `ArtifactContractError`
-- [ ] Test: MF model without required attributes → raises with details
-- [ ] Test: valid artifacts → returns expected bundle structure
-- [ ] Use tmp_path fixture with minimal files (no real models needed)
+- [x] Create `tests/test_artifacts_loader.py`
+- [x] Test: missing metadata file → raises `ArtifactContractError`
+- [x] Test: missing MF model → raises `ArtifactContractError`
+- [x] Test: MF model without required attributes → raises with details
+- [x] Test: valid artifacts → returns expected bundle structure
+- [x] Use tmp_path fixture with minimal files (no real models needed)
 
 **Prompt for Claude Sonnet 4.5:**
 
