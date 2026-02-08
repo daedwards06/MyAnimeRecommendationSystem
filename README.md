@@ -75,6 +75,115 @@ Evaluated on 300 users from a held-out test set using binary relevance (rated it
 
 📊 **Detailed evaluation**: See [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) for metric curves, ablation studies, and cold-start analysis.
 
+## 🏗️ Architecture
+
+The recommendation pipeline uses a three-stage architecture to balance relevance, diversity, and computational efficiency:
+
+```mermaid
+graph TB
+    subgraph Data["📦 Data Layer"]
+        D1[anime_metadata.parquet<br/>13,000+ anime<br/>genres, synopsis, studios, scores]
+        D2[User Ratings<br/>73,515 users<br/>310K+ ratings]
+        D3[Synopsis Text<br/>Tokenized descriptions]
+    end
+
+    subgraph Models["🧠 Offline Model Training"]
+        M1[Matrix Factorization<br/>FunkSVD: P users × factors, Q items × factors<br/>64 factors, global_mean]
+        M2[Item-kNN<br/>Cosine similarity, k=40]
+        M3[TF-IDF + SVD<br/>Genre/theme/synopsis<br/>512 dimensions]
+        M4[Neural Embeddings<br/>all-MiniLM-L6-v2<br/>Sentence transformers]
+    end
+
+    subgraph Stage0["🎯 Stage 0: Candidate Generation"]
+        S0A[Neural Top-K<br/>Primary semantic pool<br/>~300 candidates]
+        S0B[Metadata Overlap<br/>Genre/theme confirmer<br/>~150 candidates]
+        S0C[Popularity Backfill<br/>Safety net<br/>~50 candidates]
+        S0D[Candidate Pool<br/>~500 total]
+    end
+
+    subgraph Stage1["🔍 Stage 1: Shortlist Construction"]
+        S1A[Semantic Admission<br/>Similarity thresholds<br/>Type/episode gates]
+        S1B[Confidence Gating<br/>Neural sim ≥ threshold]
+        S1C[Pool Assignment<br/>Pool A semantic<br/>Pool B metadata]
+        S1D[Shortlist<br/>~600 items]
+    end
+
+    subgraph Stage2["⚖️ Stage 2: Final Scoring & Reranking"]
+        S2A[Hybrid CF Score<br/>93% MF + 7% kNN]
+        S2B[Content Signals<br/>Genre overlap 30%<br/>Synopsis similarity<br/>3 modalities]
+        S2C[Quality Scaling<br/>MAL score factor<br/>Obscurity penalty]
+        S2D[Final Score<br/>Weighted combination]
+    end
+
+    subgraph Post["🔧 Post-Processing"]
+        P1[Franchise Cap<br/>Max 2 per franchise<br/>in top-20]
+        P2[Personalization Blend<br/>0-100% slider<br/>Seed + User taste]
+        P3[Display Filters<br/>Genre/Type/Year<br/>User preferences]
+        P4[Top-N Selection<br/>Final ranked list]
+    end
+
+    subgraph UI["🎨 Streamlit UI"]
+        U1[Recommendation Cards<br/>Scores, badges, metadata]
+        U2[Explanation Panel<br/>Signal breakdown<br/>MF/kNN/Content shares]
+        U3[Diversity Stats<br/>Genre distribution<br/>Coverage metrics]
+    end
+
+    D1 --> M1
+    D1 --> M2
+    D1 --> M3
+    D2 --> M1
+    D2 --> M2
+    D3 --> M3
+    D3 --> M4
+
+    M1 --> S0A
+    M2 --> S0A
+    M3 --> S0A
+    M4 --> S0A
+    D1 --> S0B
+    D1 --> S0C
+
+    S0A --> S0D
+    S0B --> S0D
+    S0C --> S0D
+
+    S0D --> S1A
+    S1A --> S1B
+    S1B --> S1C
+    S1C --> S1D
+
+    S1D --> S2A
+    S1D --> S2B
+    S1D --> S2C
+    S2A --> S2D
+    S2B --> S2D
+    S2C --> S2D
+
+    S2D --> P1
+    P1 --> P2
+    P2 --> P3
+    P3 --> P4
+
+    P4 --> U1
+    P4 --> U2
+    P4 --> U3
+
+    style Data fill:#e1f5ff
+    style Models fill:#fff4e6
+    style Stage0 fill:#f3e5f5
+    style Stage1 fill:#e8f5e9
+    style Stage2 fill:#fff3e0
+    style Post fill:#fce4ec
+    style UI fill:#e0f2f1
+```
+
+**Key Design Decisions:**
+- **Three-stage funnel** (500 → 600 → 30) balances computational cost with ranking quality
+- **Neural embeddings dominate candidate generation** for semantic relevance, metadata provides safety net
+- **CF signals delayed until Stage 2** to avoid cold-start bottlenecks in candidate retrieval
+- **Quality factor scales neural similarity** by MAL consensus to prevent obscure/low-quality items from ranking above genre-relevant alternatives
+- **Post-processing diversifies** via franchise capping and supports hybrid personalization blending
+
 ## Project structure
 
 ```

@@ -465,9 +465,9 @@ REQUIREMENTS:
 **Why:** A visual diagram of the multi-stage pipeline is worth 1000 words for communicating system design.
 
 **Checklist:**
-- [ ] Create a Mermaid diagram showing: Data → Models → Stage 0 → Stage 1 → Stage 2 → UI
-- [ ] Add it to README.md in the Results or Architecture section
-- [ ] Include the key signal flows (MF, kNN, content-based, metadata)
+- [x] Create a Mermaid diagram showing: Data → Models → Stage 0 → Stage 1 → Stage 2 → UI
+- [x] Add it to README.md in the Results or Architecture section
+- [x] Include the key signal flows (MF, kNN, content-based, metadata)
 
 **Prompt for Claude Sonnet 4.5:**
 
