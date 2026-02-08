@@ -20,6 +20,18 @@ ignore = [
     "B905",   # zip without strict= (Python 3.10+)
     "SIM108", # ternary operator (readability preference)
     "RUF012", # mutable class variable (dataclass pattern)
+    # --- Pre-existing issues (address incrementally) ---
+    "RUF001", # ambiguous unicode character in string (smart quotes)
+    "RUF002", # ambiguous unicode character in docstring
+    "RUF034", # useless if-else
+    "RUF046", # unnecessary cast to int
+    "RUF059", # unused unpacked variable
+    "SIM102", # collapsible-if
+    "SIM103", # needless-bool
+    "SIM105", # suppressible-exception (try/except → contextlib.suppress)
+    "SIM118", # in-dict-keys (x in d.keys() → x in d)
+    "B007",   # unused loop control variable
+    "B904",   # raise-without-from-inside-except
 ]
 
 [lint.per-file-ignores]

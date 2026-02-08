@@ -1,15 +1,18 @@
 from __future__ import annotations
+
 from pathlib import Path
-import streamlit as st
+
 import pandas as pd
+import streamlit as st
+
 from src.app.badges import badge_payload
-from src.app.components.tooltips import format_badge_tooltip
 from src.app.components.rating import render_quick_rating_buttons
+from src.app.components.tooltips import format_badge_tooltip
 from src.app.score_semantics import (
     SCORE_LABEL_SHORT,
     format_match_score,
-    has_match_score,
     format_user_friendly_score,
+    has_match_score,
 )
 from src.utils import coerce_genres
 
@@ -80,7 +83,7 @@ def render_card_grid(
     row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
 ):
     """Render a compact grid card version.
-    
+
     Args:
         row: Metadata row for the anime
         rec: Recommendation dict with score
@@ -90,20 +93,12 @@ def render_card_grid(
     """
     # Extract anime_id early (needed for button keys)
     anime_id = int(row.get("anime_id"))
-    
+
     raw_genres = row.get("genres")
     genres = coerce_genres(raw_genres)
-    item_genres = [g for g in genres.split("|") if g]
-    user_genre_hist = _get_user_genre_hist_from_session()
-    badges = badge_payload(
-        is_in_training=is_in_training,
-        pop_percentile=pop_pct,
-        user_genre_hist=user_genre_hist,
-        item_genres=item_genres,
-    )
-    
+
     thumb = row.get("poster_thumb_url")
-    
+
     # Title selection
     title_candidates = [
         row.get("title_english"),
@@ -112,7 +107,7 @@ def render_card_grid(
         row.get("title"),
     ]
     title_display = next((t for t in title_candidates if isinstance(t, str) and t.strip()), "Anime")
-    
+
     # Metadata
     mal_score = row.get("mal_score")
     year = None
@@ -123,14 +118,12 @@ def render_card_grid(
                 year = aired_from[:4]
         except Exception:
             pass
-    
-    card_color = "#6C63FF" if not badges['cold_start'] else "#ECC94B"
-    
+
     container = st.container(border=True)
     with container:
         # Image
         _render_image_streamlit(thumb, title_display)
-        
+
         # Title + score
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
 
@@ -156,28 +149,28 @@ def render_card_grid(
         )
         if score_badge:
             st.markdown(f"<p style='margin:2px 0;'>{score_badge}</p>", unsafe_allow_html=True)
-        
+
         # Personalized explanation
         explanation = rec.get("explanation")
         if explanation:
             st.markdown(f"<p style='font-size:0.72rem; color:#4A5568; margin:4px 0; font-style:italic;'>{explanation}</p>", unsafe_allow_html=True)
-        
+
         # Metadata chips
         meta_parts = []
         if mal_score:
             sc = "#48BB78" if mal_score >= 8.0 else "#6C63FF" if mal_score >= 7.0 else "#A0AEC0"
             meta_parts.append(f'<span style="color:{sc}; font-weight:700;">★ {mal_score:.1f}</span>')
-        
+
         anime_type = row.get("type")
         if anime_type and pd.notna(anime_type):
             meta_parts.append(f'<span style="color:#B794F4; font-weight:600;">{anime_type}</span>')
-        
+
         if year:
             meta_parts.append(f'<span style="color:#A0AEC0;">{year}</span>')
-        
+
         if meta_parts:
             st.markdown(f"<p style='font-size:0.82rem; margin:4px 0;'>{' · '.join(meta_parts)}</p>", unsafe_allow_html=True)
-        
+
         # Genres (first 3) - clickable
         if genres:
             genre_list = [g.strip() for g in genres.split('|') if g.strip()][:3]
@@ -199,12 +192,12 @@ def render_card_grid(
                             st.session_state["selected_seed_ids"] = []
                             st.session_state["selected_seed_titles"] = []
                             st.rerun()
-    
+
         # More Like This button - adds to seed list
         # anime_id already extracted at top of function
         current_ids = st.session_state.get("selected_seed_ids", [])
         current_titles = st.session_state.get("selected_seed_titles", [])
-        
+
         if anime_id in current_ids:
             st.caption("✓ In seeds")
         elif len(current_ids) >= 5:
@@ -221,7 +214,7 @@ def render_card_grid(
                 st.session_state["selected_seed_ids"] = current_ids
                 st.session_state["selected_seed_titles"] = current_titles
                 st.rerun()
-        
+
         # Rating buttons (if profile loaded)
         profile = st.session_state.get("active_profile")
         if profile:
@@ -233,7 +226,7 @@ def render_card(
     row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
 ):
     """Render a detailed list card with image left / content right layout.
-    
+
     Args:
         row: Metadata row for the anime
         rec: Recommendation dict with score
@@ -253,9 +246,9 @@ def render_card(
     )
     rec["badges"] = badges
     thumb = row.get("poster_thumb_url")
-    
+
     anime_id = int(row.get("anime_id"))
-    
+
     # Title selection
     title_candidates = [
         row.get("title_english"),
@@ -265,19 +258,19 @@ def render_card(
         row.get("title_japanese"),
     ]
     title_display = next((t for t in title_candidates if isinstance(t, str) and t.strip()), "Anime")
-    
+
     alt_title = None
     if row.get("title_japanese") and row.get("title_japanese") != title_display:
         alt_title = row.get("title_japanese")
     elif row.get("title_primary") and row.get("title_primary") != title_display:
         alt_title = row.get("title_primary")
-    
+
     # Synopsis
     synopsis_val = row.get("synopsis") if "synopsis" in row else row.get("synopsis_snippet")
     display_synopsis = ""
     if synopsis_val is not None and pd.notna(synopsis_val) and str(synopsis_val).strip():
         display_synopsis = str(synopsis_val).strip()
-    
+
     # Metadata fields
     mal_score = row.get("mal_score")
     episodes = row.get("episodes")
@@ -286,7 +279,7 @@ def render_card(
     studios = studios_raw if isinstance(studios_raw, list) else []
     source = row.get("source_material")
     anime_type = row.get("type")
-    
+
     # Year
     year = None
     aired_from = row.get("aired_from")
@@ -296,15 +289,15 @@ def render_card(
                 year = aired_from[:4]
         except Exception:
             pass
-    
+
     container = st.container(border=True)
     with container:
         # Two-column layout: image | content
         col_img, col_content = st.columns([1, 3])
-        
+
         with col_img:
             _render_image_streamlit(thumb, title_display)
-        
+
         with col_content:
             # Title + match score on same line
             score = rec.get("score")
@@ -337,7 +330,7 @@ def render_card(
                     f"<p style='color:#A0AEC0; font-style:italic; font-size:0.85rem; margin:2px 0 0 0;'>{alt_title}</p>",
                     unsafe_allow_html=True,
                 )
-            
+
             # Personalized explanation
             explanation = rec.get("explanation")
             if explanation:
@@ -347,7 +340,7 @@ def render_card(
                     f"<span style='font-size:0.82rem; color:#4A5568;'>{explanation}</span></div>",
                     unsafe_allow_html=True,
                 )
-            
+
             # Metadata chips
             meta_parts = []
             if mal_score:
@@ -367,7 +360,7 @@ def render_card(
                     f"<div style='margin:6px 0; font-size:0.88rem;'>{' &nbsp;·&nbsp; '.join(meta_parts)}</div>",
                     unsafe_allow_html=True,
                 )
-            
+
             # Studio / source
             if studios:
                 studio_str = ", ".join(studios[:2])
@@ -383,7 +376,7 @@ def render_card(
                     f"<p style='color:#A0AEC0; font-size:0.82rem; margin:4px 0;'>{source}</p>",
                     unsafe_allow_html=True,
                 )
-            
+
             # Genres as pills
             if genres:
                 genre_list = [g.strip() for g in genres.split('|') if g.strip()]
@@ -401,7 +394,7 @@ def render_card(
                             st.session_state["selected_seed_ids"] = []
                             st.session_state["selected_seed_titles"] = []
                             st.rerun()
-        
+
         # Synopsis in full width below columns
         if display_synopsis:
             truncated = display_synopsis[:280] + "..." if len(display_synopsis) > 280 else display_synopsis
@@ -409,7 +402,7 @@ def render_card(
                 f"<p style='color:#4A5568; font-size:0.88rem; line-height:1.6; margin:4px 0 8px 0;'>{truncated}</p>",
                 unsafe_allow_html=True,
             )
-        
+
         # Badges row - compact
         badge_cols = st.columns([1, 1, 1, 2])
         with badge_cols[0]:
@@ -440,16 +433,14 @@ def render_card(
                     st.session_state["selected_seed_ids"] = current_ids
                     st.session_state["selected_seed_titles"] = current_titles
                     st.rerun()
-        
+
         # Expandable details
         with st.expander("More details", expanded=False):
             # Streaming
             streaming = row.get("streaming")
             streaming_list = []
             try:
-                if streaming is None:
-                    streaming_list = []
-                elif isinstance(streaming, float) and pd.isna(streaming):
+                if streaming is None or (isinstance(streaming, float) and pd.isna(streaming)):
                     streaming_list = []
                 elif isinstance(streaming, list):
                     streaming_list = streaming
@@ -465,7 +456,7 @@ def render_card(
                 ])
                 if stream_html:
                     st.markdown(f"**Watch on:** {stream_html}", unsafe_allow_html=True)
-            
+
             # Badge tooltips
             cs_tooltip = format_badge_tooltip("cold_start", badges['cold_start'])
             pop_tooltip = format_badge_tooltip("popularity_band", badges['popularity_band'])
@@ -473,11 +464,11 @@ def render_card(
             st.caption(cs_tooltip)
             st.caption(pop_tooltip)
             st.caption(nov_tooltip)
-            
+
             # Full synopsis if truncated
             if display_synopsis and len(display_synopsis) > 280:
                 st.markdown(f"**Full synopsis:** {display_synopsis}")
-            
+
             # Rating
             profile = st.session_state.get("active_profile")
             if profile:

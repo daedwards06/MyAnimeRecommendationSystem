@@ -5,15 +5,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from src.app.badges import novelty_ratio
 from src.app.diversity import (
+    average_novelty,
+    build_user_genre_hist,
     compute_popularity_percentiles,
     coverage,
     genre_exposure_ratio,
-    build_user_genre_hist,
-    average_novelty,
 )
-
-from src.app.badges import novelty_ratio
 
 
 def test_compute_popularity_percentiles_ordering():

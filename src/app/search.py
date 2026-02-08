@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List, Sequence, Tuple
+from collections.abc import Sequence
 
 try:
-    from rapidfuzz import process, fuzz  # type: ignore
+    from rapidfuzz import fuzz, process  # type: ignore
     _RAPIDFUZZ_AVAILABLE = True
-except Exception:  # noqa: BLE001
+except Exception:
     _RAPIDFUZZ_AVAILABLE = False
     from difflib import get_close_matches  # fallback
 
@@ -18,10 +18,10 @@ def normalize_title(s: str) -> str:
 
 def fuzzy_search(
     query: str,
-    choices: Sequence[Tuple[str, int]],
+    choices: Sequence[tuple[str, int]],
     limit: int = 10,
     min_score: int = 60,
-) -> List[Tuple[int, float, str]]:
+) -> list[tuple[int, float, str]]:
     """Fuzzy search titles returning (anime_id, score, matched_title).
 
     Falls back to substring and difflib if rapidfuzz is unavailable.
@@ -37,7 +37,7 @@ def fuzzy_search(
             scorer=fuzz.WRatio,
             limit=limit,
         )
-        out: List[Tuple[int, float, str]] = []
+        out: list[tuple[int, float, str]] = []
         for title, score, idx in results:
             if score >= min_score:
                 out.append((choices[idx][1], float(score), choices[idx][0]))
@@ -50,7 +50,7 @@ def fuzzy_search(
     # difflib fallback
     all_titles = [c[0] for c in choices]
     close = get_close_matches(q, all_titles, n=limit, cutoff=min_score / 100.0)
-    mapped: List[Tuple[int, float, str]] = []
+    mapped: list[tuple[int, float, str]] = []
     for title in close:
         # approximate score not provided; assign nominal value
         for original, aid in choices:

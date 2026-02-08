@@ -35,11 +35,11 @@ dataclass.
 from __future__ import annotations
 
 import logging
-import math
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,6 @@ from src.app.constants import (
     OBSCURITY_MISSING_MAL_PENALTY,
     QUALITY_FACTOR_MODE,
     SEED_RANKING_MODE,
-    compute_quality_factor,
     STAGE0_ENFORCEMENT_BUFFER,
     STAGE0_META_MIN_GENRE_OVERLAP,
     STAGE0_META_MIN_THEME_OVERLAP,
@@ -78,8 +77,9 @@ from src.app.constants import (
     STAGE2_SEED_COVERAGE_WEIGHT,
     STAGE2_STAGE1_SCORE_WEIGHT,
     USE_MEAN_USER_CF,
-    force_neural_enable_for_semantic_mode,
+    compute_quality_factor,
 )
+from src.app.explanations import format_explanation
 from src.app.franchise_cap import apply_franchise_cap
 from src.app.metadata_features import (
     METADATA_AFFINITY_COLD_START_COEF,
@@ -90,7 +90,6 @@ from src.app.metadata_features import (
     demographics_overlap_tiebreak_bonus,
     theme_stage2_tiebreak_bonus,
 )
-from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
 from src.app.recommender import (
     HybridComponents,
     HybridRecommender,
@@ -116,18 +115,21 @@ from src.app.synopsis_embeddings import (
     SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD,
     SYNOPSIS_EMBEDDINGS_MIN_SIM,
     SYNOPSIS_EMBEDDINGS_OFFTYPE_HIGH_SIM_PENALTY,
-    compute_seed_similarity_map as compute_seed_embedding_similarity_map,
-    personalized_synopsis_embeddings_bonus_for_candidate,
     synopsis_embeddings_bonus_for_candidate,
     synopsis_embeddings_penalty_for_candidate,
+)
+from src.app.synopsis_embeddings import (
+    compute_seed_similarity_map as compute_seed_embedding_similarity_map,
 )
 from src.app.synopsis_neural_embeddings import (
     SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD,
     SYNOPSIS_NEURAL_MIN_SIM,
     SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY,
-    compute_seed_similarity_map as compute_seed_neural_similarity_map,
     synopsis_neural_bonus_for_candidate,
     synopsis_neural_penalty_for_candidate,
+)
+from src.app.synopsis_neural_embeddings import (
+    compute_seed_similarity_map as compute_seed_neural_similarity_map,
 )
 from src.app.synopsis_tfidf import (
     SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD,
@@ -140,8 +142,6 @@ from src.app.synopsis_tfidf import (
     synopsis_tfidf_bonus_for_candidate,
     synopsis_tfidf_penalty_for_candidate,
 )
-from src.app.explanations import format_explanation
-from src.app.badges import badge_payload
 from src.models.user_embedding import compute_personalized_scores
 from src.utils import parse_pipe_set
 
@@ -372,7 +372,7 @@ def _neighbor_coherence(pool: list[dict], k: int = 50) -> dict:
     coverages = [float(it.get("seed_coverage", 0.0)) for it in top]
     any_match = sum(1 for v in overlaps if float(v) > 0.0)
     return {
-        "count": int(len(top)),
+        "count": len(top),
         "weighted_overlap_mean": float(sum(overlaps) / max(1, len(overlaps))),
         "seed_coverage_mean": float(sum(coverages) / max(1, len(coverages))),
         "any_genre_match_frac": float(any_match / max(1, len(overlaps))),
@@ -552,7 +552,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             row_genres = seed_row.get("genres") if isinstance(seed_row, pd.Series) else None
         except KeyError:
             continue
-        
+
         if row_genres is not None:
             if isinstance(row_genres, str):
                 seed_genres = {g.strip() for g in row_genres.split("|") if g.strip()}
@@ -716,7 +716,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     stage1_forced_neural_pool: list[dict] = []
     stage1_fallback_pool: list[dict] = []
 
-    seed_genres_count = int(len(all_seed_genres))
+    seed_genres_count = len(all_seed_genres)
     seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
 
     forced_neural_pairs: list[tuple[int, float]] = []
@@ -1003,8 +1003,8 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     )
 
     result.stage1_diagnostics = {
-        "stage1_iterated_candidate_count": int(len(candidate_df)),
-        "shortlist_size": int(len(shortlist)),
+        "stage1_iterated_candidate_count": len(candidate_df),
+        "shortlist_size": len(shortlist),
         "semantic_conf_tier": semantic_conf_tier,
         "semantic_conf_score": float(semantic_conf_score),
         "pool_a_size": len(pool_a),
@@ -1015,8 +1015,8 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 
     result.stage0_enforcement = {
         "stage0_after_hygiene_size": int(stage0_diag.stage0_after_hygiene),
-        "stage1_iterated_candidate_count": int(len(candidate_df)),
-        "shortlist_size": int(len(shortlist)),
+        "stage1_iterated_candidate_count": len(candidate_df),
+        "shortlist_size": len(shortlist),
     }
     timing["stage1"] = time.monotonic() - t_s1
 
@@ -1024,13 +1024,13 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     # Stage 2: Rerank shortlist
     # ------------------------------------------------------------------
     t_s2 = time.monotonic()
-    
+
     # Determine which user vector to use for CF scoring (Phase 2, Task 2.1)
     # If personalization is disabled and USE_MEAN_USER_CF is True, use mean-user scores
     # to represent community preferences instead of one arbitrary training user.
     use_mean_user = bool(USE_MEAN_USER_CF) and not ctx.personalization_enabled
     mf_mean_user_scores = ctx.bundle.get("models", {}).get("mf_mean_user_scores")
-    
+
     # Personalized MF scores array (built once, reused for blended_scores
     # and per-item hybrid_cf_score when personalization is enabled).
     _pers_mf_array: np.ndarray | None = None
@@ -1054,17 +1054,17 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         if use_mean_user and mf_mean_user_scores is not None:
             # Build hybrid scores using mean-user MF component
             blended_scores = np.zeros(components.num_items, dtype=np.float32)
-            
+
             # MF component: use precomputed mean-user scores
             if components.mf is not None:
                 w_mf = weights.get("mf", 0.0)
                 blended_scores += w_mf * mf_mean_user_scores
-            
+
             # kNN component: still uses user_index (typically 0 for seed-based)
             if components.knn is not None:
                 w_knn = weights.get("knn", 0.0)
                 blended_scores += w_knn * components.knn[user_index]
-            
+
             # Popularity component: broadcast across items
             if components.pop is not None:
                 w_pop = weights.get("pop", 0.0)
@@ -1395,7 +1395,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             "theme_overlap": None if theme_overlap is None else float(theme_overlap),
             "theme_stage2_bonus": float(theme_bonus),
             "stage1_score": float(s1),
-            "shortlist_size": int(len(shortlist)),
+            "shortlist_size": len(shortlist),
             "content_first_active": bool(content_first_active),
             "content_first_alpha": float(CONTENT_FIRST_ALPHA),
             "content_first_hybrid_cf_score": float(hybrid_cf_score),
@@ -1423,7 +1423,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     scored.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
 
     # Stage 0 enforcement guardrail
-    final_scored_candidate_count = int(len(scored))
+    final_scored_candidate_count = len(scored)
     if __debug__:
         if int(final_scored_candidate_count) > int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER):
             logger.warning(
@@ -1521,7 +1521,6 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
     n_requested = ctx.n_requested
     ranked_hygiene_exclude_ids = ctx.ranked_hygiene_exclude_ids
     selected_seed_ids = ctx.seed_ids
-    selected_seed_titles = ctx.seed_titles
 
     # --- Validate personalization prerequisites ---
     mf_stem = ctx.mf_stem
@@ -1650,7 +1649,7 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
             else:
                 result.ranked_items = personalized_recs
                 personalization_applied = True
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         result.personalization_blocked_reason = f"Personalization failed at scoring time: {e}"
 
     result.personalization_applied = personalization_applied
@@ -1871,12 +1870,12 @@ def finalize_explanation_shares(
 # ---------------------------------------------------------------------------
 
 __all__ = [
-    "ScoringContext",
     "PipelineResult",
-    "run_seed_based_pipeline",
-    "run_personalized_pipeline",
-    "run_browse_pipeline",
-    "blend_personalized_and_seed",
+    "ScoringContext",
     "apply_post_filters",
+    "blend_personalized_and_seed",
     "finalize_explanation_shares",
+    "run_browse_pipeline",
+    "run_personalized_pipeline",
+    "run_seed_based_pipeline",
 ]

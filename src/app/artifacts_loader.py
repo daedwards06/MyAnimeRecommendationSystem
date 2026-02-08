@@ -15,28 +15,29 @@ Design Notes:
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict
 import json
 import logging
 import os
 import random
+from pathlib import Path
+from typing import Any
+
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 
 from .constants import (
-    RANDOM_SEED,
-    MIN_METADATA_COLUMNS,
-    METADATA_PARQUET,
-    DEFAULT_MF_MODEL_STEM,
     DEFAULT_KNN_MODEL_STEM,
+    DEFAULT_MF_MODEL_STEM,
+    METADATA_PARQUET,
+    MIN_METADATA_COLUMNS,
+    RANDOM_SEED,
 )
 
 logger = logging.getLogger(__name__)
 
 
-ArtifactBundle = Dict[str, Any]
+ArtifactBundle = dict[str, Any]
 
 
 class ArtifactContractError(RuntimeError):
@@ -48,7 +49,7 @@ class ArtifactContractError(RuntimeError):
 
 
 def _select_model_stem(
-    models: Dict[str, Any],
+    models: dict[str, Any],
     *,
     candidates: list[str],
     env_var: str,
@@ -107,14 +108,14 @@ def _validate_mf_model(mf_model: Any, *, stem: str, models_dir: Path) -> None:
 
     # Basic sanity checks (non-exhaustive)
     try:
-        q = getattr(mf_model, "Q")
+        q = mf_model.Q
         if q is None or not hasattr(q, "shape"):
             raise TypeError("Q is not an array-like matrix")
-        it2i = getattr(mf_model, "item_to_index")
-        i2it = getattr(mf_model, "index_to_item")
+        it2i = mf_model.item_to_index
+        i2it = mf_model.index_to_item
         if not isinstance(it2i, dict) or not isinstance(i2it, dict):
             raise TypeError("item_to_index/index_to_item must be dicts")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise ArtifactContractError(
             f"MF artifact '{stem}' failed basic contract validation.",
             details=[
@@ -219,27 +220,27 @@ def _prune_metadata(df: pd.DataFrame) -> pd.DataFrame:
     return work.loc[:, MIN_METADATA_COLUMNS].copy()
 
 
-def _load_models(models_dir: Path) -> Dict[str, Any]:
+def _load_models(models_dir: Path) -> dict[str, Any]:
     if not models_dir.exists():
         raise FileNotFoundError(f"Models directory not found: {models_dir}")
-    models: Dict[str, Any] = {}
+    models: dict[str, Any] = {}
     for f in models_dir.glob("*.joblib"):
         try:
             models[f.stem] = joblib.load(f)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise RuntimeError(f"Failed loading model '{f}': {e}") from e
     if not models:
         raise RuntimeError(f"No .joblib models found in {models_dir}")
     return models
 
 
-def _load_json_glob(root: Path, pattern: str) -> Dict[str, Any]:
-    out: Dict[str, Any] = {}
+def _load_json_glob(root: Path, pattern: str) -> dict[str, Any]:
+    out: dict[str, Any] = {}
     for f in root.glob(pattern):
         try:
             with f.open("r", encoding="utf-8") as fh:
                 out[f.stem] = json.load(fh)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Non-critical; skip with warning semantics via logging.
             logger.warning(f"Could not load JSON artifact {f}: {e}")
     return out
@@ -394,4 +395,4 @@ def build_artifacts(
     }
 
 
-__all__ = ["build_artifacts", "set_determinism", "ArtifactContractError"]
+__all__ = ["ArtifactContractError", "build_artifacts", "set_determinism"]

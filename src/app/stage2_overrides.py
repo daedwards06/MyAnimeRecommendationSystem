@@ -197,9 +197,9 @@ def content_first_final_score(
 
 
 __all__ = [
-    "should_relax_off_type_penalty",
-    "relax_off_type_penalty",
-    "should_use_content_first",
-    "quality_prior_bonus",
     "content_first_final_score",
+    "quality_prior_bonus",
+    "relax_off_type_penalty",
+    "should_relax_off_type_penalty",
+    "should_use_content_first",
 ]

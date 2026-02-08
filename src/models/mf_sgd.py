@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Dict, Tuple, List
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 
 
-def _build_mappings(df: pd.DataFrame) -> Tuple[Dict[int, int], Dict[int, int]]:
+def _build_mappings(df: pd.DataFrame) -> tuple[dict[int, int], dict[int, int]]:
     users = df["user_id"].astype(int).unique()
     items = df["anime_id"].astype(int).unique()
     u2i = {u: i for i, u in enumerate(users)}
@@ -15,7 +15,7 @@ def _build_mappings(df: pd.DataFrame) -> Tuple[Dict[int, int], Dict[int, int]]:
     return u2i, it2i
 
 
-def _build_ui(df: pd.DataFrame, u2i: Dict[int, int], it2i: Dict[int, int]) -> csr_matrix:
+def _build_ui(df: pd.DataFrame, u2i: dict[int, int], it2i: dict[int, int]) -> csr_matrix:
     rows = df["user_id"].map(u2i).values
     cols = df["anime_id"].map(it2i).values
     data = df["rating"].astype(float).values
@@ -36,15 +36,15 @@ class FunkSVDRecommender:
     random_state: int = 42
 
     def __post_init__(self):
-        self.user_to_index: Dict[int, int] | None = None
-        self.item_to_index: Dict[int, int] | None = None
-        self.index_to_user: Dict[int, int] | None = None
-        self.index_to_item: Dict[int, int] | None = None
+        self.user_to_index: dict[int, int] | None = None
+        self.item_to_index: dict[int, int] | None = None
+        self.index_to_user: dict[int, int] | None = None
+        self.index_to_item: dict[int, int] | None = None
         self.P: np.ndarray | None = None  # users x factors
         self.Q: np.ndarray | None = None  # items x factors
         self.global_mean: float = 0.0
 
-    def fit(self, interactions: pd.DataFrame) -> "FunkSVDRecommender":
+    def fit(self, interactions: pd.DataFrame) -> FunkSVDRecommender:
         """Train with centered ratings, small init, L2 reg, and gradient clipping to avoid overflow."""
         df = interactions.dropna(subset=["user_id", "anime_id", "rating"]).copy()
         rng = np.random.default_rng(self.random_state)
@@ -96,7 +96,7 @@ class FunkSVDRecommender:
         scores = self.global_mean + self.P[uidx] @ self.Q.T
         return scores
 
-    def recommend(self, user_id: int, top_k: int = 10, exclude: set[int] | None = None) -> List[int]:
+    def recommend(self, user_id: int, top_k: int = 10, exclude: set[int] | None = None) -> list[int]:
         scores = self.predict_user(user_id)
         if exclude:
             # mask seen

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.app.recommender import HybridComponents, HybridRecommender, compute_component_shares
 from src.app.explanations import format_explanation
+from src.app.recommender import HybridComponents, HybridRecommender, compute_component_shares
 
 
 def test_component_shares_sum_to_one_for_used_components():

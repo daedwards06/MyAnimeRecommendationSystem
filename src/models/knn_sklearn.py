@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 from sklearn.preprocessing import normalize
 
 
-def _build_mappings(df: pd.DataFrame) -> Tuple[Dict[int, int], Dict[int, int]]:
+def _build_mappings(df: pd.DataFrame) -> tuple[dict[int, int], dict[int, int]]:
     users = df["user_id"].astype(int).unique()
     items = df["anime_id"].astype(int).unique()
     u2i = {u: i for i, u in enumerate(users)}
@@ -16,7 +16,7 @@ def _build_mappings(df: pd.DataFrame) -> Tuple[Dict[int, int], Dict[int, int]]:
     return u2i, it2i
 
 
-def _build_user_item_matrix(df: pd.DataFrame, u2i: Dict[int, int], it2i: Dict[int, int]) -> csr_matrix:
+def _build_user_item_matrix(df: pd.DataFrame, u2i: dict[int, int], it2i: dict[int, int]) -> csr_matrix:
     rows = df["user_id"].map(u2i).values
     cols = df["anime_id"].map(it2i).values
     data = df["rating"].astype(float).values
@@ -45,14 +45,14 @@ class ItemKNNRecommender:
     popularity_weight: float = 0.02  # small popularity prior added to scores
 
     def __post_init__(self):
-        self.user_to_index: Dict[int, int] | None = None
-        self.item_to_index: Dict[int, int] | None = None
-        self.index_to_item: Dict[int, int] | None = None
+        self.user_to_index: dict[int, int] | None = None
+        self.item_to_index: dict[int, int] | None = None
+        self.index_to_item: dict[int, int] | None = None
         self.item_user_matrix: csr_matrix | None = None  # shape: n_items x n_users (normalized if chosen)
         self.raw_item_user: csr_matrix | None = None
         self.item_pop: np.ndarray | None = None
 
-    def fit(self, interactions: pd.DataFrame) -> "ItemKNNRecommender":
+    def fit(self, interactions: pd.DataFrame) -> ItemKNNRecommender:
         # Optionally filter by min_rating
         df = interactions[interactions["rating"].astype(float) >= self.min_rating].copy()
         u2i, it2i = _build_mappings(df)
@@ -111,7 +111,7 @@ class ItemKNNRecommender:
             profile *= shrink
         return profile
 
-    def recommend(self, user_id: int, top_k: int = 10, exclude_seen: bool = True) -> List[int]:
+    def recommend(self, user_id: int, top_k: int = 10, exclude_seen: bool = True) -> list[int]:
         if self.user_to_index is None or self.item_user_matrix is None:
             raise RuntimeError("Model not fitted.")
         if user_id not in self.user_to_index:
@@ -141,7 +141,7 @@ class ItemKNNRecommender:
         top_idx = top_idx[np.argsort(-sims[top_idx])]
         return [self.index_to_item[i] for i in top_idx if np.isfinite(sims[i])]
 
-    def score_all(self, user_id: int, exclude_seen: bool = True) -> Dict[int, float]:
+    def score_all(self, user_id: int, exclude_seen: bool = True) -> dict[int, float]:
         """Return scores for all items for a user. Useful for hybrid blending.
 
         Scores are cosine similarities with optional popularity prior; higher is better.
@@ -167,7 +167,7 @@ class ItemKNNRecommender:
             seen = self.raw_item_user.getcol(uidx).nonzero()[0]
             sims[seen] = -np.inf
         # Map back to item ids
-        out: Dict[int, float] = {}
+        out: dict[int, float] = {}
         for idx, sc in enumerate(sims):
             if np.isfinite(sc):
                 out[self.index_to_item[idx]] = float(sc)

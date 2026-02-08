@@ -6,7 +6,6 @@ reporting so the app and evaluation harness can share a consistent vocabulary.
 
 from __future__ import annotations
 
-
 # Required breakdown buckets (Phase 5)
 NOT_IN_STAGE1_SHORTLIST = "not_in_stage1_shortlist"
 BLOCKED_LOW_SEMANTIC_SIM = "blocked_low_semantic_sim"
@@ -29,12 +28,12 @@ REASONS_ORDERED = [
 
 
 __all__ = [
-    "NOT_IN_STAGE1_SHORTLIST",
-    "BLOCKED_LOW_SEMANTIC_SIM",
     "BLOCKED_LOW_OVERLAP",
+    "BLOCKED_LOW_SEMANTIC_SIM",
     "BLOCKED_OTHER_ADMISSION",
-    "MISSING_SEMANTIC_VECTOR",
     "DROPPED_BY_QUALITY_FILTERS",
-    "SCORED",
+    "MISSING_SEMANTIC_VECTOR",
+    "NOT_IN_STAGE1_SHORTLIST",
     "REASONS_ORDERED",
+    "SCORED",
 ]

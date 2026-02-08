@@ -1,7 +1,7 @@
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
-from typing import List, Set
 
 
 def popularity_scores(interactions: pd.DataFrame) -> pd.Series:
@@ -19,8 +19,8 @@ def popularity_scores(interactions: pd.DataFrame) -> pd.Series:
 
 
 def recommend_popularity(
-    interactions: pd.DataFrame, top_k: int = 10, exclude: Set[int] | None = None
-) -> List[int]:
+    interactions: pd.DataFrame, top_k: int = 10, exclude: set[int] | None = None
+) -> list[int]:
     """Return top_k anime_ids by popularity, optionally excluding a set (e.g., already seen)."""
     scores = popularity_scores(interactions)
     ranked = [int(i) for i in scores.index]

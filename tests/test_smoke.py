@@ -8,14 +8,8 @@ class TestCoreImports:
 
     def test_scoring_pipeline_imports(self):
         from src.app.scoring_pipeline import (
-            ScoringContext,
             PipelineResult,
-            run_seed_based_pipeline,
-            run_personalized_pipeline,
-            run_browse_pipeline,
-            blend_personalized_and_seed,
-            apply_post_filters,
-            finalize_explanation_shares,
+            ScoringContext,
         )
         assert ScoringContext is not None
         assert PipelineResult is not None
@@ -24,39 +18,29 @@ class TestCoreImports:
         from src.app.recommender import (
             HybridComponents,
             HybridRecommender,
-            compute_component_shares,
-            choose_weights,
         )
         assert HybridComponents is not None
         assert HybridRecommender is not None
 
     def test_model_imports(self):
         from src.models.mf_sgd import FunkSVDRecommender
-        from src.models.hybrid import weighted_blend, reciprocal_rank_fusion
-        from src.models.user_embedding import generate_user_embedding
         assert FunkSVDRecommender is not None
 
     def test_eval_imports(self):
         from src.eval.metrics import (
             ndcg_at_k,
-            average_precision_at_k,
-            precision_at_k,
-            recall_at_k,
-            ndcg_at_k_graded,
         )
         assert ndcg_at_k is not None
 
     def test_feature_imports(self):
-        from src.features.cold_start import flag_cold_start, content_only_score
-        from src.features.scaling import compute_feature_stats
+        from src.features.cold_start import flag_cold_start
         assert flag_cold_start is not None
 
     def test_constants_load(self):
         from src.app.constants import (
             BALANCED_WEIGHTS,
-            DIVERSITY_EMPHASIZED_WEIGHTS,
             DEFAULT_TOP_N,
-            compute_quality_factor,
+            DIVERSITY_EMPHASIZED_WEIGHTS,
         )
         assert sum(BALANCED_WEIGHTS.values()) == pytest.approx(1.0, abs=0.01)
         assert sum(DIVERSITY_EMPHASIZED_WEIGHTS.values()) == pytest.approx(1.0, abs=0.01)

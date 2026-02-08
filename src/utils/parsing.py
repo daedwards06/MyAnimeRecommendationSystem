@@ -5,7 +5,7 @@ lists, numpy arrays, and pandas DataFrames/Series into normalized formats.
 Used across recommendation pipeline, diversity analysis, and UI components.
 """
 
-from typing import Any, List
+from typing import Any
 
 try:
     import pandas as pd
@@ -15,7 +15,7 @@ except ImportError:
 
 def parse_pipe_set(val: object) -> set[str]:
     """Parse a value that might be a pipe-delimited string, list, set, or None into a set of strings.
-    
+
     This function robustly handles multiple input types:
     - None or pandas NA → empty set
     - Empty string → empty set
@@ -23,15 +23,15 @@ def parse_pipe_set(val: object) -> set[str]:
     - Single string "Action" → {"Action"}
     - List/tuple/set → coerced to set of strings
     - Other types → converted to string
-    
+
     All values are stripped of whitespace and empty strings are filtered out.
-    
+
     Args:
         val: Value to parse (str, list, set, None, pandas types, etc.)
-    
+
     Returns:
         Set of non-empty string tokens
-        
+
     Examples:
         >>> parse_pipe_set("Action|Drama")
         {'Action', 'Drama'}
@@ -44,7 +44,7 @@ def parse_pipe_set(val: object) -> set[str]:
     """
     if val is None:
         return set()
-    
+
     # Handle pandas NA values
     try:
         if pd is not None and pd.isna(val):
@@ -87,17 +87,17 @@ def coerce_genres(val: Any) -> str:
     Robustly flattens list/tuple/set/ndarray (including nested structures) without
     relying on truth-value evaluation of array elements (avoids ambiguous truth value
     errors). Filters out None and blank string tokens.
-    
+
     This is the inverse operation of parse_pipe_set - it takes various input formats
     and produces a canonical pipe-delimited string representation suitable for storage
     or display.
-    
+
     Args:
         val: Value to coerce (str, list, tuple, set, numpy array, pandas Series, etc.)
-    
+
     Returns:
         Pipe-delimited string (e.g., "Action|Drama|Comedy") or empty string if no valid values
-        
+
     Examples:
         >>> coerce_genres(["Action", "Drama"])
         'Action|Drama'
@@ -113,14 +113,14 @@ def coerce_genres(val: Any) -> str:
     if isinstance(val, str):
         return val
 
-    def _emit_tokens(obj: Any) -> List[str]:
+    def _emit_tokens(obj: Any) -> list[str]:
         """Recursively extract string tokens from nested structures."""
-        tokens: List[str] = []
-        
+        tokens: list[str] = []
+
         # Import locally to avoid global dependency if unused
         try:
             import numpy as _np  # type: ignore
-        except Exception:  # noqa: BLE001
+        except Exception:
             _np = None  # type: ignore
 
         # Handle numpy arrays
@@ -157,7 +157,7 @@ def coerce_genres(val: Any) -> str:
                         continue
                     tokens.extend(_emit_tokens(x))
                 return tokens
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
         # Fallback: convert to string

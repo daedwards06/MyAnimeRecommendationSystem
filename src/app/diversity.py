@@ -10,9 +10,12 @@ metadata to produce summary indicators:
 
 from __future__ import annotations
 
-from typing import Iterable, List, Dict, Any, Optional, Mapping
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
 import pandas as pd
+
 from src.utils import coerce_genres
 
 
@@ -28,7 +31,7 @@ def compute_popularity_percentiles(pop_scores: np.ndarray) -> np.ndarray:
     return ranks / denom
 
 
-def coverage(recs: List[Dict[str, Any]]) -> float:
+def coverage(recs: list[dict[str, Any]]) -> float:
     if not recs:
         return 0.0
     unique_ids = {r["anime_id"] for r in recs}
@@ -38,7 +41,7 @@ def coverage(recs: List[Dict[str, Any]]) -> float:
 # Removed _coerce_genres - now using canonical version from src.utils.parsing as coerce_genres
 
 
-def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> float:
+def genre_exposure_ratio(recs: list[dict[str, Any]], metadata: pd.DataFrame) -> float:
     if not recs or metadata.empty:
         return 0.0
     all_catalog_genres: set[str] = set()
@@ -48,10 +51,10 @@ def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> 
             for g in gstr.split("|"):
                 if g:
                     all_catalog_genres.add(g.lower())
-    
+
     # Create indexed lookup for O(1) access (performance optimization)
     metadata_by_id = metadata.set_index("anime_id", drop=False)
-    
+
     rec_genres: set[str] = set()
     for r in recs:
         try:
@@ -67,7 +70,7 @@ def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> 
     return len(rec_genres) / len(all_catalog_genres)
 
 
-def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) -> Dict[str, int]:
+def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) -> dict[str, int]:
     """Build a simple user genre history histogram from profile ratings.
 
     The result is used for novelty calculations. If the user has no ratings
@@ -83,7 +86,7 @@ def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) ->
         # If we can't create index, return empty hist rather than fall back to O(N) lookups
         return {}
 
-    hist: Dict[str, int] = {}
+    hist: dict[str, int] = {}
     for raw_anime_id in ratings.keys():
         try:
             anime_id = int(raw_anime_id)
@@ -105,11 +108,11 @@ def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) ->
     return hist
 
 
-def average_novelty(recs: List[Dict[str, Any]]) -> Optional[float]:
+def average_novelty(recs: list[dict[str, Any]]) -> float | None:
     """Return average novelty ratio across recs, or None when unavailable."""
     if not recs:
         return None
-    vals: List[float] = []
+    vals: list[float] = []
     for r in recs:
         badge = r.get("badges")
         if not badge:
@@ -126,9 +129,9 @@ def average_novelty(recs: List[Dict[str, Any]]) -> Optional[float]:
 
 
 __all__ = [
+    "average_novelty",
+    "build_user_genre_hist",
     "compute_popularity_percentiles",
     "coverage",
     "genre_exposure_ratio",
-    "build_user_genre_hist",
-    "average_novelty",
 ]

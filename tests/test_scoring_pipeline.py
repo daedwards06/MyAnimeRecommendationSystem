@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.app.recommender import HybridComponents, HybridRecommender
 from src.app.scoring_pipeline import (
     PipelineResult,
     ScoringContext,
@@ -24,8 +25,6 @@ from src.app.scoring_pipeline import (
     run_personalized_pipeline,
     run_seed_based_pipeline,
 )
-from src.app.recommender import HybridComponents, HybridRecommender
-
 
 # ---------------------------------------------------------------------------
 # Mock Models
@@ -267,7 +266,7 @@ def mock_components(mock_mf_model: MockMFModel) -> HybridComponents:
     mf_scores_2d = np.zeros((3, 10), dtype=np.float32)
     for user_idx in range(3):
         mf_scores_2d[user_idx] = mock_mf_model.predict_for_user(user_idx, list(range(10)))
-    
+
     return HybridComponents(
         mf=mf_scores_2d,  # 2D array (n_users, n_items)
         knn=None,  # Can be None
@@ -305,7 +304,7 @@ def mock_scoring_context(
     mock_mf_model: MockMFModel,
 ) -> ScoringContext:
     """Comprehensive mock ScoringContext with sensible defaults.
-    
+
     This fixture provides a minimal but complete context for testing the
     seed-based pipeline. Tests can override specific attributes as needed.
     """
@@ -645,7 +644,7 @@ class TestEdgeCases:
             result = run_seed_based_pipeline(mock_scoring_context)
             assert isinstance(result, PipelineResult)
             # Either empty results or some default behavior is acceptable
-        except (IndexError, ValueError, KeyError) as e:
+        except (IndexError, ValueError, KeyError):
             # It's acceptable for the pipeline to fail with empty seeds
             pass
 

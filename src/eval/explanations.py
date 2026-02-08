@@ -1,15 +1,15 @@
 """Hybrid recommendation explanation utilities for Phase 4 & app integration."""
 from __future__ import annotations
+
 import logging
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 def compute_hybrid_contributions(
-    component_scores: Dict[str, float],
-    weights: Dict[str, float],
-) -> Dict[str, float]:
+    component_scores: dict[str, float],
+    weights: dict[str, float],
+) -> dict[str, float]:
     """Convert component scores and weights into normalized contribution shares.
 
     Parameters
@@ -34,7 +34,7 @@ def compute_hybrid_contributions(
     return {k: v / total for k, v in weighted.items()}
 
 
-def format_explanation(item_id: int, contributions: Dict[str, float]) -> str:
+def format_explanation(item_id: int, contributions: dict[str, float]) -> str:
     """Human-readable summary of component shares."""
     parts = [
         f"{src}: {pct:.1%}" for src, pct in sorted(contributions.items(), key=lambda x: -x[1])
@@ -43,10 +43,10 @@ def format_explanation(item_id: int, contributions: Dict[str, float]) -> str:
 
 
 def build_examples(
-    recommendations: List[Tuple[int, Dict[str, float]]],
-    weights: Dict[str, float],
+    recommendations: list[tuple[int, dict[str, float]]],
+    weights: dict[str, float],
     top_n: int = 3,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """Build explanation examples for the top-N recommendations.
 
     Parameters

@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.app.score_semantics import (
-    SCORE_SEMANTIC_NAME,
     SCORE_LABEL_SHORT,
+    SCORE_SEMANTIC_NAME,
     format_match_score,
     format_user_friendly_score,
 )
@@ -53,11 +53,11 @@ def test_format_user_friendly_score_middle_item() -> None:
 def test_format_user_friendly_score_color_coding() -> None:
     """Test color coding based on percentile."""
     scores = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-    
+
     # Top item: green (≥90%)
     _, _, color = format_user_friendly_score(1.0, scores)
     assert color == "#27AE60"
-    
+
     # Bottom item: grey (<60%)
     _, _, color = format_user_friendly_score(0.1, scores)
     assert color == "#95A5A6"
@@ -95,17 +95,17 @@ def test_no_legacy_confidence_strings_in_ui_files() -> None:
 
 def test_percent_match_is_percentile_based() -> None:
     """Verify that '% Match' refers to percentile rank, not raw calibration.
-    
+
     Phase 4 Task 4.2: The '% Match' display is computed from percentile rank
     within the result set, not from raw uncalibrated scores. This is a valid
     user-friendly transformation that helps end users understand relative quality.
     """
     repo_root = Path(__file__).resolve().parents[1]
     cards_py = (repo_root / "src" / "app" / "components" / "cards.py").read_text(encoding="utf-8")
-    
+
     # Should use format_user_friendly_score for percentile-based display
     assert "format_user_friendly_score" in cards_py
-    
+
     # Raw scores should still be shown as tooltips/small text for technical users
     assert "Match score" in cards_py or "Raw score" in cards_py or "SCORE_LABEL_SHORT" in cards_py
 

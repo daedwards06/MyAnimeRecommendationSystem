@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 import random
-from typing import Tuple, List
 
 import pandas as pd
 
@@ -33,7 +33,7 @@ def build_validation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return train_df, val_rows
 
 
-def sample_user_ids(user_ids: List[int], max_users: int, seed: int | None = None) -> List[int]:
+def sample_user_ids(user_ids: list[int], max_users: int, seed: int | None = None) -> list[int]:
     """Deterministically sample up to max_users from user_ids using the given seed (defaults to RANDOM_SEED)."""
     if seed is None:
         seed = RANDOM_SEED

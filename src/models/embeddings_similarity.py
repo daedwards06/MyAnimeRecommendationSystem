@@ -1,11 +1,11 @@
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
-from typing import List
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def recommend_by_embedding(embeddings: pd.DataFrame, seed_item_id: int, top_k: int = 10) -> List[int]:
+def recommend_by_embedding(embeddings: pd.DataFrame, seed_item_id: int, top_k: int = 10) -> list[int]:
     """Cosine similarity over sentence embeddings; embeddings indexed by anime_id."""
     if seed_item_id not in embeddings.index:
         raise ValueError("Seed item not found in embeddings index")

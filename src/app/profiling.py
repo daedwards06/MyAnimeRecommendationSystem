@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import time
 import tracemalloc
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 

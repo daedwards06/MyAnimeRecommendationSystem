@@ -28,11 +28,11 @@ uses genre overlap.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any
 
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # Centralized weights (keep these conservative; easy to reason about).
@@ -115,7 +115,7 @@ class SeedMetadataProfile:
     themes: frozenset[str]
     demographics: frozenset[str]
     producers: frozenset[str]
-    seed_year_mean: Optional[float]
+    seed_year_mean: float | None
 
 
 def _coerce_str_set(val: Any) -> set[str]:
@@ -174,7 +174,7 @@ def _coerce_str_set(val: Any) -> set[str]:
     return {sx} if sx else set()
 
 
-def _coerce_year(val: Any) -> Optional[int]:
+def _coerce_year(val: Any) -> int | None:
     if val is None:
         return None
     try:
@@ -239,7 +239,7 @@ def build_seed_metadata_profile(metadata: pd.DataFrame, *, seed_ids: list[int]) 
             if y is not None:
                 years.append(int(y))
 
-    seed_year_mean: Optional[float]
+    seed_year_mean: float | None
     if years:
         seed_year_mean = float(sum(years) / len(years))
     else:
@@ -274,7 +274,7 @@ def demographics_overlap_tiebreak_bonus(
 
 
 def theme_stage2_tiebreak_bonus(
-    theme_overlap: Optional[float],
+    theme_overlap: float | None,
     *,
     semantic_sim: float,
     genre_overlap: float,
@@ -327,13 +327,13 @@ def theme_stage2_tiebreak_bonus(
     return float(coef) * float(capped)
 
 
-def _binary_overlap(a: frozenset[str], b: set[str]) -> Optional[float]:
+def _binary_overlap(a: frozenset[str], b: set[str]) -> float | None:
     if not a or not b:
         return None
     return 1.0 if (a.intersection(b)) else 0.0
 
 
-def _weak_overlap_ratio(a: frozenset[str], b: set[str]) -> Optional[float]:
+def _weak_overlap_ratio(a: frozenset[str], b: set[str]) -> float | None:
     """Overlap ratio: |A∩B| / min(|A|, |B|)."""
     if not a or not b:
         return None
@@ -343,7 +343,7 @@ def _weak_overlap_ratio(a: frozenset[str], b: set[str]) -> Optional[float]:
     return float(len(a.intersection(b)) / denom)
 
 
-def _jaccard(a: frozenset[str], b: set[str]) -> tuple[Optional[float], int]:
+def _jaccard(a: frozenset[str], b: set[str]) -> tuple[float | None, int]:
     """Jaccard similarity and raw overlap count.
 
     Returns:
@@ -352,7 +352,7 @@ def _jaccard(a: frozenset[str], b: set[str]) -> tuple[Optional[float], int]:
     if not a or not b:
         return None, 0
     inter = a.intersection(b)
-    overlap = int(len(inter))
+    overlap = len(inter)
     if overlap <= 0:
         return 0.0, 0
     union = len(a.union(b))
@@ -361,7 +361,7 @@ def _jaccard(a: frozenset[str], b: set[str]) -> tuple[Optional[float], int]:
     return float(overlap / union), overlap
 
 
-def _year_similarity(seed_year_mean: Optional[float], candidate_year: Optional[int]) -> Optional[float]:
+def _year_similarity(seed_year_mean: float | None, candidate_year: int | None) -> float | None:
     if seed_year_mean is None or candidate_year is None:
         return None
     window = float(METADATA_AFFINITY_YEAR_WINDOW)
@@ -384,20 +384,18 @@ def compute_metadata_affinity(profile: SeedMetadataProfile, candidate_row: Mappi
 
     # Themes: graded similarity with conservative thresholding.
     themes_sim_raw = _weak_overlap_ratio(profile.themes, cand_themes)
-    themes_overlap = int(len(profile.themes.intersection(cand_themes))) if profile.themes and cand_themes else 0
-    themes_sim: Optional[float]
+    themes_overlap = len(profile.themes.intersection(cand_themes)) if profile.themes and cand_themes else 0
+    themes_sim: float | None
     if themes_sim_raw is None:
         themes_sim = None
     else:
         # Conservative: themes only contribute when similarity is meaningful.
-        if themes_overlap < int(METADATA_AFFINITY_THEMES_MIN_OVERLAP_COUNT):
-            themes_sim = 0.0
-        elif float(themes_sim_raw) < float(METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO):
+        if themes_overlap < int(METADATA_AFFINITY_THEMES_MIN_OVERLAP_COUNT) or float(themes_sim_raw) < float(METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO):
             themes_sim = 0.0
         else:
             themes_sim = float(themes_sim_raw)
 
-    sims: dict[str, Optional[float]] = {
+    sims: dict[str, float | None] = {
         "studios": studios_sim,
         "themes": themes_sim,
         "year": _year_similarity(profile.seed_year_mean, cand_year),
@@ -436,22 +434,22 @@ def compute_metadata_affinity(profile: SeedMetadataProfile, candidate_row: Mappi
 
 
 __all__ = [
-    "SeedMetadataProfile",
-    "METADATA_AFFINITY_WEIGHTS",
-    "METADATA_AFFINITY_YEAR_WINDOW",
+    "METADATA_AFFINITY_COLD_START_COEF",
+    "METADATA_AFFINITY_PERSONALIZED_COEF",
+    "METADATA_AFFINITY_THEMES_MIN_JACCARD",
     "METADATA_AFFINITY_THEMES_MIN_OVERLAP_COUNT",
     "METADATA_AFFINITY_THEMES_MIN_OVERLAP_RATIO",
-    "METADATA_AFFINITY_THEMES_MIN_JACCARD",
-    "METADATA_AFFINITY_COLD_START_COEF",
     "METADATA_AFFINITY_TRAINED_COEF",
-    "METADATA_AFFINITY_PERSONALIZED_COEF",
+    "METADATA_AFFINITY_WEIGHTS",
+    "METADATA_AFFINITY_YEAR_WINDOW",
     "METADATA_DEMOGRAPHICS_OVERLAP_TIEBREAK_BONUS",
-    "THEME_STAGE2_COEF",
     "THEME_STAGE2_CAP",
-    "THEME_STAGE2_MIN_SEM_SIM",
+    "THEME_STAGE2_COEF",
     "THEME_STAGE2_GENRE_GATE_OVERLAP",
+    "THEME_STAGE2_MIN_SEM_SIM",
+    "SeedMetadataProfile",
     "build_seed_metadata_profile",
+    "compute_metadata_affinity",
     "demographics_overlap_tiebreak_bonus",
     "theme_stage2_tiebreak_bonus",
-    "compute_metadata_affinity",
 ]

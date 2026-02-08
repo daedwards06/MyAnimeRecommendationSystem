@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
-from typing import List
 from sklearn.metrics.pairwise import cosine_similarity
 
 
 def recommend_by_tfidf(
     item_features: pd.DataFrame, seed_item_id: int, top_k: int = 10, exclude_seed: bool = True
-) -> List[int]:
+) -> list[int]:
     """Recommend items by cosine similarity on TF-IDF (or multi-hot) features.
 
     item_features: DataFrame indexed by anime_id with feature columns.

@@ -8,7 +8,6 @@ import pytest
 
 from src.utils.parsing import coerce_genres, parse_pipe_set
 
-
 # ============================================================================
 # Tests for parse_pipe_set
 # ============================================================================

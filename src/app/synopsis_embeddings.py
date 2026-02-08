@@ -23,14 +23,14 @@ Deterministic truncation rule (mirrors `src.app.artifacts_loader` fallback):
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Any, Mapping, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # Centralized constants (Phase 4 embeddings experiment)
@@ -90,7 +90,7 @@ SYNOPSIS_EMBEDDINGS_SVD_N_ITER: int = 7
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _is_blank_text(val: Any) -> bool:
@@ -244,9 +244,9 @@ def build_synopsis_embeddings_artifact(
     # sentence-transformers plan, but is not used by the local SVD pipeline.
     _ = batch_size
 
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.decomposition import TruncatedSVD
     import sklearn  # type: ignore
+    from sklearn.decomposition import TruncatedSVD
+    from sklearn.feature_extraction.text import TfidfVectorizer
 
     work = metadata.copy()
     work[id_col] = pd.to_numeric(work[id_col], errors="coerce").astype("Int64")
@@ -367,26 +367,26 @@ def compute_seed_similarity_map(
 
 
 __all__ = [
-    "SYNOPSIS_EMBEDDINGS_SCHEMA",
-    "SYNOPSIS_EMBEDDINGS_MIN_SIM",
-    "SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD",
-    "SYNOPSIS_EMBEDDINGS_MIN_EPISODES",
-    "SYNOPSIS_EMBEDDINGS_OFFTYPE_HIGH_SIM_PENALTY",
+    "DEFAULT_SENTENCE_TRANSFORMERS_MODEL",
     "SYNOPSIS_EMBEDDINGS_COLD_START_COEF",
-    "SYNOPSIS_EMBEDDINGS_TRAINED_COEF",
-    "SYNOPSIS_EMBEDDINGS_PERSONALIZED_COEF",
+    "SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD",
+    "SYNOPSIS_EMBEDDINGS_MAX_CHARS",
+    "SYNOPSIS_EMBEDDINGS_MIN_EPISODES",
+    "SYNOPSIS_EMBEDDINGS_MIN_SIM",
+    "SYNOPSIS_EMBEDDINGS_OFFTYPE_HIGH_SIM_PENALTY",
     "SYNOPSIS_EMBEDDINGS_OFFTYPE_SHORT_PENALTY_BASE",
     "SYNOPSIS_EMBEDDINGS_OFFTYPE_SHORT_PENALTY_SIM_RELIEF",
-    "SYNOPSIS_EMBEDDINGS_MAX_CHARS",
+    "SYNOPSIS_EMBEDDINGS_PERSONALIZED_COEF",
+    "SYNOPSIS_EMBEDDINGS_SCHEMA",
+    "SYNOPSIS_EMBEDDINGS_TRAINED_COEF",
     "SYNOPSIS_EMBEDDINGS_TRUNC_SUFFIX",
-    "DEFAULT_SENTENCE_TRANSFORMERS_MODEL",
     "SynopsisEmbeddingsArtifact",
-    "validate_synopsis_embeddings_artifact",
-    "truncate_synopsis",
+    "build_synopsis_embeddings_artifact",
     "choose_embedding_text",
+    "compute_seed_similarity_map",
+    "personalized_synopsis_embeddings_bonus_for_candidate",
     "synopsis_embeddings_bonus_for_candidate",
     "synopsis_embeddings_penalty_for_candidate",
-    "personalized_synopsis_embeddings_bonus_for_candidate",
-    "build_synopsis_embeddings_artifact",
-    "compute_seed_similarity_map",
+    "truncate_synopsis",
+    "validate_synopsis_embeddings_artifact",
 ]

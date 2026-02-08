@@ -1,5 +1,6 @@
 """Help / FAQ panel component."""
 from __future__ import annotations
+
 import streamlit as st
 
 FAQ_MD_RANKED = """

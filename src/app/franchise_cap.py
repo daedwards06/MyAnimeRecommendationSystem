@@ -16,11 +16,11 @@ Contract
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 from src.app.constants import FRANCHISE_STRONG_MATCH_ENABLED, FRANCHISE_STRONG_MATCH_MIN_SEED_LEN
-
 
 SeedRankingMode = str  # "completion" | "discovery" (validated upstream)
 
@@ -101,7 +101,7 @@ def _boundary_contains(*, haystack: str, needle: str) -> bool:
 def _classify_franchise_like(
     *,
     mode: str,
-    seed_titles: Optional[list[str]],
+    seed_titles: list[str] | None,
     candidate_title: str,
     title_overlap_value: float,
     threshold: float,
@@ -181,11 +181,11 @@ def apply_franchise_cap(
     *,
     n: int,
     seed_ranking_mode: SeedRankingMode,
-    seed_titles: Optional[list[str]] = None,
+    seed_titles: list[str] | None = None,
     title_overlap: Callable[[dict[str, Any]], float],
     title: Callable[[dict[str, Any]], str],
     anime_id: Callable[[dict[str, Any]], int],
-    neural_sim: Optional[Callable[[dict[str, Any]], float]] = None,
+    neural_sim: Callable[[dict[str, Any]], float] | None = None,
     threshold: float,
     cap_top20: int,
     cap_top50: int,
@@ -373,7 +373,7 @@ def apply_franchise_cap(
 
             # Determine which cap applies at this output position.
             next_pos = int(len(selected_full) + 1)
-            cap_here: Optional[int]
+            cap_here: int | None
             if next_pos <= 20:
                 cap_here = cap20
             elif next_pos <= 50:
@@ -421,7 +421,7 @@ def apply_franchise_cap(
         top20_franchise_like_count_after=int(top20_after),
         top50_franchise_like_count_before=int(top50_before),
         top50_franchise_like_count_after=int(top50_after),
-        franchise_items_dropped_count=int(len(dropped)),
+        franchise_items_dropped_count=len(dropped),
         franchise_items_dropped_count_top20=int(dropped_top20),
         franchise_items_dropped_count_top50=int(dropped_top50),
         franchise_items_dropped_examples_top5=list(dropped[:5]),
