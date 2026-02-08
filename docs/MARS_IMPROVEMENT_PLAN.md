@@ -260,7 +260,7 @@ REQUIREMENTS:
 - [x] Add a constant `USE_MEAN_USER_CF = True` to constants.py (allows toggling back)
 - [ ] Compare seed-based recommendations before/after on 5 golden queries — document any changes in a brief note
 - [x] Update the `HybridRecommender._blend()` docstring to note the mean-user approach
-- [ ] Verify MF share percentages in explanation badges still sum to 100% and make sense
+- [x] Verify MF share percentages in explanation badges still sum to 100% and make sense
 
 **Prompt for Claude Sonnet 4.5:**
 
@@ -304,11 +304,11 @@ Read src/app/artifacts_loader.py, src/app/recommender.py, and the scoring pipeli
 **Why:** The current `quality_factor = clamp((MAL_score - 5) / 4, 0.15, 1.0)` scales neural similarity by MAL rating, which penalizes niche anime with MAL 6-7 that may be highly relevant. This conflates community consensus with personal relevance.
 
 **Checklist:**
-- [ ] Add `QUALITY_FACTOR_MODE` constant with options: `"mal_scaled"` (current), `"binary"` (1.0 if MAL >= 6.0 else 0.5), `"disabled"` (always 1.0)
-- [ ] Implement all three modes in the scoring formula
-- [ ] Default to `"mal_scaled"` (preserve current behavior)
-- [ ] Run golden queries with all 3 modes and document which niche anime emerge/disappear
-- [ ] Add a brief comment in constants.py explaining the tradeoff
+- [x] Add `QUALITY_FACTOR_MODE` constant with options: `"mal_scaled"` (current), `"binary"` (1.0 if MAL >= 6.0 else 0.5), `"disabled"` (always 1.0)
+- [x] Implement all three modes in the scoring formula
+- [x] Default to `"mal_scaled"` (preserve current behavior)
+- [x] Run golden queries with all 3 modes and document which niche anime emerge/disappear
+- [x] Add a brief comment in constants.py explaining the tradeoff
 
 **Prompt for Claude Sonnet 4.5:**
 
