@@ -1,4 +1,4 @@
-"""Tests for src/eval/metrics.py"""
+"""Tests for src/eval/metrics.py and src/eval/metrics_extra.py"""
 import pytest
 from src.eval.metrics import (
     precision_at_k,
@@ -8,6 +8,10 @@ from src.eval.metrics import (
     ndcg_at_k_graded,
     average_precision_at_k,
     evaluate_ranking,
+)
+from src.eval.metrics_extra import (
+    item_coverage,
+    gini_index,
 )
 
 
@@ -331,3 +335,138 @@ class TestEvaluateRanking:
         assert result["f1"][2] == f1_at_k(ranked, relevant, 2)
         assert result["ndcg"][4] == ndcg_at_k(ranked, relevant, 4)
         assert result["map"][2] == average_precision_at_k(ranked, relevant, 2)
+
+
+class TestItemCoverage:
+    """Tests for item_coverage function from metrics_extra."""
+    
+    def test_coverage_full(self):
+        """All catalog items recommended → coverage = 1.0."""
+        recommendations = {
+            1: [10, 20, 30],
+            2: [40, 50],
+        }
+        total_items = 5  # Items 10, 20, 30, 40, 50
+        assert item_coverage(recommendations, total_items) == 1.0
+    
+    def test_coverage_partial(self):
+        """Half of catalog recommended → coverage = 0.5."""
+        recommendations = {
+            1: [1, 2],
+            2: [3, 4],
+        }
+        total_items = 8
+        assert item_coverage(recommendations, total_items) == 0.5
+    
+    def test_coverage_empty_recommendations(self):
+        """No recommendations → coverage = 0.0."""
+        recommendations = {}
+        total_items = 100
+        assert item_coverage(recommendations, total_items) == 0.0
+    
+    def test_coverage_zero_catalog(self):
+        """Edge case: zero total items → coverage = 0.0."""
+        recommendations = {1: [1, 2, 3]}
+        total_items = 0
+        assert item_coverage(recommendations, total_items) == 0.0
+    
+    def test_coverage_duplicate_items(self):
+        """Duplicate items across users count once."""
+        recommendations = {
+            1: [1, 2, 3],
+            2: [2, 3, 4],
+            3: [3, 4, 5],
+        }
+        # Unique items: {1, 2, 3, 4, 5} = 5 items
+        total_items = 10
+        assert item_coverage(recommendations, total_items) == 0.5
+    
+    def test_coverage_single_user(self):
+        """Single user recommendations."""
+        recommendations = {1: [10, 20, 30, 40]}
+        total_items = 10
+        assert item_coverage(recommendations, total_items) == 0.4
+
+
+class TestGiniIndex:
+    """Tests for gini_index function from metrics_extra."""
+    
+    def test_gini_uniform(self):
+        """All items recommended equally → Gini ≈ 0.0."""
+        recommendations = {
+            1: [1, 2, 3],
+            2: [1, 2, 3],
+            3: [1, 2, 3],
+        }
+        # Each item appears 3 times - perfectly uniform
+        gini = gini_index(recommendations)
+        assert gini == pytest.approx(0.0, abs=1e-6)
+    
+    def test_gini_concentrated(self):
+        """One item dominates → Gini > 0.0 indicating concentration."""
+        recommendations = {
+            1: [1, 1, 1, 1, 1],
+            2: [1, 1, 1, 1, 1],
+            3: [1, 1, 1, 1, 2],
+        }
+        # Item 1 appears 14 times, item 2 appears 1 time
+        gini = gini_index(recommendations)
+        assert gini > 0.3  # Significant concentration
+    
+    def test_gini_empty_recommendations(self):
+        """No recommendations → Gini = 0.0."""
+        recommendations = {}
+        assert gini_index(recommendations) == 0.0
+    
+    def test_gini_single_item(self):
+        """Single item recommended → Gini = 0.0 (perfect equality for 1 item)."""
+        recommendations = {
+            1: [5],
+            2: [5],
+            3: [5],
+        }
+        gini = gini_index(recommendations)
+        assert gini == pytest.approx(0.0, abs=1e-6)
+    
+    def test_gini_two_items_equal(self):
+        """Two items with equal frequency → Gini = 0.0."""
+        recommendations = {
+            1: [1, 2],
+            2: [1, 2],
+            3: [1, 2],
+        }
+        gini = gini_index(recommendations)
+        assert gini == pytest.approx(0.0, abs=1e-6)
+    
+    def test_gini_two_items_unequal(self):
+        """Two items with unequal frequency → 0 < Gini < 1."""
+        recommendations = {
+            1: [1, 1, 1, 2],
+            2: [1, 1, 1, 2],
+        }
+        # Item 1 appears 6 times, item 2 appears 2 times
+        gini = gini_index(recommendations)
+        assert 0.0 < gini < 1.0
+    
+    def test_gini_range(self):
+        """Gini index should always be in [0, 1]."""
+        # Test various distributions
+        test_cases = [
+            {1: [1, 2, 3, 4, 5]},
+            {1: [1], 2: [2], 3: [3]},
+            {1: [1, 1, 2, 3, 4]},
+            {1: list(range(100))},  # Many different items
+        ]
+        for recs in test_cases:
+            gini = gini_index(recs)
+            assert 0.0 <= gini <= 1.0
+    
+    def test_gini_perfect_inequality(self):
+        """Single item gets everything, many others get one each."""
+        recommendations = {
+            1: [1] * 100 + [2, 3, 4, 5, 6],
+        }
+        # Item 1 appears 100 times, others appear 1 time each
+        gini = gini_index(recommendations)
+        assert gini > 0.7  # Very high inequality
+

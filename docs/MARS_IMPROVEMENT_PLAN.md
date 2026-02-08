@@ -787,10 +787,10 @@ REQUIREMENTS:
 **Why:** `src/eval/metrics.py` and `metrics_extra.py` have no dedicated tests. These are critical functions that need correctness validation.
 
 **Checklist:**
-- [ ] Create `tests/test_eval_metrics.py`
-- [ ] Test each metric function with known-answer inputs
-- [ ] Test edge cases: empty lists, k=0, k > len(ranked_list), no relevant items
-- [ ] Test consistency: P@K, R@K, F1@K relationship (F1 = harmonic mean of P and R)
+- [x] Create `tests/test_eval_metrics.py`
+- [x] Test each metric function with known-answer inputs
+- [x] Test edge cases: empty lists, k=0, k > len(ranked_list), no relevant items
+- [x] Test consistency: P@K, R@K, F1@K relationship (F1 = harmonic mean of P and R)
 
 **Prompt for Claude Sonnet 4.5:**
 
