@@ -253,3 +253,90 @@ def force_neural_enable_for_semantic_mode(semantic_mode: str) -> bool:
     sem = str(semantic_mode or "").strip().lower()
     default = bool(sem == "neural")
     return _env_bool("FORCE_NEURAL_ENABLE", default)
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 Final Score Weights
+#
+# These weights were tuned via grid search during Phase 4 ablation study.
+# See reports/phase4_ablation.md for detailed tuning process and results.
+#
+# The final score formula combines:
+# - Genre/theme/studio overlap (metadata affinity)
+# - Seed coverage (how many seed attributes match)
+# - Hybrid CF score (collaborative filtering from MF + kNN)
+# - Popularity boost (mainstream appeal signal)
+# - Stage 1 score (semantic admission confidence)
+# - Neural similarity (content-based relevance, quality-scaled)
+# - Various bonuses and penalties (demographics, theme, obscurity)
+#
+# These weights balance collaborative signals (CF) with content signals
+# (neural similarity, metadata overlap) to achieve high relevance while
+# maintaining diversity and quality.
+# ---------------------------------------------------------------------------
+
+# Final score formula weights
+STAGE2_GENRE_OVERLAP_WEIGHT: float = 0.3
+STAGE2_SEED_COVERAGE_WEIGHT: float = 0.1
+STAGE2_HYBRID_CF_WEIGHT: float = 0.15
+STAGE2_POPULARITY_BOOST_WEIGHT: float = 0.05
+STAGE2_STAGE1_SCORE_WEIGHT: float = 0.10
+STAGE2_NEURAL_SIM_WEIGHT: float = 1.5
+
+# Raw component weights (for explanation breakdown)
+# These are used to attribute final score to MF/kNN/Popularity components
+# for display in the UI explanation badges
+STAGE2_RAW_KNN_GENRE_OVERLAP_WEIGHT: float = 0.5
+STAGE2_RAW_KNN_SEED_COVERAGE_WEIGHT: float = 0.2
+STAGE2_RAW_KNN_STAGE1_WEIGHT: float = 0.10
+STAGE2_RAW_HYBRID_CONTRIBUTION_WEIGHT: float = 0.25
+
+
+# ---------------------------------------------------------------------------
+# Quality Factor (scales neural similarity by MAL consensus)
+#
+# The quality factor scales neural similarity contribution based on MAL rating,
+# which serves as a proxy for community consensus on quality. This biases the
+# system toward titles with proven quality while still allowing niche titles
+# to surface based on relevance.
+#
+# Formula: quality_factor = clamp((mal_score - FLOOR) / RANGE, MIN, MAX)
+#
+# Tradeoff: This approach favors community-validated titles but may penalize
+# highly relevant niche anime with lower MAL scores (6.0-7.0). Alternative
+# approaches (e.g., binary gating or disabled scaling) can be explored via
+# Task 2.2 in the improvement plan.
+# ---------------------------------------------------------------------------
+
+QUALITY_FACTOR_MAL_FLOOR: float = 5.0
+QUALITY_FACTOR_MAL_RANGE: float = 4.0
+QUALITY_FACTOR_MIN: float = 0.15
+QUALITY_FACTOR_MAX: float = 1.0
+QUALITY_FACTOR_DEFAULT_MISSING_MAL: float = 0.3
+
+
+# ---------------------------------------------------------------------------
+# Obscurity Penalty
+#
+# Obscurity penalties prevent low-quality or extremely obscure items from
+# ranking above genre-relevant alternatives. These penalties are applied
+# after the main scoring formula to down-rank items that may have high
+# semantic similarity but lack community validation or engagement.
+#
+# Penalties:
+# - Low member count: Items with fewer than THRESHOLD members get penalized,
+#   as they may be obscure or have unreliable metadata
+# - Missing MAL score: Items without MAL ratings get penalized as we can't
+#   assess their quality
+# - Low MAL score: Items with MAL < THRESHOLD get a scaled penalty based on
+#   how far below the threshold they fall
+#
+# These values were determined empirically during Phase 4 testing to balance
+# discovery of hidden gems with filtering out genuinely low-quality items.
+# ---------------------------------------------------------------------------
+
+OBSCURITY_MEMBERS_THRESHOLD: int = 50000
+OBSCURITY_LOW_MEMBERS_PENALTY: float = 0.25
+OBSCURITY_MISSING_MAL_PENALTY: float = 0.15
+OBSCURITY_LOW_MAL_THRESHOLD: float = 7.0
+OBSCURITY_LOW_MAL_PENALTY_SCALE: float = 0.20
