@@ -996,7 +996,7 @@ else:
 
     # Phase 5 follow-up: Seed-based ranking goal (Completion vs Discovery).
     # Keep Browse unchanged; only show when Seed-based is the active top-level mode.
-    if str(st.session_state.get("ui_mode", "Seed-based")) == "Seed-based":
+    if str(st.session_state.get("ui_mode", "Seed-based")) in {"Seed-based", "Personalized"}:
         _goal_opts = [
             "Goal: Completion (more from franchise)",
             "Goal: Discovery (similar vibes)",
@@ -1547,16 +1547,33 @@ else:
                     st.session_state["stage0_enforcement"] = seed_result.stage0_enforcement
                     st.session_state["franchise_cap_diagnostics"] = seed_result.franchise_cap_diagnostics
                 else:
-                    # Seedless fallback: plain hybrid recommender
-                    recs = recommender.get_top_n_for_user(
-                        user_index,
-                        n=n_requested,
-                        weights=weights,
-                        exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
-                    )
+                    # Seedless fallback: use community-baseline (mean-user)
+                    # when personalization is enabled so that sub-100%
+                    # strength blends the user's taste against a meaningful
+                    # community average instead of an arbitrary training user.
+                    _mf_mean_user_scores = bundle.get("models", {}).get("mf_mean_user_scores")
+                    if _personalization_enabled and _mf_mean_user_scores is not None:
+                        recs = recommender.get_top_n_for_user(
+                            user_index,
+                            n=n_requested,
+                            weights=weights,
+                            exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
+                            override_mf_scores=_mf_mean_user_scores,
+                        )
+                    else:
+                        recs = recommender.get_top_n_for_user(
+                            user_index,
+                            n=n_requested,
+                            weights=weights,
+                            exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
+                        )
     
                 # ── Personalization overlay ──────────────────────────────
-                if recs and _personalization_enabled:
+                # When seeds are present, personalization is already injected
+                # into the seed pipeline's Stage 2 reranking (personal MF
+                # scores blended into the hybrid CF component).  The separate
+                # overlay is only needed for the *seedless* personalized path.
+                if recs and _personalization_enabled and not selected_seed_ids:
                     pers_result = run_personalized_pipeline(ctx)
     
                     # Propagate any blocked reason back to session state
@@ -1581,6 +1598,10 @@ else:
                                 ranked_hygiene_exclude_ids=ranked_hygiene_exclude_ids,
                             )
                         # else: strength ≤ 0.01 → keep seed-based as-is
+
+                # Mark personalization applied when seed pipeline used personal scores
+                if selected_seed_ids and _personalization_enabled and _user_embedding is not None:
+                    personalization_applied = True
     
                 # ── Personalized explanation text (Streamlit-dependent) ──
                 if recs and _personalization_enabled and _active_profile:

@@ -142,6 +142,7 @@ from src.app.synopsis_tfidf import (
 )
 from src.app.explanations import format_explanation
 from src.app.badges import badge_payload
+from src.models.user_embedding import compute_personalized_scores
 from src.utils import parse_pipe_set
 
 logger = logging.getLogger(__name__)
@@ -1030,6 +1031,25 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     use_mean_user = bool(USE_MEAN_USER_CF) and not ctx.personalization_enabled
     mf_mean_user_scores = ctx.bundle.get("models", {}).get("mf_mean_user_scores")
     
+    # Personalized MF scores array (built once, reused for blended_scores
+    # and per-item hybrid_cf_score when personalization is enabled).
+    _pers_mf_array: np.ndarray | None = None
+    _pers_strength = float(ctx.personalization_strength) if ctx.personalization_enabled else 0.0
+    if (
+        ctx.personalization_enabled
+        and ctx.user_embedding is not None
+        and ctx.mf_model is not None
+        and _pers_strength > 0.01
+    ):
+        try:
+            _pers_scores_dict = compute_personalized_scores(ctx.user_embedding, ctx.mf_model)
+            _pers_mf_array = np.zeros(components.num_items, dtype=np.float32)
+            for _pi, _pid in enumerate(components.item_ids):
+                if int(_pid) in _pers_scores_dict:
+                    _pers_mf_array[_pi] = _pers_scores_dict[int(_pid)]
+        except Exception:
+            _pers_mf_array = None
+
     try:
         if use_mean_user and mf_mean_user_scores is not None:
             # Build hybrid scores using mean-user MF component
@@ -1054,6 +1074,18 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
     except Exception:
         blended_scores = None
+
+    # When personalization is enabled with seeds, blend personal MF scores
+    # into the hybrid CF component. Seeds shape the candidate pool (Stage 0/1),
+    # personal taste re-ranks within that pool via the CF signal.
+    if _pers_mf_array is not None and blended_scores is not None:
+        _pers_blended = np.zeros(components.num_items, dtype=np.float32)
+        _pers_blended += float(weights.get("mf", 0.0)) * _pers_mf_array
+        if components.knn is not None:
+            _pers_blended += float(weights.get("knn", 0.0)) * components.knn[user_index]
+        if components.pop is not None:
+            _pers_blended += float(weights.get("pop", 0.0)) * components.pop
+        blended_scores = _pers_strength * _pers_blended + (1.0 - _pers_strength) * blended_scores
 
     id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
     scored: list[dict] = []
@@ -1087,6 +1119,13 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
                     mf_base = float(components.mf[user_index, idx]) if components.mf is not None else 0.0
             except Exception:
                 mf_base = 0.0
+            # Blend personalized MF into mf_base when available
+            if _pers_mf_array is not None:
+                try:
+                    mf_base_pers = float(_pers_mf_array[idx])
+                    mf_base = _pers_strength * mf_base_pers + (1.0 - _pers_strength) * mf_base
+                except Exception:
+                    pass
             try:
                 knn_base = float(components.knn[user_index, idx]) if components.knn is not None else 0.0
             except Exception:
@@ -1609,6 +1648,7 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
                     "MF personalization returned no results (likely no overlap with MF items)."
                 )
             else:
+                result.ranked_items = personalized_recs
                 personalization_applied = True
     except Exception as e:  # noqa: BLE001
         result.personalization_blocked_reason = f"Personalization failed at scoring time: {e}"
