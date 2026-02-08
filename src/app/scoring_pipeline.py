@@ -53,6 +53,16 @@ from src.app.constants import (
     FRANCHISE_CAP_TOP20,
     FRANCHISE_CAP_TOP50,
     FRANCHISE_TITLE_OVERLAP_THRESHOLD,
+    OBSCURITY_LOW_MAL_PENALTY_SCALE,
+    OBSCURITY_LOW_MAL_THRESHOLD,
+    OBSCURITY_LOW_MEMBERS_PENALTY,
+    OBSCURITY_MEMBERS_THRESHOLD,
+    OBSCURITY_MISSING_MAL_PENALTY,
+    QUALITY_FACTOR_DEFAULT_MISSING_MAL,
+    QUALITY_FACTOR_MAL_FLOOR,
+    QUALITY_FACTOR_MAL_RANGE,
+    QUALITY_FACTOR_MAX,
+    QUALITY_FACTOR_MIN,
     SEED_RANKING_MODE,
     STAGE0_ENFORCEMENT_BUFFER,
     STAGE0_META_MIN_GENRE_OVERLAP,
@@ -60,6 +70,16 @@ from src.app.constants import (
     STAGE0_NEURAL_TOPK,
     STAGE0_POOL_CAP,
     STAGE0_POPULARITY_BACKFILL,
+    STAGE2_GENRE_OVERLAP_WEIGHT,
+    STAGE2_HYBRID_CF_WEIGHT,
+    STAGE2_NEURAL_SIM_WEIGHT,
+    STAGE2_POPULARITY_BOOST_WEIGHT,
+    STAGE2_RAW_HYBRID_CONTRIBUTION_WEIGHT,
+    STAGE2_RAW_KNN_GENRE_OVERLAP_WEIGHT,
+    STAGE2_RAW_KNN_SEED_COVERAGE_WEIGHT,
+    STAGE2_RAW_KNN_STAGE1_WEIGHT,
+    STAGE2_SEED_COVERAGE_WEIGHT,
+    STAGE2_STAGE1_SCORE_WEIGHT,
     force_neural_enable_for_semantic_mode,
 )
 from src.app.franchise_cap import apply_franchise_cap
@@ -1221,19 +1241,22 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             item_members_count = None
 
         if item_mal_score is not None and item_mal_score > 0:
-            quality_factor = max(0.15, min(1.0, (item_mal_score - 5.0) / 4.0))
+            quality_factor = max(
+                QUALITY_FACTOR_MIN,
+                min(QUALITY_FACTOR_MAX, (item_mal_score - QUALITY_FACTOR_MAL_FLOOR) / QUALITY_FACTOR_MAL_RANGE),
+            )
         else:
-            quality_factor = 0.3
+            quality_factor = QUALITY_FACTOR_DEFAULT_MISSING_MAL
 
-        neural_contribution = 1.5 * float(synopsis_neural_sim) * quality_factor
+        neural_contribution = STAGE2_NEURAL_SIM_WEIGHT * float(synopsis_neural_sim) * quality_factor
 
         # Final score formula
         score_before = (
-            (0.3 * weighted_overlap)
-            + (0.1 * seed_coverage)
-            + (0.15 * float(hybrid_val_for_scoring))
-            + (0.05 * popularity_boost)
-            + (0.10 * float(s1))
+            (STAGE2_GENRE_OVERLAP_WEIGHT * weighted_overlap)
+            + (STAGE2_SEED_COVERAGE_WEIGHT * seed_coverage)
+            + (STAGE2_HYBRID_CF_WEIGHT * float(hybrid_val_for_scoring))
+            + (STAGE2_POPULARITY_BOOST_WEIGHT * popularity_boost)
+            + (STAGE2_STAGE1_SCORE_WEIGHT * float(s1))
             + neural_contribution
             + meta_bonus
             + synopsis_tfidf_adjustment
@@ -1245,12 +1268,14 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 
         # Obscurity/quality penalty
         obscurity_penalty = 0.0
-        if item_members_count is not None and item_members_count < 50000:
-            obscurity_penalty += 0.25
+        if item_members_count is not None and item_members_count < OBSCURITY_MEMBERS_THRESHOLD:
+            obscurity_penalty += OBSCURITY_LOW_MEMBERS_PENALTY
         if item_mal_score is None:
-            obscurity_penalty += 0.15
-        elif item_mal_score < 7.0:
-            obscurity_penalty += max(0.0, 0.20 * (7.0 - item_mal_score))
+            obscurity_penalty += OBSCURITY_MISSING_MAL_PENALTY
+        elif item_mal_score < OBSCURITY_LOW_MAL_THRESHOLD:
+            obscurity_penalty += max(
+                0.0, OBSCURITY_LOW_MAL_PENALTY_SCALE * (OBSCURITY_LOW_MAL_THRESHOLD - item_mal_score)
+            )
         score_before = score_before - obscurity_penalty
 
         score_after = float(score_before)
@@ -1271,16 +1296,16 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 
         raw_mf = 0.0
         raw_knn = (
-            (0.5 * weighted_overlap)
-            + (0.2 * seed_coverage)
-            + (0.10 * float(s1))
+            (STAGE2_RAW_KNN_GENRE_OVERLAP_WEIGHT * weighted_overlap)
+            + (STAGE2_RAW_KNN_SEED_COVERAGE_WEIGHT * seed_coverage)
+            + (STAGE2_RAW_KNN_STAGE1_WEIGHT * float(s1))
             + meta_bonus
             + synopsis_tfidf_adjustment
             + synopsis_embed_adjustment
             + float(demo_bonus)
             + float(theme_bonus)
         )
-        raw_pop = (0.05 * popularity_boost)
+        raw_pop = (STAGE2_POPULARITY_BOOST_WEIGHT * popularity_boost)
         used_components: list[str] = ["knn", "pop"]
         if aid in id_to_index:
             idx = id_to_index[aid]
@@ -1288,9 +1313,9 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
                 raw_hybrid = recommender.raw_components_for_item(user_index, idx, weights)
             except Exception:
                 raw_hybrid = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
-            raw_mf += 0.25 * float(raw_hybrid.get("mf", 0.0))
-            raw_knn += 0.25 * float(raw_hybrid.get("knn", 0.0))
-            raw_pop += 0.25 * float(raw_hybrid.get("pop", 0.0))
+            raw_mf += STAGE2_RAW_HYBRID_CONTRIBUTION_WEIGHT * float(raw_hybrid.get("mf", 0.0))
+            raw_knn += STAGE2_RAW_HYBRID_CONTRIBUTION_WEIGHT * float(raw_hybrid.get("knn", 0.0))
+            raw_pop += STAGE2_RAW_HYBRID_CONTRIBUTION_WEIGHT * float(raw_hybrid.get("pop", 0.0))
 
             used_components = sorted(
                 set(used_components) | set(recommender.used_components_for_weights(weights)),

@@ -190,11 +190,11 @@ REQUIREMENTS:
 **Why:** The final scoring formula at ~L2200 of main.py mixes hardcoded numbers (`0.3`, `0.1`, `0.15`, `0.05`, `1.5`, `-0.25`, etc.) with imported constants. A reviewer will ask "how were these tuned?" Moving them to named constants with comments makes the formula auditable.
 
 **Checklist:**
-- [ ] Add all scoring formula weights to `src/app/constants.py` with descriptive names and docstring comments
-- [ ] Add all penalty thresholds (obscurity penalty, quality factor bounds) to constants
-- [ ] Replace all inline magic numbers in the scoring formula with constant references
-- [ ] Add a block comment above each constant group explaining the rationale (e.g., "Tuned via Optuna Phase 4 ablation study — see reports/phase4_ablation.md")
-- [ ] Verify recommendations are identical after the swap
+- [x] Add all scoring formula weights to `src/app/constants.py` with descriptive names and docstring comments
+- [x] Add all penalty thresholds (obscurity penalty, quality factor bounds) to constants
+- [x] Replace all inline magic numbers in the scoring formula with constant references
+- [x] Add a block comment above each constant group explaining the rationale (e.g., "Tuned via Optuna Phase 4 ablation study — see reports/phase4_ablation.md")
+- [x] Verify recommendations are identical after the swap
 
 **Prompt for Claude Sonnet 4.5:**
 
