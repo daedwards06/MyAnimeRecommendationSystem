@@ -28,6 +28,8 @@ root_str = str(ROOT_DIR)
 if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
+from src.utils import parse_pipe_set
+
 from src.app.artifacts_loader import build_artifacts, ArtifactContractError
 from src.app.components.cards import render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
@@ -160,32 +162,7 @@ def load_personas(path: str) -> list[dict]:
 IMPORT_LIGHT = bool(os.environ.get("APP_IMPORT_LIGHT"))
 
 
-def _parse_str_set(val: object) -> set[str]:
-    if val is None:
-        return set()
-    try:
-        if pd.isna(val):
-            return set()
-    except Exception:
-        pass
-    if isinstance(val, str):
-        s = val.strip()
-        if not s:
-            return set()
-        if "|" in s:
-            return {x.strip() for x in s.split("|") if x and x.strip()}
-        return {s}
-    if hasattr(val, "__iter__") and not isinstance(val, str):
-        out: set[str] = set()
-        for x in val:
-            if not x:
-                continue
-            sx = str(x).strip()
-            if sx:
-                out.add(sx)
-        return out
-    s = str(val).strip()
-    return {s} if s else set()
+# Removed _parse_str_set - now using canonical version from src.utils.parsing
 
 
 def _render_artifact_load_failure(err: Exception) -> None:

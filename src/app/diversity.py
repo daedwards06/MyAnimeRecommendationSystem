@@ -13,6 +13,8 @@ from __future__ import annotations
 from typing import Iterable, List, Dict, Any, Optional, Mapping
 import numpy as np
 import pandas as pd
+from src.utils import coerce_genres
+from src.utils import coerce_genres
 
 
 def compute_popularity_percentiles(pop_scores: np.ndarray) -> np.ndarray:
@@ -34,67 +36,7 @@ def coverage(recs: List[Dict[str, Any]]) -> float:
     return len(unique_ids) / len(recs)
 
 
-def _coerce_genres(val: Any) -> str:
-    """Normalize a genres value to a pipe-delimited string.
-
-    Robustly flattens list/tuple/set/ndarray (including nested) without
-    relying on truth-value evaluation of array elements (avoids ambiguous
-    truth value errors). Filters out None and blank string tokens.
-    """
-    if val is None:
-        return ""
-    if isinstance(val, str):
-        return val
-
-    def _emit_tokens(obj: Any) -> List[str]:
-        tokens: List[str] = []
-        # Import locally to avoid global dependency if unused.
-        try:
-            import numpy as _np  # type: ignore
-        except Exception:  # noqa: BLE001
-            _np = None  # type: ignore
-
-        if _np is not None and isinstance(obj, _np.ndarray):
-            flat = obj.ravel().tolist()
-            for y in flat:
-                if y is None:
-                    continue
-                sy = str(y).strip()
-                if sy:
-                    tokens.append(sy)
-            return tokens
-
-        if isinstance(obj, (list, tuple, set)):
-            for x in obj:
-                if x is None:
-                    continue
-                if isinstance(x, (list, tuple, set)) or (_np is not None and isinstance(x, _np.ndarray)):
-                    tokens.extend(_emit_tokens(x))
-                else:
-                    sx = str(x).strip()
-                    if sx:
-                        tokens.append(sx)
-            return tokens
-
-        # pandas Series
-        try:
-            import pandas as _pd  # type: ignore
-            if isinstance(obj, _pd.Series):
-                for x in obj.tolist():
-                    if x is None:
-                        continue
-                    tokens.extend(_emit_tokens(x))
-                return tokens
-        except Exception:  # noqa: BLE001
-            pass
-
-        so = str(obj).strip()
-        if so:
-            tokens.append(so)
-        return tokens
-
-    flat_tokens = _emit_tokens(val)
-    return "|".join(flat_tokens)
+# Removed _coerce_genres - now using canonical version from src.utils.parsing as coerce_genres
 
 
 def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> float:
@@ -103,7 +45,7 @@ def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> 
     all_catalog_genres: set[str] = set()
     if "genres" in metadata.columns:
         for raw in metadata["genres"].dropna():
-            gstr = _coerce_genres(raw)
+            gstr = coerce_genres(raw)
             for g in gstr.split("|"):
                 if g:
                     all_catalog_genres.add(g.lower())
@@ -112,7 +54,7 @@ def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> 
         row = metadata.loc[metadata["anime_id"] == r["anime_id"]]
         if row.empty:
             continue
-        gstr = _coerce_genres(row.iloc[0].get("genres"))
+        gstr = coerce_genres(row.iloc[0].get("genres"))
         for g in gstr.split("|"):
             if g:
                 rec_genres.add(g.lower())
@@ -151,7 +93,7 @@ def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) ->
                 continue
             row = row_df.iloc[0]
 
-        gstr = _coerce_genres(getattr(row, "get", lambda k, d=None: d)("genres"))
+        gstr = coerce_genres(getattr(row, "get", lambda k, d=None: d)("genres"))
         for g in gstr.split("|"):
             gg = g.strip().lower()
             if not gg:

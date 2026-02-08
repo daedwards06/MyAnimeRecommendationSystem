@@ -657,10 +657,10 @@ REQUIREMENTS:
 **Why:** `_coerce_genres` / `_parse_str_set` / `_parse_pipe_set` are implemented 3+ times across different files. This violates DRY and creates divergence risk.
 
 **Checklist:**
-- [ ] Create `src/utils/parsing.py` with canonical implementations of: `parse_pipe_delimited_set()`, `coerce_genres()`, `parse_str_set()`
-- [ ] Replace all duplicates in `app/main.py`, `src/app/components/cards.py`, `src/app/diversity.py`, `src/app/stage0_candidates.py`
-- [ ] Add unit tests for the canonical implementations
-- [ ] Verify all existing tests still pass
+- [x] Create `src/utils/parsing.py` with canonical implementations of: `parse_pipe_delimited_set()`, `coerce_genres()`, `parse_str_set()`
+- [x] Replace all duplicates in `app/main.py`, `src/app/components/cards.py`, `src/app/diversity.py`, `src/app/stage0_candidates.py`
+- [x] Add unit tests for the canonical implementations
+- [x] Verify all existing tests still pass
 
 **Prompt for Claude Sonnet 4.5:**
 
