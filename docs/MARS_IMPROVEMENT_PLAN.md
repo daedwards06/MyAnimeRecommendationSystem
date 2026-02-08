@@ -743,10 +743,10 @@ REQUIREMENTS:
 **Why:** The post-scoring filter loop does `metadata.loc[metadata["anime_id"] == anime_id].head(1)` per recommendation — O(N) per item. With 13K metadata rows and 30 results, that's 390K comparisons instead of 30 hashtable lookups.
 
 **Checklist:**
-- [ ] Build a `metadata_by_id: dict[int, pd.Series]` lookup once before the results loop
-- [ ] Or use `metadata.set_index("anime_id")` and `.loc[id]` for O(1) lookups
-- [ ] Apply the same fix in browse mode filtering if applicable
-- [ ] Verify correctness — same results, faster
+- [x] Build a `metadata_by_id: dict[int, pd.Series]` lookup once before the results loop
+- [x] Or use `metadata.set_index("anime_id")` and `.loc[id]` for O(1) lookups
+- [x] Apply the same fix in browse mode filtering if applicable
+- [x] Verify correctness — same results, faster
 
 **Prompt for Claude Sonnet 4.5:**
 

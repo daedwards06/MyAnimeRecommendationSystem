@@ -49,12 +49,17 @@ def genre_exposure_ratio(recs: List[Dict[str, Any]], metadata: pd.DataFrame) -> 
             for g in gstr.split("|"):
                 if g:
                     all_catalog_genres.add(g.lower())
+    
+    # Create indexed lookup for O(1) access (performance optimization)
+    metadata_by_id = metadata.set_index("anime_id", drop=False)
+    
     rec_genres: set[str] = set()
     for r in recs:
-        row = metadata.loc[metadata["anime_id"] == r["anime_id"]]
-        if row.empty:
+        try:
+            row = metadata_by_id.loc[r["anime_id"]]
+            gstr = coerce_genres(row.get("genres") if isinstance(row, pd.Series) else None)
+        except KeyError:
             continue
-        gstr = coerce_genres(row.iloc[0].get("genres"))
         for g in gstr.split("|"):
             if g:
                 rec_genres.add(g.lower())
@@ -72,10 +77,12 @@ def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) ->
     if not ratings or metadata.empty or "anime_id" not in metadata.columns:
         return {}
 
+    # Create indexed lookup for O(1) access (performance optimization)
     try:
         meta_idx = metadata.set_index("anime_id", drop=False)
     except Exception:
-        meta_idx = metadata
+        # If we can't create index, return empty hist rather than fall back to O(N) lookups
+        return {}
 
     hist: Dict[str, int] = {}
     for raw_anime_id in ratings.keys():
@@ -86,12 +93,9 @@ def build_user_genre_hist(ratings: Mapping[Any, Any], metadata: pd.DataFrame) ->
 
         try:
             row = meta_idx.loc[anime_id]
-        except Exception:
-            # Fall back to slower lookup when index isn't available.
-            row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-            if row_df.empty:
-                continue
-            row = row_df.iloc[0]
+        except KeyError:
+            # Item not in metadata - skip it
+            continue
 
         gstr = coerce_genres(getattr(row, "get", lambda k, d=None: d)("genres"))
         for g in gstr.split("|"):
