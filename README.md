@@ -37,6 +37,44 @@
 - **Confidence Ratings**: Visual match indicators on all recommendations
 - **Responsive Design**: Clean cards with colored borders and inline badges
 
+## 📈 Results
+
+### Offline Evaluation
+
+Evaluated on 300 users from a held-out test set using binary relevance (rated items = relevant):
+
+| Metric | @10 | @20 |
+|--------|-----|-----|
+| **NDCG** | 0.043 | 0.050 |
+| **MAP** | 0.033 | 0.035 |
+
+*NDCG = Normalized Discounted Cumulative Gain; MAP = Mean Average Precision*
+
+### Beyond-Accuracy Metrics
+
+| Metric | @10 | @20 | Interpretation |
+|--------|-----|-----|----------------|
+| **Catalog Coverage** | 3.9% | 6.4% | Fraction of catalog recommended across all users |
+| **Gini Index** | 0.71 | 0.72 | Concentration measure (0=uniform, 1=concentrated) |
+
+**Diversity-Accuracy Trade-off**: The hybrid model balances personalized accuracy with catalog exploration. A Gini of ~0.71 indicates moderate concentration—avoiding pure popularity bias while maintaining relevance.
+
+### Model Architecture
+
+**Hybrid Recommender** combining three complementary signals:
+- **Matrix Factorization (93.08%)**: FunkSVD with 64-factor decomposition trained on 73,515 users × 13,000+ anime
+- **Item-kNN (6.62%)**: Cosine similarity on user-item interaction patterns (k=40 neighbors)
+- **Popularity (0.30%)**: Member counts as a quality/safety signal
+
+**Content-Based Enrichment** for cold-start and semantic matching:
+- **TF-IDF + SVD**: Genre, theme, demographic, and synopsis text (512 dimensions)
+- **Neural Embeddings**: Sentence transformers (all-MiniLM-L6-v2) for deep semantic similarity
+- **Metadata Features**: Studio overlap, episode range gates, streaming availability
+
+**Training Data**: Kaggle user-anime ratings (73,515 users, 310K+ ratings) enriched with MyAnimeList API data (genres, synopsis, studios, streaming, scores).
+
+📊 **Detailed evaluation**: See [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) for metric curves, ablation studies, and cold-start analysis.
+
 ## Project structure
 
 ```
