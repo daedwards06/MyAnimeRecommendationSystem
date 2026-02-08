@@ -407,13 +407,13 @@ REQUIREMENTS:
 **Why:** The README has extensive feature descriptions but zero numbers. A hiring manager scanning the README wants to see "NDCG@10 = 0.XX" immediately. This is the single highest-ROI change for portfolio impact.
 
 **Checklist:**
-- [ ] Run the full evaluation pipeline (`make phase4-artifacts` or equivalent)
-- [ ] Collect key metrics: NDCG@10, MAP@10, Precision@10, Recall@10, Coverage, Gini Index
-- [ ] Add a "## Results" section after "Key Features" in README.md
-- [ ] Include a results table with metrics
-- [ ] Add 1-2 sentences of interpretation (what the numbers mean)
-- [ ] Include the hybrid weight breakdown (MF 93%, kNN 7%, Pop 0.3%)
-- [ ] Reference the reports directory for detailed evaluation
+- [x] Run the full evaluation pipeline (`make phase4-artifacts` or equivalent)
+- [x] Collect key metrics: NDCG@10, MAP@10, Precision@10, Recall@10, Coverage, Gini Index
+- [x] Add a "## Results" section after "Key Features" in README.md
+- [x] Include a results table with metrics
+- [x] Add 1-2 sentences of interpretation (what the numbers mean)
+- [x] Include the hybrid weight breakdown (MF 93%, kNN 7%, Pop 0.3%)
+- [x] Reference the reports directory for detailed evaluation
 
 **Prompt for Claude Sonnet 4.5:**
 
