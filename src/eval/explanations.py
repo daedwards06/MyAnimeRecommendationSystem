@@ -1,6 +1,9 @@
 """Hybrid recommendation explanation utilities for Phase 4 & app integration."""
 from __future__ import annotations
+import logging
 from typing import Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def compute_hybrid_contributions(
@@ -81,4 +84,4 @@ if __name__ == "__main__":  # Simple self-test
     ]
     weights_demo = {"mf": 0.93078, "knn": 0.06625, "pop": 0.00297, "content": 0.0}
     for ex in build_examples(demo_recs, weights_demo):
-        print(ex["text"])  # Smoke output
+        logger.debug(ex["text"])  # Smoke output for self-test
