@@ -6,10 +6,14 @@ Procedure:
 2. Sort by timestamp; allocate earliest fraction to train, remainder to validation.
 3. Train FunkSVD MF model on train partition.
 4. For each validation user, generate recommendations (exclude seen training items) and compute metrics at K values.
-5. Aggregate mean metrics and write JSON artifact for comparison against unified slice.
+5. Aggregate mean metrics (both binary and graded NDCG) and write JSON artifact for comparison against unified slice.
 
 Outputs:
   reports/artifacts/temporal_split_comparison.json
+  
+Notes:
+  - Binary NDCG treats all relevant items equally (gain=1)
+  - Graded NDCG uses exponential gain (2^rating - 1) to emphasize highly-rated items
 """
 from __future__ import annotations
 import argparse
@@ -54,19 +58,45 @@ def evaluate_model(model: FunkSVDRecommender, train_df: pd.DataFrame, val_df: pd
         max_k = max(k_values)
         recs = model.recommend(u, top_k=max_k, exclude=train_seen.get(u, set()))
         per_user_recs[u] = recs
-        # Compute metrics
+        # Compute metrics (binary)
         m = evaluate_ranking(recs, relevant, k_values)
         # Store only ndcg/map at each k
         for k in k_values:
             metric_accumulators["ndcg"].append(m["ndcg"][k])
             metric_accumulators["map"].append(m["map"][k])
 
-    # Aggregate: mean over users for final K=10 (and others)
+    # Aggregate: mean over users for final K values
     metrics_out = {}
+    
+    # Binary NDCG and MAP
     for k in k_values:
-        ndcg_k = [evaluate_ranking(per_user_recs[u], set(val_groups.get_group(u)["anime_id"].tolist()), [k])["ndcg"][k] for u in users]
-        map_k = [evaluate_ranking(per_user_recs[u], set(val_groups.get_group(u)["anime_id"].tolist()), [k])["map"][k] for u in users]
-        metrics_out[f"ndcg@{k}"] = float(np.mean(ndcg_k)) if ndcg_k else 0.0
+        ndcg_k = []
+        ndcg_graded_k = []
+        map_k = []
+        
+        for u in users:
+            if u not in val_groups.groups:
+                continue
+            
+            user_val_data = val_groups.get_group(u)
+            relevant = set(user_val_data["anime_id"].tolist())
+            
+            # Build item_ratings dict for graded NDCG
+            item_ratings = dict(zip(user_val_data["anime_id"], user_val_data["rating"]))
+            
+            recs = per_user_recs[u]
+            
+            # Binary metrics
+            m_binary = evaluate_ranking(recs, relevant, [k])
+            ndcg_k.append(m_binary["ndcg"][k])
+            map_k.append(m_binary["map"][k])
+            
+            # Graded NDCG
+            m_graded = evaluate_ranking(recs, relevant, [k], item_ratings=item_ratings, gain_fn="exponential")
+            ndcg_graded_k.append(m_graded["ndcg_graded"][k])
+        
+        metrics_out[f"ndcg_binary@{k}"] = float(np.mean(ndcg_k)) if ndcg_k else 0.0
+        metrics_out[f"ndcg_graded@{k}"] = float(np.mean(ndcg_graded_k)) if ndcg_graded_k else 0.0
         metrics_out[f"map@{k}"] = float(np.mean(map_k)) if map_k else 0.0
 
     coverage_k10 = item_coverage({u: recs[:10] for u, recs in per_user_recs.items()}, total_items=len(model.item_to_index or {}))
@@ -119,7 +149,12 @@ def main(args: argparse.Namespace) -> None:
         "timestamp_source": source_note,
         "temporal": metrics_temporal,
         "unified": unified_metrics,
-        "interpretation": "Review deltas: large drops may indicate time-based drift or leakage. If timestamp_source is synthetic, treat results as heuristic only.",
+        "interpretation": (
+            "Binary NDCG treats all relevant items equally; Graded NDCG (exponential gain: 2^rating - 1) "
+            "emphasizes highly-rated items and provides more nuanced quality signal. "
+            "Review deltas: large drops may indicate time-based drift or leakage. "
+            "If timestamp_source is synthetic, treat results as heuristic only."
+        ),
     }
 
     out_path = Path("reports/artifacts/temporal_split_comparison.json")

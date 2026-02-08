@@ -347,11 +347,11 @@ REQUIREMENTS:
 **Why:** The eval module uses binary relevance (0/1) for NDCG, but the data has 1-10 ratings. Graded relevance is the standard in RecSys literature and makes the metric more informative.
 
 **Checklist:**
-- [ ] Add `ndcg_at_k_graded()` to `src/eval/metrics.py` that accepts a `ratings: dict[int, float]` instead of a `relevant: set[int]`
-- [ ] Use gain = `2^rating - 1` (standard) or `rating` (linear) — make it configurable
-- [ ] Update `evaluate_ranking()` to compute both binary and graded NDCG
-- [ ] Add tests for the graded NDCG function in `tests/test_eval_metrics.py`
-- [ ] Re-run evaluation scripts and update reported NDCG numbers
+- [x] Add `ndcg_at_k_graded()` to `src/eval/metrics.py` that accepts a `ratings: dict[int, float]` instead of a `relevant: set[int]`
+- [x] Use gain = `2^rating - 1` (standard) or `rating` (linear) — make it configurable
+- [x] Update `evaluate_ranking()` to compute both binary and graded NDCG
+- [x] Add tests for the graded NDCG function in `tests/test_eval_metrics.py`
+- [x] Re-run evaluation scripts and update reported NDCG numbers
 
 **Prompt for Claude Sonnet 4.5:**
 
