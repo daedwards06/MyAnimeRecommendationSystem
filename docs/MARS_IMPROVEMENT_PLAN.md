@@ -78,21 +78,21 @@ Start by reading app/main.py lines 1500-2600 to understand the full pipeline, th
 **Why:** The extracted pipeline can now be tested with pure data fixtures — no Streamlit mocking required. This is the highest-value test coverage we can add.
 
 **Checklist:**
-- [ ] Create `tests/test_scoring_pipeline.py`
-- [ ] Add a `mock_scoring_context()` fixture that builds a minimal ScoringContext with tiny synthetic data (5-10 anime, 2-3 users, small factor matrices)
-- [ ] Test: `run_seed_based_pipeline` returns non-empty results for valid seed
-- [ ] Test: `run_seed_based_pipeline` returns empty results for seed not in metadata
-- [ ] Test: results are sorted by score descending
-- [ ] Test: seed anime IDs are excluded from results
-- [ ] Test: watched IDs are excluded from results
-- [ ] Test: genre filter restricts output genres
-- [ ] Test: type filter restricts output types
-- [ ] Test: year range filter restricts output years
-- [ ] Test: `run_personalized_pipeline` returns results when user_embedding is valid
-- [ ] Test: `run_personalized_pipeline` raises/returns empty when user_embedding is None
-- [ ] Test: franchise cap limits same-franchise entries in top-20
-- [ ] Test: `PipelineResult.timing` contains expected keys
-- [ ] Test: deterministic — same inputs produce same outputs across 3 runs
+- [x] Create `tests/test_scoring_pipeline.py`
+- [x] Add a `mock_scoring_context()` fixture that builds a minimal ScoringContext with tiny synthetic data (5-10 anime, 2-3 users, small factor matrices)
+- [x] Test: `run_seed_based_pipeline` returns non-empty results for valid seed
+- [x] Test: `run_seed_based_pipeline` returns empty results for seed not in metadata
+- [x] Test: results are sorted by score descending
+- [x] Test: seed anime IDs are excluded from results
+- [x] Test: watched IDs are excluded from results
+- [x] Test: genre filter restricts output genres
+- [x] Test: type filter restricts output types
+- [x] Test: year range filter restricts output years
+- [x] Test: `run_personalized_pipeline` returns results when user_embedding is valid
+- [x] Test: `run_personalized_pipeline` raises/returns empty when user_embedding is None
+- [x] Test: franchise cap limits same-franchise entries in top-20
+- [x] Test: `PipelineResult.timing` contains expected keys
+- [x] Test: deterministic — same inputs produce same outputs across 3 runs
 
 **Prompt for Claude Sonnet 4.5:**
 
