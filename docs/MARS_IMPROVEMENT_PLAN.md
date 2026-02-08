@@ -25,17 +25,17 @@
 **Why:** The entire Stage 0 → Stage 1 → Stage 2 → post-processing pipeline currently lives inline inside `app/main.py` (approximately lines 1574–2530), interleaved with `st.session_state` reads and Streamlit widget calls. This makes the core ranking logic impossible to unit-test without mocking Streamlit, and signals poor decomposition to portfolio reviewers.
 
 **Checklist:**
-- [ ] Create `src/app/scoring_pipeline.py` with a pure-data `ScoringContext` dataclass and a `run_seed_based_pipeline()` function
-- [ ] Create `src/app/scoring_pipeline.py` with a `run_personalized_pipeline()` function
-- [ ] Move Stage 0 orchestration call (candidate pool construction) into the pipeline module
-- [ ] Move Stage 1 shortlist loop (genre overlap, semantic similarity, type gates, pool assignment) into the pipeline module
-- [ ] Move Stage 1 confidence gating and `build_stage1_shortlist()` call into the pipeline module
-- [ ] Move Stage 2 reranking loop (hybrid CF, popularity boost, semantic bonuses/penalties, obscurity penalty, final score formula) into the pipeline module
-- [ ] Move post-score processing (franchise cap, personalization blend, post-filters) into the pipeline module
-- [ ] Create a `PipelineResult` dataclass returned by the pipeline (ranked items, diagnostics, diversity stats, timing)
-- [ ] Update `app/main.py` to call the pipeline module instead of inline logic
-- [ ] Verify the app produces identical output before/after refactor by manual comparison on 3+ seed queries
-- [ ] Ensure no `import streamlit` appears in `src/app/scoring_pipeline.py`
+- [x] Create `src/app/scoring_pipeline.py` with a pure-data `ScoringContext` dataclass and a `run_seed_based_pipeline()` function
+- [x] Create `src/app/scoring_pipeline.py` with a `run_personalized_pipeline()` function
+- [x] Move Stage 0 orchestration call (candidate pool construction) into the pipeline module
+- [x] Move Stage 1 shortlist loop (genre overlap, semantic similarity, type gates, pool assignment) into the pipeline module
+- [x] Move Stage 1 confidence gating and `build_stage1_shortlist()` call into the pipeline module
+- [x] Move Stage 2 reranking loop (hybrid CF, popularity boost, semantic bonuses/penalties, obscurity penalty, final score formula) into the pipeline module
+- [x] Move post-score processing (franchise cap, personalization blend, post-filters) into the pipeline module
+- [x] Create a `PipelineResult` dataclass returned by the pipeline (ranked items, diagnostics, diversity stats, timing)
+- [x] Update `app/main.py` to call the pipeline module instead of inline logic
+- [x] Verify the app produces identical output before/after refactor by manual comparison on 3+ seed queries
+- [x] Ensure no `import streamlit` appears in `src/app/scoring_pipeline.py`
 
 **Prompt for Claude Sonnet 4.5:**
 

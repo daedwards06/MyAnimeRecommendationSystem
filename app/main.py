@@ -49,6 +49,16 @@ from src.app.constants import (
     STAGE0_ENFORCEMENT_BUFFER,
 )
 from src.app.stage0_candidates import build_stage0_seed_candidate_pool
+from src.app.scoring_pipeline import (
+    ScoringContext,
+    PipelineResult,
+    run_seed_based_pipeline,
+    run_personalized_pipeline,
+    run_browse_pipeline,
+    blend_personalized_and_seed,
+    apply_post_filters,
+    finalize_explanation_shares,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -1329,85 +1339,23 @@ if browse_mode:
         )
         recs = []
     else:
-        # Browse mode: filter metadata directly without recommendations
+        # Browse mode: filter metadata directly via pipeline module
         with st.spinner("🔍 Loading anime..."):
-            browse_results = []
-            for idx, row in metadata.iterrows():
-                anime_id = int(row["anime_id"])
-                row_genres_val = row.get("genres")
-                
-                # Handle both string and array formats
-                item_genres = set()
-                if isinstance(row_genres_val, str):
-                    item_genres = set([g.strip() for g in row_genres_val.split("|") if g.strip()])
-                elif hasattr(row_genres_val, '__iter__') and not isinstance(row_genres_val, str):
-                    item_genres = set([str(g).strip() for g in row_genres_val if g])
-                
-                # Check if any selected genre matches
-                if any(gf in item_genres for gf in genre_filter):
-                    # Exclude watched anime (profile filter)
-                    if st.session_state["active_profile"]:
-                        watched_ids = st.session_state["active_profile"].get("watched_ids", [])
-                        if anime_id in watched_ids:
-                            continue  # Skip already-watched anime
-                    
-                    # Apply type filter
-                    include = True
-                    if type_filter and "type" in metadata.columns:
-                        item_type = row.get("type")
-                        if pd.notna(item_type):
-                            type_str = str(item_type).strip()
-                            if type_str not in type_filter:
-                                include = False
-                        else:
-                            include = False  # Exclude items with no type when filter is active
-                    
-                    # Apply year filter
-                    if include and (year_range[0] > 1960 or year_range[1] < 2025):
-                        aired_from = row.get("aired_from")
-                        if aired_from and isinstance(aired_from, str):
-                            try:
-                                year = int(aired_from[:4])
-                                if not (year_range[0] <= year <= year_range[1]):
-                                    include = False
-                            except Exception:
-                                include = False
-                        else:
-                            include = False
-                    
-                    if include:
-                        # Create a rec-like dict for compatibility with existing card rendering
-                        browse_results.append({
-                            "anime_id": anime_id,
-                            # Browse mode has no recommender score; keep this absent to avoid mixed semantics.
-                            "score": None,
-                            "explanation": None,  # No explanation in browse mode
-                            "_mal_score": float(row.get("mal_score", 0) if pd.notna(row.get("mal_score")) else 0),
-                            "_year": 0,
-                            "_popularity": _pop_pct_for_anime_id(anime_id)
-                        })
-                        # Extract year for sorting
-                        aired_from = row.get("aired_from")
-                        if aired_from and isinstance(aired_from, str):
-                            try:
-                                browse_results[-1]["_year"] = int(aired_from[:4])
-                            except Exception:
-                                pass
-            
-            # Sort browse results
-            if sort_by == "MAL Score":
-                browse_results.sort(key=lambda x: x["_mal_score"], reverse=True)
-            elif sort_by == "Year (Newest)":
-                browse_results.sort(key=lambda x: x["_year"], reverse=True)
-            elif sort_by == "Year (Oldest)":
-                browse_results.sort(key=lambda x: x["_year"], reverse=False)
-            elif sort_by == "Popularity":
-                browse_results.sort(key=lambda x: x["_popularity"], reverse=False)
-            else:  # Default
-                browse_results.sort(key=lambda x: x["_mal_score"], reverse=True)
-            
-            # Limit to top N for performance
-            recs = browse_results[:min(top_n, len(browse_results))]
+            browse_ctx = ScoringContext(
+                metadata=metadata,
+                bundle=bundle,
+                browse_mode=True,
+                genre_filter=genre_filter,
+                type_filter=type_filter,
+                year_range=year_range,
+                sort_by=sort_by,
+                default_sort_for_mode=default_sort_for_mode,
+                top_n=top_n,
+                pop_pct_fn=_pop_pct_for_anime_id,
+                watched_ids={int(x) for x in (st.session_state["active_profile"].get("watched_ids", []) or [])} if st.session_state["active_profile"] else set(),
+            )
+            browse_result = run_browse_pipeline(browse_ctx)
+            recs = browse_result.ranked_items
             
             if not recs:
                 st.warning("No titles found matching your filters.")
@@ -1483,1307 +1431,115 @@ else:
         )
         recs = []
     elif n_requested > 0 and not personalized_gate_reason:
-        # Compute recommendations with progress indicator
+        # ── Scoring pipeline (delegated to src.app.scoring_pipeline) ─────
         with st.spinner("🔍 Finding recommendations..."):
             with latency_timer("recommendations"):
+                # ── Build ScoringContext from session state + local vars ──
+                _active_profile = st.session_state.get("active_profile")
+                _watched_ids: set[int] = set()
+                if _active_profile:
+                    _watched_ids = {int(x) for x in (_active_profile.get("watched_ids", []) or [])}
+    
+                _personalization_enabled = st.session_state.get("personalization_enabled", False)
+                _personalization_strength = st.session_state.get("personalization_strength", 100) / 100.0
+                _user_embedding = st.session_state.get("user_embedding")
+                _user_embedding_meta = st.session_state.get("user_embedding_meta", {}) or {}
+                _seed_ranking_mode = st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE)
+                _mf_model = bundle.get("models", {}).get("mf")
+                _mf_stem = bundle.get("models", {}).get("_mf_stem")
+    
+                ctx = ScoringContext(
+                    metadata=metadata,
+                    bundle=bundle,
+                    recommender=recommender,
+                    components=components,
+                    seed_ids=list(selected_seed_ids),
+                    seed_titles=list(selected_seed_titles),
+                    user_index=user_index,
+                    user_embedding=_user_embedding,
+                    personalization_enabled=_personalization_enabled,
+                    personalization_strength=_personalization_strength,
+                    active_profile=_active_profile,
+                    watched_ids=_watched_ids,
+                    personalization_blocked_reason=st.session_state.get("personalization_blocked_reason"),
+                    weights=weights,
+                    seed_ranking_mode=_seed_ranking_mode,
+                    genre_filter=genre_filter,
+                    type_filter=type_filter,
+                    year_range=year_range,
+                    sort_by=sort_by,
+                    default_sort_for_mode=default_sort_for_mode,
+                    n_requested=n_requested,
+                    top_n=top_n,
+                    pop_pct_fn=_pop_pct_for_anime_id,
+                    is_in_training_fn=_is_in_training,
+                    mf_model=_mf_model,
+                    mf_stem=_mf_stem,
+                    user_embedding_meta=_user_embedding_meta,
+                    ranked_hygiene_exclude_ids=ranked_hygiene_exclude_ids,
+                )
+    
+                # ── Run seed-based pipeline ──────────────────────────────
                 if selected_seed_ids:
-                    # Multi-seed weighted average aggregation
-                    # Build seed genre map and aggregate all genres
-                    seed_genre_map = {}  # seed_title -> set of genres
-                    all_seed_genres = set()
-                    genre_weights = {}  # genre -> count of seeds having it
-                    
-                    for seed_id, seed_title in zip(selected_seed_ids, selected_seed_titles):
-                        seed_row = metadata.loc[metadata["anime_id"] == seed_id].head(1)
-                        if not seed_row.empty:
-                            # Parse genres - handle both string and array formats
-                            row_genres = seed_row.iloc[0].get("genres")
-                            if isinstance(row_genres, str):
-                                seed_genres = set([g.strip() for g in row_genres.split("|") if g.strip()])
-                            elif hasattr(row_genres, '__iter__') and not isinstance(row_genres, str):
-                                seed_genres = set([str(g).strip() for g in row_genres if g])
-                            else:
-                                seed_genres = set()
-                            
-                            seed_genre_map[seed_title] = seed_genres
-                            all_seed_genres.update(seed_genres)
-                            # Weight genres by how many seeds have them
-                            for genre in seed_genres:
-                                genre_weights[genre] = genre_weights.get(genre, 0) + 1
-
-                    # Deterministic seed title tokenization for franchise-like backfill.
-                    _TITLE_STOP = {
-                        "the", "and", "of", "to", "a", "an", "in", "on", "for", "with",
-                        "movie", "film", "tv", "ova", "ona", "special", "season", "part",
-                        "episode", "eps", "edition", "new",
-                    }
-
-                    def _title_tokens(s: str) -> set[str]:
-                        raw = str(s or "").lower()
-                        cleaned = "".join((ch if ch.isalnum() else " ") for ch in raw)
-                        toks = [t for t in cleaned.split() if len(t) >= 3 and t not in _TITLE_STOP]
-                        return set(toks)
-
-                    seed_title_token_map: dict[str, set[str]] = {str(t): _title_tokens(str(t)) for t in (selected_seed_titles or [])}
-
-                    # Phase 4 / Chunk A3: lightweight metadata affinity profile.
-                    # This is used as a *small* bonus for cold-start candidates.
-                    seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
-
-                    # Phase 4/5: semantic rerank artifacts
-                    # - TF-IDF (legacy)
-                    # - SVD embeddings (Phase 4; lightweight, lexical-ish)
-                    # - Neural sentence embeddings (Phase 5; built offline in WSL2)
-                    synopsis_tfidf_artifact = bundle.get("models", {}).get("synopsis_tfidf")
-                    synopsis_embeddings_artifact = bundle.get("models", {}).get("synopsis_embeddings")
-                    synopsis_neural_artifact = bundle.get("models", {}).get("synopsis_neural_embeddings")
-
-                    semantic_mode = str(os.environ.get("PHASE4_SEMANTIC_MODE", "")).strip().lower()
-                    if semantic_mode not in {"neural", "embeddings", "tfidf", "both", "none", ""}:
-                        semantic_mode = ""
-                    if not semantic_mode:
-                        # Default remains conservative and deterministic.
-                        # Prefer Phase 5 neural when present; otherwise keep Phase 4 behavior.
-                        if synopsis_neural_artifact is not None:
-                            semantic_mode = "neural"
-                        elif synopsis_embeddings_artifact is not None and synopsis_tfidf_artifact is not None:
-                            semantic_mode = "both"
-                        elif synopsis_embeddings_artifact is not None:
-                            semantic_mode = "embeddings"
-                        elif synopsis_tfidf_artifact is not None:
-                            semantic_mode = "tfidf"
-                        else:
-                            semantic_mode = "none"
-
-                    synopsis_sims_by_id: dict[int, float] = {}
-                    embed_sims_by_id: dict[int, float] = {}
-                    neural_sims_by_id: dict[int, float] = {}
-                    seed_type_target: str | None = None
-
-                    try:
-                        seed_type_target = most_common_seed_type(metadata, selected_seed_ids)
-                    except Exception:
-                        seed_type_target = None
-
-                    if semantic_mode in {"tfidf", "both"} and synopsis_tfidf_artifact is not None:
-                        try:
-                            synopsis_sims_by_id = compute_seed_similarity_map(
-                                synopsis_tfidf_artifact, seed_ids=selected_seed_ids
-                            )
-                        except Exception:
-                            synopsis_sims_by_id = {}
-
-                    if semantic_mode in {"embeddings", "both"} and synopsis_embeddings_artifact is not None:
-                        try:
-                            embed_sims_by_id = compute_seed_embedding_similarity_map(
-                                synopsis_embeddings_artifact, seed_ids=selected_seed_ids
-                            )
-                        except Exception:
-                            embed_sims_by_id = {}
-
-                    if semantic_mode in {"neural"} and synopsis_neural_artifact is not None:
-                        try:
-                            min_sim_neural = float(SYNOPSIS_NEURAL_MIN_SIM)
-                            if bool(force_neural_enabled(semantic_mode=semantic_mode)):
-                                min_sim_neural = float(min(float(min_sim_neural), float(FORCE_NEURAL_MIN_SIM)))
-                            neural_sims_by_id = compute_seed_neural_similarity_map(
-                                synopsis_neural_artifact,
-                                seed_ids=selected_seed_ids,
-                                min_sim=float(min_sim_neural),
-                            )
-                        except Exception:
-                            neural_sims_by_id = {}
-                    
-                    num_seeds = len(selected_seed_ids)
-
-                    # Option A (Phase 4): Two-stage seed-conditioned ranking.
-                    # Stage 1: shortlist using seed-conditioned signals ONLY (no MF/demo-user/hybrid).
-                    # Stage 2: rerank that shortlist using existing final scoring logic.
-                    seed_shortlist_size = 600
-
-                    watched_ids_set: set[int] = set()
-                    if st.session_state["active_profile"]:
-                        watched_ids_set = {int(x) for x in (st.session_state["active_profile"].get("watched_ids", []) or [])}
-
-                    # ------------------------------------------------------------------
-                    # Stage 0 (Phase 5 final fix): Seed-conditioned candidate pool
-                    #
-                    # Constrain the universe BEFORE Stage 1 admission / Stage 2 scoring.
-                    # Browse mode bypasses this entirely.
-                    # ------------------------------------------------------------------
-                    stage0_ids, stage0_flags_by_id, stage0_diag = build_stage0_seed_candidate_pool(
-                        metadata=metadata,
-                        seed_ids=list(selected_seed_ids),
-                        ranked_hygiene_exclude_ids=set(ranked_hygiene_exclude_ids),
-                        watched_ids=set(watched_ids_set),
-                        neural_artifact=synopsis_neural_artifact,
-                        neural_topk=int(STAGE0_NEURAL_TOPK),
-                        meta_min_genre_overlap=float(STAGE0_META_MIN_GENRE_OVERLAP),
-                        meta_min_theme_overlap=float(STAGE0_META_MIN_THEME_OVERLAP),
-                        popularity_backfill=int(STAGE0_POPULARITY_BACKFILL),
-                        pool_cap=int(STAGE0_POOL_CAP),
-                        pop_item_ids=(components.item_ids if components is not None else None),
-                        pop_scores=(components.pop if components is not None else None),
-                    )
-
-                    # Diagnostics only: keep in session_state (no UI changes required).
-                    st.session_state["last_stage0"] = {
-                        "stage0_pool_raw": int(stage0_diag.stage0_pool_raw),
-                        "stage0_raw_counts_by_tier": {
-                            "stage0_from_neural": int(stage0_diag.stage0_from_neural_raw),
-                            "stage0_from_meta_strict": int(stage0_diag.stage0_from_meta_strict_raw),
-                            "stage0_from_popularity": int(stage0_diag.stage0_from_popularity_raw),
-                        },
-                        "stage0_after_hygiene": int(stage0_diag.stage0_after_hygiene),
-                        "stage0_after_cap": int(stage0_diag.stage0_after_cap),
-                        "stage0_after_cap_counts_by_tier": {
-                            "stage0_from_neural": int(stage0_diag.stage0_from_neural),
-                            "stage0_from_meta_strict": int(stage0_diag.stage0_from_meta_strict),
-                            "stage0_from_popularity": int(stage0_diag.stage0_from_popularity),
-                        },
-                        "stage0_overlap_counts": {
-                            "stage0_neural_only": int(stage0_diag.stage0_neural_only),
-                            "stage0_meta_only": int(stage0_diag.stage0_meta_only),
-                            "stage0_pop_only": int(stage0_diag.stage0_pop_only),
-                            "stage0_neural_and_meta": int(stage0_diag.stage0_neural_and_meta),
-                        },
-                    }
-
-                    # Stage 0 enforcement: this is the ONLY candidate universe.
-                    candidate_ids = [int(x) for x in (stage0_ids or []) if int(x) > 0]
-                    candidate_id_set = {int(x) for x in candidate_ids}
-
-                    # Stable order: preserve metadata's existing order.
-                    if candidate_id_set:
-                        try:
-                            candidate_df = metadata.loc[metadata["anime_id"].astype(int).isin(candidate_id_set)]
-                        except Exception:
-                            candidate_df = metadata
-                    else:
-                        candidate_df = metadata.iloc[0:0]
-
-                    logger.info(
-                        "Stage0(seed-based) pool_raw=%s after_hygiene=%s after_cap=%s src_raw(neural/meta_strict/pop)=%s/%s/%s overlap(neural_only/meta_only/pop_only/neural_and_meta)=%s/%s/%s/%s",
-                        int(stage0_diag.stage0_pool_raw),
-                        int(stage0_diag.stage0_after_hygiene),
-                        int(stage0_diag.stage0_after_cap),
-                        int(stage0_diag.stage0_from_neural_raw),
-                        int(stage0_diag.stage0_from_meta_strict_raw),
-                        int(stage0_diag.stage0_from_popularity_raw),
-                        int(stage0_diag.stage0_neural_only),
-                        int(stage0_diag.stage0_meta_only),
-                        int(stage0_diag.stage0_pop_only),
-                        int(stage0_diag.stage0_neural_and_meta),
-                    )
-
-                    stage1_embed_pool: list[dict] = []
-                    stage1_tfidf_pool: list[dict] = []
-                    stage1_neural_pool: list[dict] = []
-                    stage1_forced_neural_pool: list[dict] = []
-                    stage1_fallback_pool: list[dict] = []
-
-                    seed_genres_count = int(len(all_seed_genres))
-                    seed_themes = getattr(seed_meta_profile, "themes", frozenset()) or frozenset()
-
-                    forced_neural_pairs: list[tuple[int, float]] = []
-                    forced_neural_ids: set[int] = set()
-                    if (
-                        semantic_mode in {"neural"}
-                        and synopsis_neural_artifact is not None
-                        and bool(force_neural_enabled(semantic_mode=semantic_mode))
-                        and bool(neural_sims_by_id)
-                    ):
-                        forced_neural_pairs = select_forced_neural_pairs(
-                            neural_sims_by_id,
-                            seed_ids=selected_seed_ids,
-                            exclude_ids=set(ranked_hygiene_exclude_ids),
-                            watched_ids=set(watched_ids_set),
-                            topk=int(FORCE_NEURAL_TOPK),
-                            min_sim=float(FORCE_NEURAL_MIN_SIM),
-                        )
-                        forced_neural_ids = {int(aid) for aid, _ in forced_neural_pairs}
-
-                    # Stage 1 operates ONLY over Stage 0 candidates.
-                    for _, mrow in candidate_df.iterrows():
-                        aid = int(mrow["anime_id"])
-                        if aid in selected_seed_ids:
-                            continue
-                        if aid in ranked_hygiene_exclude_ids:
-                            continue
-                        if aid in watched_ids_set:
-                            continue
-
-                        row_genres = mrow.get("genres")
-                        if isinstance(row_genres, str):
-                            item_genres = {g.strip() for g in row_genres.split("|") if g.strip()}
-                        elif hasattr(row_genres, '__iter__') and not isinstance(row_genres, str):
-                            item_genres = {str(g).strip() for g in row_genres if g}
-                        else:
-                            item_genres = set()
-
-                        item_themes = _parse_str_set(mrow.get("themes"))
-
-                        raw_overlap = sum(genre_weights.get(g, 0) for g in item_genres)
-                        max_possible_overlap = len(all_seed_genres) * num_seeds
-                        weighted_overlap = raw_overlap / max_possible_overlap if max_possible_overlap > 0 else 0.0
-
-                        overlap_per_seed = {
-                            seed_title: len(seed_genres & item_genres)
-                            for seed_title, seed_genres in seed_genre_map.items()
-                        }
-                        num_seeds_matched = sum(1 for count in overlap_per_seed.values() if count > 0)
-                        seed_coverage = num_seeds_matched / num_seeds
-
-                        meta_affinity = compute_metadata_affinity(seed_meta_profile, mrow)
-                        meta_bonus_s1 = 0.0
-                        if meta_affinity > 0.0:
-                            meta_bonus_s1 = float(METADATA_AFFINITY_COLD_START_COEF) * float(meta_affinity)
-
-                        synopsis_tfidf_sim = float(synopsis_sims_by_id.get(aid, 0.0))
-                        synopsis_embed_sim = float(embed_sims_by_id.get(aid, 0.0))
-                        synopsis_neural_sim = float(neural_sims_by_id.get(aid, 0.0))
-
-                        cand_title = str(mrow.get("title_display") or mrow.get("title_primary") or "")
-                        cand_tokens = _title_tokens(cand_title)
-                        title_overlap = 0.0
-                        for _, stoks in seed_title_token_map.items():
-                            if not stoks:
-                                continue
-                            try:
-                                title_overlap = max(title_overlap, float(len(stoks & cand_tokens)) / float(len(stoks)))
-                            except Exception:
-                                continue
-                        title_bonus_s1 = 0.40 * float(title_overlap)
-                        cand_type = None if pd.isna(mrow.get("type")) else str(mrow.get("type")).strip()
-                        cand_eps = mrow.get("episodes")
-                        base_passes_gate = synopsis_gate_passes(
-                            seed_type=seed_type_target,
-                            candidate_type=cand_type,
-                            candidate_episodes=cand_eps,
-                        )
-
-                        high_sim_override_tfidf = (not bool(base_passes_gate)) and (
-                            float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD)
-                        )
-                        high_sim_override_embed = (not bool(base_passes_gate)) and (
-                            float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD)
-                        )
-                        high_sim_override_neural = (not bool(base_passes_gate)) and (
-                            float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD)
-                        )
-
-                        base = {
-                            "anime_id": aid,
-                            "mrow": mrow,
-                            "item_genres": item_genres,
-                            "weighted_overlap": float(weighted_overlap),
-                            "theme_overlap": theme_overlap_ratio(seed_themes, item_themes),
-                            "seed_coverage": float(seed_coverage),
-                            "overlap_per_seed": overlap_per_seed,
-                            "seeds_matched": int(num_seeds_matched),
-                            "metadata_affinity": float(meta_affinity),
-                            "title_overlap": float(title_overlap),
-                            "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
-                            "synopsis_embed_sim": float(synopsis_embed_sim),
-                            "synopsis_neural_sim": float(synopsis_neural_sim),
-                            "passes_gate": bool(base_passes_gate),
-                            "synopsis_tfidf_high_sim_override": bool(high_sim_override_tfidf),
-                            "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
-                            "synopsis_neural_high_sim_override": bool(high_sim_override_neural),
-                            "cand_type": cand_type,
-                            "cand_eps": cand_eps,
-                            "forced_neural": bool(aid in forced_neural_ids),
-                        }
-
-                        # Phase 5 refinement: force-include top-K neural neighbors into the
-                        # Stage 1 shortlist (ranked modes only). This bypasses only the
-                        # type/episodes gate; ranked hygiene exclusions were already applied.
-                        if bool(base.get("forced_neural")) and float(synopsis_neural_sim) >= float(FORCE_NEURAL_MIN_SIM):
-                            forced_item = dict(base)
-                            forced_item["stage1_score"] = float(synopsis_neural_sim)
-                            stage1_forced_neural_pool.append(forced_item)
-
-                        # Neural-first pool (gated): Phase 5 semantic generalization.
-                        passes_gate_effective_neural = bool(base_passes_gate) or bool(high_sim_override_neural)
-                        if semantic_mode in {"neural"} and bool(passes_gate_effective_neural):
-                            neural_decision = stage1_semantic_admission(
-                                semantic_sim=float(synopsis_neural_sim),
-                                min_sim=float(SYNOPSIS_NEURAL_MIN_SIM),
-                                high_sim=float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD),
-                                genre_overlap=float(weighted_overlap),
-                                title_overlap=float(title_overlap),
-                                seed_genres_count=int(seed_genres_count),
-                                num_seeds=int(num_seeds),
-                                theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
-                                seed_demographics=getattr(seed_meta_profile, "demographics", frozenset()) or frozenset(),
-                                candidate_demographics=mrow.get("demographics"),
-                                demo_shounen_min_sim=float(STAGE1_DEMO_SHOUNEN_MIN_SIM_NEURAL),
-                            )
-                            if bool(neural_decision.admitted):
-                                item = dict(base)
-                                item["stage1_score"] = float(synopsis_neural_sim)
-                                stage1_neural_pool.append(item)
-                                continue
-
-                        # Embeddings-first pool (gated): keep shortlist semantically seed-like.
-                        passes_gate_effective_embed = bool(base_passes_gate) or bool(high_sim_override_embed)
-                        if (
-                            semantic_mode in {"embeddings", "both"}
-                            and bool(passes_gate_effective_embed)
-                            and bool(
-                                stage1_semantic_admission(
-                                    semantic_sim=float(synopsis_embed_sim),
-                                    min_sim=float(SYNOPSIS_EMBEDDINGS_MIN_SIM),
-                                    high_sim=float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD),
-                                    genre_overlap=float(weighted_overlap),
-                                    title_overlap=float(title_overlap),
-                                    seed_genres_count=int(seed_genres_count),
-                                    num_seeds=int(num_seeds),
-                                    theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
-                                ).admitted
-                            )
-                        ):
-                            item = dict(base)
-                            item["stage1_score"] = float(synopsis_embed_sim)
-                            stage1_embed_pool.append(item)
-                            continue
-
-                        # TF-IDF-first pool (gated): keep shortlist seed-like.
-                        passes_gate_effective_tfidf = bool(base_passes_gate) or bool(high_sim_override_tfidf)
-                        if (
-                            semantic_mode in {"tfidf", "both"}
-                            and bool(passes_gate_effective_tfidf)
-                            and bool(
-                                stage1_semantic_admission(
-                                    semantic_sim=float(synopsis_tfidf_sim),
-                                    min_sim=float(SYNOPSIS_TFIDF_MIN_SIM),
-                                    high_sim=float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD),
-                                    genre_overlap=float(weighted_overlap),
-                                    title_overlap=float(title_overlap),
-                                    seed_genres_count=int(seed_genres_count),
-                                    num_seeds=int(num_seeds),
-                                    theme_overlap=theme_overlap_ratio(seed_themes, item_themes),
-                                ).admitted
-                            )
-                        ):
-                            item = dict(base)
-                            item["stage1_score"] = float(synopsis_tfidf_sim)
-                            stage1_tfidf_pool.append(item)
-                            continue
-
-                        # Backfill pool when TF-IDF is absent/insufficient.
-                        fallback_score = (
-                            (0.5 * float(weighted_overlap))
-                            + (0.2 * float(seed_coverage))
-                            + float(meta_bonus_s1)
-                            + float(title_bonus_s1)
-                        )
-                        if float(fallback_score) > 0.0:
-                            item = dict(base)
-                            item["stage1_score"] = float(fallback_score)
-                            stage1_fallback_pool.append(item)
-
-                    stage1_embed_pool.sort(
-                        key=lambda x: (
-                            -float(x.get("synopsis_embed_sim", 0.0)),
-                            -float(x.get("weighted_overlap", 0.0)),
-                            -float(x.get("metadata_affinity", 0.0)),
-                            int(x.get("anime_id", 0)),
-                        )
-                    )
-                    stage1_tfidf_pool.sort(
-                        key=lambda x: (
-                            -float(x.get("synopsis_tfidf_sim", 0.0)),
-                            -float(x.get("weighted_overlap", 0.0)),
-                            -float(x.get("metadata_affinity", 0.0)),
-                            int(x.get("anime_id", 0)),
-                        )
-                    )
-                    stage1_neural_pool.sort(
-                        key=lambda x: (
-                            -float(x.get("synopsis_neural_sim", 0.0)),
-                            -float(x.get("weighted_overlap", 0.0)),
-                            -float(x.get("metadata_affinity", 0.0)),
-                            int(x.get("anime_id", 0)),
-                        )
-                    )
-                    stage1_forced_neural_pool.sort(
-                        key=lambda x: (-float(x.get("synopsis_neural_sim", 0.0)), int(x.get("anime_id", 0)))
-                    )
-                    stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
-
-                    # Phase 4 stabilization: Stage 1 mixture shortlist + semantic confidence gating.
-                    # Pool A: semantic neighbors (embeddings/TF-IDF)
-                    # Pool B: metadata/genre candidates
-                    # Pool C: deterministic backfill if needed
-                    pool_a: list[dict] = []
-                    pool_a.extend(stage1_neural_pool)
-                    pool_a.extend(stage1_embed_pool)
-                    pool_a.extend(stage1_tfidf_pool)
-                    pool_b: list[dict] = list(stage1_fallback_pool)
-
-                    def _topk_sim_stats(sim_map: dict[int, float], k: int = 50) -> dict:
-                        vals: list[float] = []
-                        for aid, s in (sim_map or {}).items():
-                            try:
-                                aid_i = int(aid)
-                                if aid_i in ranked_hygiene_exclude_ids or aid_i in selected_seed_ids or aid_i in watched_ids_set:
-                                    continue
-                                fs = float(s)
-                                if fs <= 0.0:
-                                    continue
-                                vals.append(fs)
-                            except Exception:
-                                continue
-                        vals.sort(reverse=True)
-                        top = vals[: max(0, int(k))]
-                        if not top:
-                            return {"count": 0, "mean": 0.0, "p95": 0.0}
-                        arr = np.asarray(top, dtype=np.float64)
-                        mean = float(arr.mean())
-                        p95 = float(np.percentile(arr, 95)) if int(arr.size) >= 2 else float(arr[0])
-                        return {"count": int(arr.size), "mean": float(mean), "p95": float(p95)}
-
-                    def _conf_score(stats: dict, min_sim: float, high_sim: float) -> float:
-                        denom = float(max(1e-6, float(high_sim) - float(min_sim)))
-                        mean_n = max(0.0, min(1.0, (float(stats.get("mean", 0.0)) - float(min_sim)) / denom))
-                        p95_n = max(0.0, min(1.0, (float(stats.get("p95", 0.0)) - float(min_sim)) / denom))
-                        return float(0.5 * (mean_n + p95_n))
-
-                    def _neighbor_coherence(pool: list[dict], k: int = 50) -> dict:
-                        top = pool[: max(0, int(k))]
-                        if not top:
-                            return {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
-                        overlaps = [float(it.get("weighted_overlap", 0.0)) for it in top]
-                        coverages = [float(it.get("seed_coverage", 0.0)) for it in top]
-                        any_match = sum(1 for v in overlaps if float(v) > 0.0)
-                        return {
-                            "count": int(len(top)),
-                            "weighted_overlap_mean": float(sum(overlaps) / max(1, len(overlaps))),
-                            "seed_coverage_mean": float(sum(coverages) / max(1, len(coverages))),
-                            "any_genre_match_frac": float(any_match / max(1, len(overlaps))),
-                        }
-
-                    def _coherence_score(stats: dict) -> float:
-                        overlap_mean = float(stats.get("weighted_overlap_mean", 0.0))
-                        seed_cov_mean = float(stats.get("seed_coverage_mean", 0.0))
-                        any_match = float(stats.get("any_genre_match_frac", 0.0))
-                        overlap_s = max(0.0, min(1.0, overlap_mean / 0.20))
-                        seedcov_s = max(0.0, min(1.0, seed_cov_mean / 0.50))
-                        any_s = max(0.0, min(1.0, any_match / 0.80))
-                        return float((overlap_s + seedcov_s + any_s) / 3.0)
-
-                    # Prefer embeddings for confidence when active; fall back to TF-IDF.
-                    semantic_conf_tier = "none"
-                    semantic_conf_score = 0.0
-                    if semantic_mode in {"embeddings", "both"} and synopsis_embeddings_artifact is not None and embed_sims_by_id:
-                        stats = _topk_sim_stats(embed_sims_by_id, k=50)
-                        if int(stats.get("count", 0)) > 0:
-                            sim_conf = _conf_score(stats, float(SYNOPSIS_EMBEDDINGS_MIN_SIM), float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
-                            coh_conf = _coherence_score(_neighbor_coherence(stage1_embed_pool, k=50))
-                            semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
-                    elif semantic_mode in {"tfidf", "both"} and synopsis_tfidf_artifact is not None and synopsis_sims_by_id:
-                        stats = _topk_sim_stats(synopsis_sims_by_id, k=50)
-                        if int(stats.get("count", 0)) > 0:
-                            sim_conf = _conf_score(stats, float(SYNOPSIS_TFIDF_MIN_SIM), float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD))
-                            coh_conf = _coherence_score(_neighbor_coherence(stage1_tfidf_pool, k=50))
-                            semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
-
-                    if semantic_conf_score <= 0.0:
-                        semantic_conf_tier = "none"
-                    elif float(semantic_conf_score) >= 0.60:
-                        semantic_conf_tier = "high"
-                    elif float(semantic_conf_score) >= 0.30:
-                        semantic_conf_tier = "medium"
-                    else:
-                        semantic_conf_tier = "low"
-
-                    if semantic_conf_tier == "high":
-                        sem_frac = 0.50
-                    elif semantic_conf_tier == "medium":
-                        sem_frac = 0.40
-                    elif semantic_conf_tier == "low":
-                        sem_frac = 0.20
-                    else:
-                        sem_frac = 0.0
-
-                    k_sem = int(round(float(seed_shortlist_size) * float(sem_frac)))
-                    k_sem = max(0, min(int(seed_shortlist_size), int(k_sem)))
-                    k_meta = int(seed_shortlist_size) - int(k_sem)
-
-                    shortlist, _forced_added = build_stage1_shortlist(
-                        pool_a=pool_a,
-                        pool_b=pool_b,
-                        shortlist_k=int(seed_shortlist_size),
-                        k_sem=int(k_sem),
-                        k_meta=int(k_meta),
-                        forced_first=stage1_forced_neural_pool,
-                    )
-
-                    # Enforcement diagnostics: Stage 1 must never expand beyond Stage 0.
-                    st.session_state["last_stage0_enforcement"] = {
-                        "stage0_after_hygiene_size": int(stage0_diag.stage0_after_hygiene),
-                        "stage1_iterated_candidate_count": int(len(candidate_df)),
-                        "shortlist_size": int(len(shortlist)),
-                    }
-
-                    # Stage 2: rerank shortlist using existing hybrid + pop + bonuses.
-                    try:
-                        blended_scores = recommender._blend(user_index, weights)  # pylint: disable=protected-access
-                    except Exception:
-                        blended_scores = None
-
-                    id_to_index = {int(aid): idx for idx, aid in enumerate(components.item_ids)}
-                    scored: list[dict] = []
-
-                    for c in shortlist:
-                        aid = int(c["anime_id"])
-                        mrow = c["mrow"]
-                        item_genres = c["item_genres"]
-                        weighted_overlap = float(c["weighted_overlap"])
-                        seed_coverage = float(c["seed_coverage"])
-                        overlap_per_seed = c["overlap_per_seed"]
-                        num_seeds_matched = int(c["seeds_matched"])
-
-                        pop_pct = _pop_pct_for_anime_id(aid)
-                        popularity_boost = max(0.0, (0.5 - pop_pct) / 0.5)
-
-                        if blended_scores is not None and aid in id_to_index:
-                            hybrid_val = float(blended_scores[id_to_index[aid]])
-                        else:
-                            hybrid_val = 0.0
-
-                        # Compute CF-only hybrid score (mf/knn only; pop excluded) for content-first blend.
-                        # NOTE: We use this for gating because blended hybrid_val can be dominated by popularity.
-                        hybrid_cf_score = 0.0
-                        if aid in id_to_index:
-                            idx = int(id_to_index[aid])
-                            try:
-                                mf_base = float(components.mf[user_index, idx]) if components.mf is not None else 0.0
-                            except Exception:
-                                mf_base = 0.0
-                            try:
-                                knn_base = float(components.knn[user_index, idx]) if components.knn is not None else 0.0
-                            except Exception:
-                                knn_base = 0.0
-
-                            # Match the spec's CF stabilizer weights.
-                            hybrid_cf_score = float((0.93 * mf_base) + (0.07 * knn_base))
-
-                        # Phase 5 experiment: gated content-first scoring for seed-based rerank.
-                        # Conservative trigger: neural mode + semantic confidence high + CF coverage near-zero.
-                        content_first_active = bool(
-                            should_use_content_first(
-                                float(hybrid_cf_score),
-                                semantic_mode=str(semantic_mode),
-                                sem_conf=str(semantic_conf_tier),
-                                neural_sim=float(synopsis_neural_sim),
-                            )
-                        )
-
-                        meta_affinity = float(c.get("metadata_affinity", 0.0))
-                        meta_bonus = 0.0
-                        if meta_affinity > 0.0:
-                            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
-                            meta_bonus = float(coef) * float(meta_affinity)
-
-                        synopsis_tfidf_sim = float(c.get("synopsis_tfidf_sim", 0.0))
-                        synopsis_embed_sim = float(c.get("synopsis_embed_sim", 0.0))
-                        synopsis_neural_sim = float(c.get("synopsis_neural_sim", 0.0))
-                        passes_gate = bool(c.get("passes_gate", False))
-                        high_sim_override_tfidf = (not bool(passes_gate)) and (
-                            float(synopsis_tfidf_sim) >= float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD)
-                        )
-                        high_sim_override_embed = (not bool(passes_gate)) and (
-                            float(synopsis_embed_sim) >= float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD)
-                        )
-                        high_sim_override_neural = (not bool(passes_gate)) and (
-                            float(synopsis_neural_sim) >= float(SYNOPSIS_NEURAL_HIGH_SIM_THRESHOLD)
-                        )
-                        passes_gate_effective_tfidf = bool(passes_gate) or bool(high_sim_override_tfidf)
-                        passes_gate_effective_embed = bool(passes_gate) or bool(high_sim_override_embed)
-                        passes_gate_effective_neural = bool(passes_gate) or bool(high_sim_override_neural)
-                        cand_eps = c.get("cand_eps")
-
-                        # If we admitted a candidate via the high-sim override, treat it as a
-                        # cold-start-ish semantic neighbor for TF-IDF coefficient selection and
-                        # do not let a negative hybrid value effectively veto it.
-                        hybrid_val_for_scoring = float(hybrid_val)
-                        hybrid_val_for_tfidf = float(hybrid_val)
-                        hybrid_val_for_embed = float(hybrid_val)
-                        hybrid_val_for_neural = float(hybrid_val)
-                        if bool(high_sim_override_tfidf) or bool(high_sim_override_embed) or bool(high_sim_override_neural):
-                            hybrid_val_for_scoring = max(0.0, float(hybrid_val))
-                        if bool(high_sim_override_tfidf):
-                            hybrid_val_for_tfidf = 0.0
-                        if bool(high_sim_override_embed):
-                            hybrid_val_for_embed = 0.0
-                        if bool(high_sim_override_neural):
-                            hybrid_val_for_neural = 0.0
-
-                        synopsis_tfidf_bonus = 0.0
-                        synopsis_tfidf_penalty = 0.0
-                        synopsis_tfidf_adjustment = 0.0
-                        if semantic_mode in {"tfidf", "both"}:
-                            if bool(passes_gate_effective_tfidf):
-                                synopsis_tfidf_bonus = float(
-                                    synopsis_tfidf_bonus_for_candidate(
-                                        sim=synopsis_tfidf_sim,
-                                        hybrid_val=hybrid_val_for_tfidf,
-                                    )
-                                )
-
-                            # Prefer a small penalty (not exclusion) for very-high-sim off-type items.
-                            # Keep the existing conservative short-form penalty for all other off-gate cases.
-                            if bool(high_sim_override_tfidf):
-                                synopsis_tfidf_penalty = -float(SYNOPSIS_TFIDF_OFFTYPE_HIGH_SIM_PENALTY)
-                            else:
-                                synopsis_tfidf_penalty = float(
-                                    synopsis_tfidf_penalty_for_candidate(
-                                        passes_gate=passes_gate,
-                                        sim=synopsis_tfidf_sim,
-                                        candidate_episodes=cand_eps,
-                                    )
-                                )
-                            synopsis_tfidf_adjustment = float(synopsis_tfidf_bonus + synopsis_tfidf_penalty)
-
-                        synopsis_embed_bonus = 0.0
-                        synopsis_embed_penalty = 0.0
-                        synopsis_embed_adjustment = 0.0
-                        if semantic_mode in {"embeddings", "both"}:
-                            if bool(passes_gate_effective_embed):
-                                synopsis_embed_bonus = float(
-                                    synopsis_embeddings_bonus_for_candidate(
-                                        sim=synopsis_embed_sim,
-                                        hybrid_val=hybrid_val_for_embed,
-                                    )
-                                )
-
-                            if bool(high_sim_override_embed):
-                                synopsis_embed_penalty = -float(SYNOPSIS_EMBEDDINGS_OFFTYPE_HIGH_SIM_PENALTY)
-                            else:
-                                synopsis_embed_penalty = float(
-                                    synopsis_embeddings_penalty_for_candidate(
-                                        passes_gate=passes_gate,
-                                        sim=synopsis_embed_sim,
-                                        candidate_episodes=cand_eps,
-                                    )
-                                )
-                            synopsis_embed_adjustment = float(synopsis_embed_bonus + synopsis_embed_penalty)
-
-                        synopsis_neural_bonus = 0.0
-                        synopsis_neural_penalty = 0.0
-                        synopsis_neural_adjustment = 0.0
-                        if semantic_mode in {"neural"}:
-                            if bool(passes_gate_effective_neural):
-                                synopsis_neural_bonus = float(
-                                    synopsis_neural_bonus_for_candidate(
-                                        sim=synopsis_neural_sim,
-                                        hybrid_val=hybrid_val_for_neural,
-                                    )
-                                )
-
-                            if bool(high_sim_override_neural):
-                                synopsis_neural_penalty = -float(SYNOPSIS_NEURAL_OFFTYPE_HIGH_SIM_PENALTY)
-                            else:
-                                synopsis_neural_penalty = float(
-                                    synopsis_neural_penalty_for_candidate(
-                                        passes_gate=passes_gate,
-                                        sim=synopsis_neural_sim,
-                                        candidate_episodes=cand_eps,
-                                    )
-                                )
-
-                            # Phase 5 Stage 2 refinement: for extremely high-sim neural
-                            # neighbors, relax only the off-type/short-form penalty term.
-                            synopsis_neural_penalty = float(
-                                relax_off_type_penalty(
-                                    penalty=float(synopsis_neural_penalty),
-                                    neural_sim=float(synopsis_neural_sim),
-                                    semantic_mode=str(semantic_mode),
-                                    browse_mode=False,
-                                )
-                            )
-                            synopsis_neural_adjustment = float(synopsis_neural_bonus + synopsis_neural_penalty)
-
-                        # Optional tiny tie-breaker: demographics overlap (Stage 2 only; never gates).
-                        if "demographics" in metadata.columns:
-                            demo_bonus = demographics_overlap_tiebreak_bonus(
-                                seed_meta_profile.demographics,
-                                mrow.get("demographics"),
-                            )
-                        else:
-                            demo_bonus = 0.0
-
-                        # Optional tiny tie-breaker: themes overlap (Stage 2 only; never gates).
-                        # No penalty for missing themes; only computed when Stage 1 overlap ratio exists.
-                        theme_overlap = c.get("theme_overlap")
-                        semantic_sim_for_theme = max(float(synopsis_tfidf_sim), float(synopsis_embed_sim), float(synopsis_neural_sim))
-                        theme_bonus = theme_stage2_tiebreak_bonus(
-                            None if theme_overlap is None else float(theme_overlap),
-                            semantic_sim=float(semantic_sim_for_theme),
-                            genre_overlap=float(weighted_overlap),
-                        )
-
-                        s1 = float(c.get("stage1_score", 0.0))
-
-                        # Retrieve MAL score and members count for quality scaling.
-                        try:
-                            item_mal_score = None if pd.isna(mrow.get("mal_score")) else float(mrow.get("mal_score"))
-                        except Exception:
-                            item_mal_score = None
-                        try:
-                            item_members_count = None if pd.isna(mrow.get("members_count")) else int(mrow.get("members_count"))
-                        except Exception:
-                            item_members_count = None
-
-                        # Phase 5 fix: Quality-scaled neural contribution.
-                        # Scale neural_sim by quality factor: MAL 5.0->0.15, 7.0->0.5, 9.0->1.0
-                        # Items with missing MAL score get quality_factor=0.3 (conservative default).
-                        if item_mal_score is not None and item_mal_score > 0:
-                            quality_factor = max(0.15, min(1.0, (item_mal_score - 5.0) / 4.0))
-                        else:
-                            quality_factor = 0.3  # Conservative default for missing scores
-
-                        neural_contribution = 1.5 * float(synopsis_neural_sim) * quality_factor
-
-                        # Phase 5 fix: rebalanced weights to make neural similarity dominant.
-                        # - Reduced genre overlap (0.5 -> 0.3) and seed coverage (0.2 -> 0.1)
-                        # - Reduced hybrid CF weight (0.25 -> 0.15)
-                        # - Added QUALITY-SCALED neural similarity contribution
-                        score_before = (
-                            (0.3 * weighted_overlap)
-                            + (0.1 * seed_coverage)
-                            + (0.15 * float(hybrid_val_for_scoring))
-                            + (0.05 * popularity_boost)
-                            + (0.10 * float(s1))
-                            + neural_contribution  # Quality-scaled neural contribution
-                            + meta_bonus
-                            + synopsis_tfidf_adjustment
-                            + synopsis_embed_adjustment
-                            + synopsis_neural_adjustment
-                            + float(demo_bonus)
-                            + float(theme_bonus)
-                        )
-
-                        # Phase 5 fix: Obscurity/quality penalty for low-quality/unknown items.
-                        # Penalize items with low member counts, low MAL scores, or missing data.
-                        obscurity_penalty = 0.0
-                        if item_members_count is not None and item_members_count < 50000:
-                            obscurity_penalty += 0.25  # Low member count penalty (aggressive)
-                        if item_mal_score is None:
-                            obscurity_penalty += 0.15  # Missing MAL score penalty
-                        elif item_mal_score < 7.0:
-                            # Strong penalty for low-rated items: MAL 6.0 -> 0.20, MAL 5.0 -> 0.40
-                            obscurity_penalty += max(0.0, 0.20 * (7.0 - item_mal_score))
-                        score_before = score_before - obscurity_penalty
-
-                        score_after = float(score_before)
-                        if bool(content_first_active):
-                            # Reuse mal_score and members_count already retrieved above.
-                            score_after = float(
-                                content_first_final_score(
-                                    score_before=float(score_before),
-                                    neural_sim=float(synopsis_neural_sim),
-                                    hybrid_cf_score=float(hybrid_cf_score),
-                                    mal_score=item_mal_score,
-                                    members_count=item_members_count,
-                                )
-                            )
-
-                        score = float(score_after)
-                        if score <= 0:
-                            continue
-
-                        raw_mf = 0.0
-                        raw_knn = (
-                            (0.5 * weighted_overlap)
-                            + (0.2 * seed_coverage)
-                            + (0.10 * float(s1))
-                            + meta_bonus
-                            + synopsis_tfidf_adjustment
-                            + synopsis_embed_adjustment
-                            + float(demo_bonus)
-                            + float(theme_bonus)
-                        )
-                        raw_pop = (0.05 * popularity_boost)
-                        used_components: list[str] = ["knn", "pop"]
-                        if aid in id_to_index:
-                            idx = id_to_index[aid]
-                            try:
-                                raw_hybrid = recommender.raw_components_for_item(user_index, idx, weights)
-                            except Exception:
-                                raw_hybrid = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
-                            raw_mf += 0.25 * float(raw_hybrid.get("mf", 0.0))
-                            raw_knn += 0.25 * float(raw_hybrid.get("knn", 0.0))
-                            raw_pop += 0.25 * float(raw_hybrid.get("pop", 0.0))
-
-                            used_components = sorted(
-                                set(used_components) | set(recommender.used_components_for_weights(weights)),
-                                key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
-                            )
-
-                        raw_components = {"mf": raw_mf, "knn": raw_knn, "pop": raw_pop}
-                        shares = compute_component_shares(raw_components, used_components=used_components)
-
-                        explanation = {
-                            "seed_titles": selected_seed_titles,
-                            "overlap_per_seed": overlap_per_seed,
-                            "weighted_overlap": weighted_overlap,
-                            "seeds_matched": num_seeds_matched,
-                            "seed_coverage": seed_coverage,
-                            "common_genres": list(all_seed_genres & item_genres),
-                            "metadata_affinity": float(meta_affinity),
-                            "metadata_bonus": float(meta_bonus),
-                            "title_overlap": float(c.get("title_overlap", 0.0)),
-                            "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
-                            "synopsis_tfidf_bonus": float(synopsis_tfidf_bonus),
-                            "synopsis_tfidf_penalty": float(synopsis_tfidf_penalty),
-                            "synopsis_tfidf_adjustment": float(synopsis_tfidf_adjustment),
-                            "synopsis_tfidf_base_gate_passed": bool(passes_gate),
-                            "synopsis_tfidf_high_sim_override": bool(high_sim_override_tfidf),
-                            "synopsis_embed_sim": float(synopsis_embed_sim),
-                            "synopsis_embed_bonus": float(synopsis_embed_bonus),
-                            "synopsis_embed_penalty": float(synopsis_embed_penalty),
-                            "synopsis_embed_adjustment": float(synopsis_embed_adjustment),
-                            "synopsis_embed_high_sim_override": bool(high_sim_override_embed),
-                            "synopsis_neural_sim": float(synopsis_neural_sim),
-                            "demographics_overlap_bonus": float(demo_bonus),
-                            "theme_overlap": None if theme_overlap is None else float(theme_overlap),
-                            "theme_stage2_bonus": float(theme_bonus),
-                            "stage1_score": float(s1),
-                            "shortlist_size": int(len(shortlist)),
-                            # Phase 5 experiment: gated content-first scoring diagnostics.
-                            "content_first_active": bool(content_first_active),
-                            "content_first_alpha": float(CONTENT_FIRST_ALPHA),
-                            "content_first_hybrid_cf_score": float(hybrid_cf_score),
-                            "hybrid_val": float(hybrid_val),
-                            "score_before": float(score_before),
-                            "score_after": float(score_after),
-                        }
-                        explanation.update(shares)
-
-                        scored.append({
-                            "anime_id": aid,
-                            "score": score,
-                            "explanation": explanation,
-                            "_title_display": str(mrow.get("title_display") or mrow.get("title_primary") or ""),
-                            "_title_overlap": float(c.get("title_overlap", 0.0)),
-                            "_synopsis_neural_sim": float(synopsis_neural_sim),
-                            "_raw_components": raw_components,
-                            "_used_components": used_components,
-                            "_explanation_meta": {
-                                "seed_titles": selected_seed_titles,
-                                "seeds_matched": num_seeds_matched,
-                            },
-                        })
-
-                    scored.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
-
-                    # Debug-only guardrail: once Stage 0 is enforced, we should never be
-                    # scoring a universe that looks like the full catalog.
-                    final_scored_candidate_count = int(len(scored))
-                    if __debug__:
-                        if int(final_scored_candidate_count) > int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER):
-                            logger.warning(
-                                "Stage0 enforcement violated: scored=%s > cap+buf=%s (cap=%s buf=%s)",
-                                int(final_scored_candidate_count),
-                                int(int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER)),
-                                int(STAGE0_POOL_CAP),
-                                int(STAGE0_ENFORCEMENT_BUFFER),
-                            )
-                            assert int(final_scored_candidate_count) <= int(STAGE0_POOL_CAP) + int(STAGE0_ENFORCEMENT_BUFFER)
-
-                    # Phase 5 follow-up: Discovery mode franchise-cap (post-score selection only).
-                    seed_ranking_mode = str(st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE) or SEED_RANKING_MODE)
-                    seed_ranking_mode = seed_ranking_mode.strip().lower()
-                    if seed_ranking_mode == "discovery":
-                        scored_capped, cap_diag = apply_franchise_cap(
-                            scored,
-                            n=int(n_requested),
-                            seed_ranking_mode=str(seed_ranking_mode),
-                            seed_titles=list(selected_seed_titles or []),
-                            threshold=float(FRANCHISE_TITLE_OVERLAP_THRESHOLD),
-                            cap_top20=int(FRANCHISE_CAP_TOP20),
-                            cap_top50=int(FRANCHISE_CAP_TOP50),
-                            title_overlap=lambda r: float(r.get("_title_overlap", 0.0)),
-                            title=lambda r: str(r.get("_title_display", "")),
-                            anime_id=lambda r: int(r.get("anime_id", 0)),
-                            neural_sim=lambda r: float(r.get("_synopsis_neural_sim", 0.0)),
-                        )
-                        st.session_state["last_franchise_cap"] = {
-                            "seed_ranking_mode": cap_diag.seed_ranking_mode,
-                            "franchise_cap_threshold": cap_diag.franchise_cap_threshold,
-                            "franchise_cap_top20": cap_diag.franchise_cap_top20,
-                            "franchise_cap_top50": cap_diag.franchise_cap_top50,
-                            "top20_franchise_like_count_before": cap_diag.top20_franchise_like_count_before,
-                            "top20_franchise_like_count_after": cap_diag.top20_franchise_like_count_after,
-                            "top50_franchise_like_count_before": cap_diag.top50_franchise_like_count_before,
-                            "top50_franchise_like_count_after": cap_diag.top50_franchise_like_count_after,
-                            "franchise_items_dropped_count": cap_diag.franchise_items_dropped_count,
-                            "franchise_items_dropped_count_top20": cap_diag.franchise_items_dropped_count_top20,
-                            "franchise_items_dropped_count_top50": cap_diag.franchise_items_dropped_count_top50,
-                            "franchise_items_dropped_examples_top5": cap_diag.franchise_items_dropped_examples_top5,
-                        }
-                        recs = scored_capped
-                    else:
-                        recs = scored[:n_requested]
-
-                    # Downstream enforcement diagnostics: final ranked items must all be from Stage 0.
-                    try:
-                        top20 = recs[:20]
-                        top50 = recs[:50]
-                        top20_in_stage0 = sum(1 for r in top20 if int(r.get("anime_id", 0)) in candidate_id_set)
-                        top50_in_stage0 = sum(1 for r in top50 if int(r.get("anime_id", 0)) in candidate_id_set)
-                    except Exception:
-                        top20_in_stage0 = 0
-                        top50_in_stage0 = 0
-
-                    try:
-                        enr = st.session_state.get("last_stage0_enforcement") or {}
-                        enr.update(
-                            {
-                                "final_scored_candidate_count": int(final_scored_candidate_count),
-                                "top20_in_stage0_count": int(top20_in_stage0),
-                                "top50_in_stage0_count": int(top50_in_stage0),
-                            }
-                        )
-                        st.session_state["last_stage0_enforcement"] = enr
-                    except Exception:
-                        pass
+                    seed_result = run_seed_based_pipeline(ctx)
+                    recs = seed_result.ranked_items
+                    st.session_state["stage0_diagnostics"] = seed_result.stage0_diagnostics
+                    st.session_state["stage0_enforcement"] = seed_result.stage0_enforcement
+                    st.session_state["franchise_cap_diagnostics"] = seed_result.franchise_cap_diagnostics
                 else:
-                    # Default: seed-based recommendations
+                    # Seedless fallback: plain hybrid recommender
                     recs = recommender.get_top_n_for_user(
                         user_index,
                         n=n_requested,
                         weights=weights,
                         exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
                     )
-        
-        # Check if personalization is enabled (after recs are generated)
-        personalization_enabled = st.session_state.get("personalization_enabled", False)
-        user_embedding = st.session_state.get("user_embedding")
-        personalization_strength = st.session_state.get("personalization_strength", 100) / 100.0  # Convert to 0-1
-        
-        # Apply personalization if enabled and requirements are met.
-        if recs and personalization_enabled:
-            mf_model = bundle.get("models", {}).get("mf")
-            mf_stem = bundle.get("models", {}).get("_mf_stem")
-            cached = st.session_state.get("user_embedding_meta", {}) or {}
-            if mf_model is None:
-                st.session_state["personalization_blocked_reason"] = (
-                    "MF model is not available (artifact load/selection failed)."
-                )
-            elif user_embedding is None:
-                st.session_state["personalization_blocked_reason"] = (
-                    "User embedding is not available."
-                )
-            elif cached.get("mf_stem") != mf_stem:
-                # Defensive: embeddings must correspond to the active MF artifact.
-                st.session_state["personalization_blocked_reason"] = (
-                    "User embedding was generated from a different MF artifact; rerun to refresh."
-                )
-            elif st.session_state.get("personalization_blocked_reason"):
-                # Blocked earlier in the sidebar generation step.
-                pass
-            else:
-                st.session_state["personalization_blocked_reason"] = None
-            
-            # Get watched anime IDs for exclusion
-            watched_ids = []
-            if st.session_state["active_profile"]:
-                watched_ids = st.session_state["active_profile"].get("watched_ids", [])
-
-            # Candidate hygiene exclusions always apply in ranked modes.
-            exclude_ranked_ids = sorted(set(watched_ids) | set(ranked_hygiene_exclude_ids))
-
-            if st.session_state.get("personalization_blocked_reason") is None:
-                try:
-                    if personalization_strength >= 0.99:
-                        # Pure personalized recommendations (100% strength)
-                        personalized_recs = recommender.get_personalized_recommendations(
-                            user_embedding=user_embedding,
-                            mf_model=mf_model,
-                            n=n_requested,
-                            weights=weights,
-                            exclude_item_ids=exclude_ranked_ids,
+    
+                # ── Personalization overlay ──────────────────────────────
+                if recs and _personalization_enabled:
+                    pers_result = run_personalized_pipeline(ctx)
+    
+                    # Propagate any blocked reason back to session state
+                    if pers_result.personalization_blocked_reason is not None:
+                        st.session_state["personalization_blocked_reason"] = (
+                            pers_result.personalization_blocked_reason
                         )
-                        if not personalized_recs:
-                            st.session_state["personalization_blocked_reason"] = (
-                                "MF personalization returned no results (likely no overlap with MF items)."
+    
+                    if pers_result.personalization_applied:
+                        personalization_applied = True
+    
+                        if _personalization_strength >= 0.99:
+                            # Pure personalized — replace seed-based recs
+                            recs = pers_result.ranked_items
+                        elif _personalization_strength > 0.01:
+                            # Blend personalized with seed-based
+                            recs = blend_personalized_and_seed(
+                                personalized_recs=pers_result.ranked_items,
+                                seed_recs=recs,
+                                personalization_strength=_personalization_strength,
+                                n_requested=n_requested,
+                                ranked_hygiene_exclude_ids=ranked_hygiene_exclude_ids,
                             )
-                        else:
-                            # Phase 4 / Chunk A3: when seeds are selected, apply a tiny deterministic
-                            # metadata affinity nudge to reduce occasional "weird match" outputs.
-                            if selected_seed_ids:
-                                seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
-                                synopsis_tfidf_artifact = bundle.get("models", {}).get("synopsis_tfidf")
-                                synopsis_sims_by_id: dict[int, float] = {}
-                                seed_type_target: str | None = None
-                                if synopsis_tfidf_artifact is not None:
-                                    try:
-                                        synopsis_sims_by_id = compute_seed_similarity_map(
-                                            synopsis_tfidf_artifact, seed_ids=selected_seed_ids
-                                        )
-                                        seed_type_target = most_common_seed_type(metadata, selected_seed_ids)
-                                    except Exception:
-                                        synopsis_sims_by_id = {}
-                                        seed_type_target = None
-                                for rec in personalized_recs:
-                                    aid = int(rec.get("anime_id"))
-                                    row_df = metadata.loc[metadata["anime_id"] == aid].head(1)
-                                    if row_df.empty:
-                                        continue
-                                    affinity = compute_metadata_affinity(seed_meta_profile, row_df.iloc[0])
-                                    bonus = float(METADATA_AFFINITY_PERSONALIZED_COEF) * float(affinity)
-                                    if bonus > 0.0:
-                                        rec["score"] = float(rec.get("score", 0.0)) + bonus
-                                        raw = rec.get("_raw_components")
-                                        if isinstance(raw, dict):
-                                            raw["knn"] = float(raw.get("knn", 0.0)) + bonus
-                                        else:
-                                            rec["_raw_components"] = {"mf": 0.0, "knn": bonus, "pop": 0.0}
-                                        used = rec.get("_used_components")
-                                        if isinstance(used, list) and "knn" not in used:
-                                            used.append("knn")
-
-                                    # Phase 4 (A3 → early A4): synopsis TF-IDF nudge in personalized mode
-                                    # when seeds are selected (optional artifact).
-                                    if synopsis_sims_by_id:
-                                        sim = float(synopsis_sims_by_id.get(aid, 0.0))
-                                        if sim > 0.0:
-                                            cand_type = None
-                                            if "type" in row_df.columns:
-                                                cand_type = None if pd.isna(row_df.iloc[0].get("type")) else str(row_df.iloc[0].get("type")).strip()
-                                            cand_eps = row_df.iloc[0].get("episodes") if "episodes" in row_df.columns else None
-                                            if synopsis_gate_passes(
-                                                seed_type=seed_type_target,
-                                                candidate_type=cand_type,
-                                                candidate_episodes=cand_eps,
-                                            ):
-                                                tfidf_bonus = float(personalized_synopsis_tfidf_bonus_for_candidate(sim))
-                                                if tfidf_bonus > 0.0:
-                                                    rec["score"] = float(rec.get("score", 0.0)) + tfidf_bonus
-                                                    raw = rec.get("_raw_components")
-                                                    if isinstance(raw, dict):
-                                                        raw["knn"] = float(raw.get("knn", 0.0)) + tfidf_bonus
-                                                    else:
-                                                        rec["_raw_components"] = {"mf": 0.0, "knn": tfidf_bonus, "pop": 0.0}
-                                                    used = rec.get("_used_components")
-                                                    if isinstance(used, list) and "knn" not in used:
-                                                        used.append("knn")
-                                # Deterministic ordering: score desc, then anime_id asc.
-                                personalized_recs.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
-                                personalized_recs = personalized_recs[:n_requested]
-                            recs = personalized_recs
-                            personalization_applied = True
-                    elif personalization_strength > 0.01:
-                        # Blend personalized and seed-based
-                        personalized_recs = recommender.get_personalized_recommendations(
-                            user_embedding=user_embedding,
-                            mf_model=mf_model,
-                            n=n_requested,
-                            weights=weights,
-                            exclude_item_ids=exclude_ranked_ids,
-                        )
-                        if not personalized_recs:
-                            st.session_state["personalization_blocked_reason"] = (
-                                "MF personalization returned no results (likely no overlap with MF items)."
-                            )
-                        else:
-                            personalization_applied = True
-                except Exception as e:  # noqa: BLE001
-                    st.session_state["personalization_blocked_reason"] = (
-                        f"Personalization failed at scoring time: {e}"
+                        # else: strength ≤ 0.01 → keep seed-based as-is
+    
+                # ── Personalized explanation text (Streamlit-dependent) ──
+                if recs and _personalization_enabled and _active_profile:
+                    from src.app.components.explanations import generate_batch_explanations
+                    recs = generate_batch_explanations(
+                        recommendations=recs,
+                        user_profile=_active_profile,
+                        metadata_df=metadata,
                     )
+    
+                # ── Truthful MF/kNN/Pop share labels ─────────────────────
+                recs = finalize_explanation_shares(recs)
+    
+                # ── Post-filters (genre / type / year / sort) ────────────
+                recs = apply_post_filters(recs, ctx)
+    
+                # ── Trim to requested top_n ──────────────────────────────
+                recs = recs[:top_n]
 
-                if personalization_applied and personalization_strength > 0.01 and personalization_strength < 0.99:
-                    # Create score dictionaries
-                    personalized_scores = {rec["anime_id"]: rec["score"] for rec in personalized_recs}
-                    seed_scores = {rec["anime_id"]: rec["score"] for rec in recs}
-
-                    # Keep raw components so we can compute truthful shares after blending.
-                    personalized_raw = {
-                        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                        for rec in personalized_recs
-                    }
-                    seed_raw = {
-                        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                        for rec in recs
-                    }
-                    personalized_used = {
-                        rec["anime_id"]: rec.get("_used_components", []) for rec in personalized_recs
-                    }
-                    seed_used = {rec["anime_id"]: rec.get("_used_components", []) for rec in recs}
-
-                    # Collect all unique anime IDs
-                    all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
-
-                    # Blend scores
-                    blended = []
-                    for aid in all_anime_ids:
-                        if aid in ranked_hygiene_exclude_ids:
-                            continue
-                        p_score = personalized_scores.get(aid, 0.0)
-                        s_score = seed_scores.get(aid, 0.0)
-
-                        # Weighted blend based on personalization strength
-                        final_score = (personalization_strength * p_score) + ((1 - personalization_strength) * s_score)
-
-                        pr = personalized_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                        sr = seed_raw.get(aid, {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-                        raw_components = {
-                            "mf": (personalization_strength * float(pr.get("mf", 0.0)))
-                            + ((1 - personalization_strength) * float(sr.get("mf", 0.0))),
-                            "knn": (personalization_strength * float(pr.get("knn", 0.0)))
-                            + ((1 - personalization_strength) * float(sr.get("knn", 0.0))),
-                            "pop": (personalization_strength * float(pr.get("pop", 0.0)))
-                            + ((1 - personalization_strength) * float(sr.get("pop", 0.0))),
-                        }
-                        used_components = sorted(
-                            set(personalized_used.get(aid, [])) | set(seed_used.get(aid, [])),
-                            key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
-                        )
-
-                        blended.append({
-                            "anime_id": aid,
-                            "score": final_score,
-                            "_raw_components": raw_components,
-                            "_used_components": used_components,
-                        })
-
-                    # Sort and take top N
-                    blended.sort(key=lambda x: x["score"], reverse=True)
-                    recs = blended[:n_requested]
-            # else: personalization_strength <= 0.01, keep seed-based recs as-is
-        
-        # Generate explanations for personalized recommendations
-        if recs and personalization_enabled and st.session_state.get("active_profile"):
-            from src.app.components.explanations import generate_batch_explanations
-            recs = generate_batch_explanations(
-                recommendations=recs,
-                user_profile=st.session_state["active_profile"],
-                metadata_df=metadata
-            )
-
-        # Ensure all cards show truthful MF/kNN/Pop shares (and hide components not used).
-        # This runs *after* optional personalized explanation text generation so we can append shares.
-        for rec in recs:
-            raw = rec.get("_raw_components")
-            used = rec.get("_used_components")
-            if not isinstance(raw, dict) or not isinstance(used, list) or not used:
-                continue
-            shares = compute_component_shares(raw, used_components=used)
-
-            contributions = {"mf": shares.get("mf", 0.0), "knn": shares.get("knn", 0.0), "pop": shares.get("pop", 0.0), "_used": shares.get("_used", used)}
-            meta = rec.get("_explanation_meta")
-            if isinstance(meta, dict):
-                contributions.update(meta)
-            share_text = format_explanation(contributions)
-
-            existing = rec.get("explanation")
-            if isinstance(existing, str) and existing.strip():
-                rec["explanation"] = f"{existing} • {share_text}"
-            else:
-                rec["explanation"] = share_text
-        
-        # Apply user filters and sorting
-        if recs:
-            import pandas as pd
-            # Filter by genre
-            if genre_filter:
-                filtered_recs = []
-                for rec in recs:
-                    anime_id = rec["anime_id"]
-                    row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-                    if not row_df.empty:
-                        row_genres_val = row_df.iloc[0].get("genres", "")
-                        # Handle both string and array formats
-                        item_genres = set()
-                        if isinstance(row_genres_val, str):
-                            item_genres = set([g.strip() for g in row_genres_val.split("|") if g.strip()])
-                        elif hasattr(row_genres_val, '__iter__') and not isinstance(row_genres_val, str):
-                            item_genres = set([str(g).strip() for g in row_genres_val if g])
-                        # Check if any selected genre is in item genres
-                        if any(gf in item_genres for gf in genre_filter):
-                            filtered_recs.append(rec)
-                recs = filtered_recs
-            
-            # Filter by type
-            if type_filter and "type" in metadata.columns:
-                before_count = len(recs)
-                print(f"[TYPE FILTER] Active filter: {type_filter}")
-                print(f"[TYPE FILTER] Processing {before_count} recommendations...")
-                filtered_recs = []
-                types_found = {}
-                for rec in recs:
-                    anime_id = rec["anime_id"]
-                    row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-                    if not row_df.empty:
-                        item_type = row_df.iloc[0].get("type")
-                        type_str = str(item_type).strip() if pd.notna(item_type) else "None"
-                        types_found[type_str] = types_found.get(type_str, 0) + 1
-                        # Handle NaN and convert to string for comparison
-                        if pd.notna(item_type) and str(item_type).strip() in type_filter:
-                            filtered_recs.append(rec)
-                after_count = len(filtered_recs)
-                print(f"[TYPE FILTER] Types in recommendations: {dict(sorted(types_found.items(), key=lambda x: -x[1]))}")
-                print(f"[TYPE FILTER] Result: {before_count} → {after_count} (removed {before_count - after_count})")
-                recs = filtered_recs
-            
-            # Filter by year range
-            if year_range[0] > 1960 or year_range[1] < 2025:
-                filtered_recs = []
-                for rec in recs:
-                    anime_id = rec["anime_id"]
-                    row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-                    if not row_df.empty:
-                        aired_from = row_df.iloc[0].get("aired_from")
-                        if aired_from:
-                            try:
-                                if isinstance(aired_from, str):
-                                    year = int(aired_from[:4])
-                                    if year_range[0] <= year <= year_range[1]:
-                                        filtered_recs.append(rec)
-                            except Exception:
-                                pass
-                recs = filtered_recs
-            
-            # Sort recommendations
-            if sort_by != default_sort_for_mode:
-                # Enrich recs with metadata for sorting
-                enriched_recs = []
-                for rec in recs:
-                    anime_id = rec["anime_id"]
-                    row_df = metadata.loc[metadata["anime_id"] == anime_id].head(1)
-                    if not row_df.empty:
-                        row = row_df.iloc[0]
-                        rec_copy = rec.copy()
-                        rec_copy["_mal_score"] = row.get("mal_score") if pd.notna(row.get("mal_score")) else 0
-                        rec_copy["_year"] = 0
-                        aired_from = row.get("aired_from")
-                        if aired_from and isinstance(aired_from, str):
-                            try:
-                                rec_copy["_year"] = int(aired_from[:4])
-                            except Exception:
-                                pass
-                        rec_copy["_popularity"] = _pop_pct_for_anime_id(int(anime_id))
-                        enriched_recs.append(rec_copy)
-                
-                # Sort based on selected option
-                if sort_by == "MAL Score":
-                    enriched_recs.sort(key=lambda x: x["_mal_score"], reverse=True)
-                elif sort_by == "Year (Newest)":
-                    enriched_recs.sort(key=lambda x: x["_year"], reverse=True)
-                elif sort_by == "Year (Oldest)":
-                    enriched_recs.sort(key=lambda x: x["_year"], reverse=False)
-                elif sort_by == "Popularity":
-                    enriched_recs.sort(key=lambda x: x["_popularity"], reverse=False)  # Lower percentile = more popular
-                
-                recs = enriched_recs
-            
-            # After all filtering and sorting, trim to requested top_n
-            recs = recs[:top_n]
 
 # Active scoring path indicator (single source of truth: derived from executed flags)
 active_scoring_path = None
@@ -2791,13 +1547,12 @@ if browse_mode:
     active_scoring_path = "Browse"
 else:
     ui_mode_main = str(st.session_state.get("ui_mode", "Seed-based"))
-    personalized_gate_reason = locals().get("personalized_gate_reason")
     if ui_mode_main == "Personalized" and personalized_gate_reason:
         active_scoring_path = "Personalized (Unavailable)"
     else:
         if recommender is None or components is None:
             active_scoring_path = "Ranked modes disabled"
-        elif locals().get("personalization_applied", False):
+        elif personalization_applied:
             active_scoring_path = "Personalized"
         elif selected_seed_ids:
             active_scoring_path = "Seed-based" if len(selected_seed_ids) == 1 else "Multi-seed"
@@ -2809,7 +1564,7 @@ personalization_requested = st.session_state.get("personalization_enabled", Fals
 blocked_reason = st.session_state.get("personalization_blocked_reason")
 if (
     personalization_requested
-    and not locals().get("personalization_applied", False)
+    and not personalization_applied
     and blocked_reason
     and str(st.session_state.get("ui_mode", "Seed-based")) != "Personalized"
 ):
@@ -2840,7 +1595,7 @@ if recs:
     blocked_reason = st.session_state.get("personalization_blocked_reason")
     if (
         st.session_state.get("personalization_enabled", False)
-        and not locals().get("personalization_applied", False)
+        and not personalization_applied
         and blocked_reason
     ):
         st.warning(f"Personalization enabled but not applied: {blocked_reason}")
