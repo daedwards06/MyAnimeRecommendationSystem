@@ -49,6 +49,7 @@ def test_negative_raw_contributions_are_not_shown_as_negative_share():
 
 
 def test_format_explanation_hides_unused_components():
-    # Only mf+pop are used; knn should not appear in the formatted string.
+    # Only mf+pop are used; Content (knn) should not appear in the formatted string.
     s = format_explanation({"mf": 0.8, "knn": 0.2, "pop": 0.2, "_used": ["mf", "pop"]})
-    assert "knn" not in s
+    assert "Content" not in s
+    assert "knn" not in s.lower()

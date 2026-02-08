@@ -1,4 +1,4 @@
-# Feature Documentation (Template)
+# Feature Documentation
 
 ## Overview
 This document describes engineered features used by recommendation models, covering source data, transformations, storage format, and intended usage.

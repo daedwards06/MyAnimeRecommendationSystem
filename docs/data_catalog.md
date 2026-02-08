@@ -1,5 +1,7 @@
 # Data Catalog
 
+> Last updated: 2026-02-08
+
 ## Overview
 This catalog documents all data assets used in the anime recommendation system, their schemas, provenance, and transformation lineage.
 

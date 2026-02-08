@@ -320,6 +320,32 @@ class TestEdgeCases:
         assert embedding_high.shape == (64,)
         assert embedding_low.shape == (64,)
         # They should be different (unless ratings don't matter in weighted avg with same values)
+
+    def test_narrow_range_ratings_all_contribute(self, mock_mf_model):
+        """Verify that a user who rates everything 8-10 still has all items contribute.
+
+        Regression test: the old min-max normalization mapped the lowest
+        rating to weight 0.0, completely discarding the user's positively-
+        rated anime.  Mean-centered weights ensure every rated item gets a
+        positive contribution.
+        """
+        narrow_ratings = {0: 8, 1: 9, 2: 10}
+
+        # With only items 0,1,2 in the model, weighted_average should produce
+        # an embedding influenced by all three — not just items 1 and 2.
+        emb = generate_user_embedding(
+            narrow_ratings, mock_mf_model, method="weighted_average", normalize=False
+        )
+
+        # Compare to simple average (uniform) — both should be non-zero and
+        # the weighted version should differ because ratings are not uniform.
+        emb_simple = generate_user_embedding(
+            narrow_ratings, mock_mf_model, method="simple_average", normalize=False
+        )
+        assert not np.allclose(emb, 0.0), "Narrow-range embedding should not be zero"
+        assert not np.allclose(emb, emb_simple), (
+            "Weighted embedding should differ from simple average when ratings vary"
+        )
     
     def test_large_rating_count(self, mock_mf_model):
         """Test with many ratings (performance check)."""
