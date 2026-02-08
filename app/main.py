@@ -234,112 +234,175 @@ if "_personalization_autoset" not in st.session_state:
 # Custom CSS for modern, polished aesthetic
 st.markdown("""
 <style>
-    /* Main container styling */
+    /* ===== Global Layout ===== */
     .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-        max-width: 1200px;
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+        max-width: 1100px;
     }
-    
-    /* Header styling */
+
+    /* ===== Typography ===== */
     h1 {
-        color: #1E1E1E;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
+        color: #1A1A2E;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.25rem;
     }
-    
-    h2, h3 {
-        color: #2C3E50;
+    h2 {
+        color: #1A1A2E;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    h3 {
+        color: #2D3748;
         font-weight: 600;
     }
-    
-    /* Sidebar styling */
+    .stMarkdown { line-height: 1.65; }
+
+    /* ===== Sidebar ===== */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+        background: #FAFBFC;
+        border-right: 1px solid #E2E8F0;
     }
-    
-    /* Card improvements */
-    .stMarkdown {
-        line-height: 1.6;
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #4A5568;
     }
-    
-    /* Button styling */
-    .stButton>button {
+
+    /* ===== Buttons ===== */
+    .stButton > button {
         border-radius: 8px;
-        font-weight: 500;
-        transition: all 0.3s ease;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border: 1px solid #E2E8F0;
     }
-    
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(108, 99, 255, 0.18);
     }
-    
-    /* Genre pill button styling - make them look like badges */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #6C63FF 0%, #5A52D5 100%);
+        border: none;
+    }
+
+    /* ===== Genre pill buttons ===== */
     button[kind="secondary"] {
-        background-color: #ECF0F1 !important;
-        color: #34495E !important;
-        border: none !important;
-        padding: 4px 12px !important;
-        font-size: 0.8rem !important;
-        border-radius: 12px !important;
-        font-weight: 500 !important;
-        min-height: 28px !important;
-        height: 28px !important;
+        background-color: #F0EFFF !important;
+        color: #6C63FF !important;
+        border: 1px solid #D6D3FF !important;
+        padding: 4px 14px !important;
+        font-size: 0.78rem !important;
+        border-radius: 20px !important;
+        font-weight: 600 !important;
+        min-height: 30px !important;
+        height: 30px !important;
+        letter-spacing: 0.02em !important;
     }
-    
     button[kind="secondary"]:hover {
-        background-color: #3498DB !important;
-        color: white !important;
+        background-color: #6C63FF !important;
+        color: #FFFFFF !important;
+        border-color: #6C63FF !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3) !important;
+        box-shadow: 0 3px 10px rgba(108, 99, 255, 0.25) !important;
     }
-    
-    /* Remove extra spacing */
-    .element-container {
-        margin-bottom: 0.5rem;
+
+    /* ===== Containers / Cards ===== */
+    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {
+        border-radius: 12px !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
     }
-    
-    /* Expander styling */
+    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"]:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
+    }
+
+    /* ===== Expander ===== */
     .streamlit-expanderHeader {
-        font-weight: 500;
-        color: #34495E;
+        font-weight: 600;
+        color: #2D3748;
+        font-size: 0.9rem;
     }
-    
-    /* Caption text */
-    .css-1629p8f, [data-testid="stCaptionContainer"] {
-        color: #7F8C8D;
-        font-size: 0.85rem;
+
+    /* ===== Metrics ===== */
+    [data-testid="stMetric"] {
+        background: #F7FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 12px 16px;
     }
+    [data-testid="stMetricLabel"] {
+        color: #4A5568;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* ===== Dividers ===== */
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #E2E8F0, transparent);
+        margin: 1.5rem 0;
+    }
+
+    /* ===== Captions ===== */
+    [data-testid="stCaptionContainer"] {
+        color: #A0AEC0;
+        font-size: 0.82rem;
+    }
+
+    /* ===== Radio group horizontal ===== */
+    .stRadio > div[role="radiogroup"] {
+        gap: 0.5rem;
+    }
+
+    /* ===== Selectbox / Multiselect ===== */
+    .stSelectbox, .stMultiSelect {
+        border-radius: 8px;
+    }
+
+    /* ===== Hide default Streamlit branding ===== */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 _ui_mode_for_header = str(st.session_state.get("ui_mode", "Seed-based"))
 if _ui_mode_for_header == "Browse":
-    st.title("🎬 Anime Explorer")
     st.markdown(
-        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Explore the catalog by genre, type, and year (metadata-only)</p>",
+        "<h1 style='margin-bottom:0; font-weight:800;'>Anime Explorer</h1>"
+        "<p style='color:#A0AEC0; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
+        "Browse the catalog by genre, type, and year</p>",
         unsafe_allow_html=True,
     )
 elif _ui_mode_for_header == "Personalized":
-    st.title("🎬 Personalized Anime Recommendations")
     st.markdown(
-        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Ranked using your rated history (shows ‘unavailable’ when it can’t run)</p>",
+        "<h1 style='margin-bottom:0; font-weight:800;'>Your Recommendations</h1>"
+        "<p style='color:#A0AEC0; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
+        "Ranked from your rated history</p>",
         unsafe_allow_html=True,
     )
 else:
-    st.title("🎬 Seed-based Anime Recommendations")
     st.markdown(
-        "<p style='color: #7F8C8D; font-size: 1.1rem; margin-top: -10px;'>Ranked from 1–5 seed titles using Match score (relative)</p>",
+        "<h1 style='margin-bottom:0; font-weight:800;'>Anime Recommender</h1>"
+        "<p style='color:#A0AEC0; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
+        "Discover anime similar to titles you love</p>",
         unsafe_allow_html=True,
     )
 
 if os.environ.get("APP_IMPORT_LIGHT"):
-    st.warning("Lightweight import mode is active (APP_IMPORT_LIGHT=1). Images and full metadata may be unavailable. Restart without this flag to see thumbnails.")
+    st.warning("Lightweight import mode active. Restart without APP_IMPORT_LIGHT for full functionality.")
 render_onboarding(ui_mode=_ui_mode_for_header)
 
 # Sidebar Controls ---------------------------------------------------------
-st.sidebar.header("Controls")
+st.sidebar.markdown("<p style='font-weight:700; font-size:0.8rem; color:#4A5568; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>Mode</p>", unsafe_allow_html=True)
 
 # Top-level mode selector (single control)
 prev_mode = st.session_state.get("_ui_mode_prev")
@@ -443,7 +506,7 @@ if (
 # ============================================================================
 # SIDEBAR: USER PROFILE (Section 1 - Top Priority)
 # ============================================================================
-st.sidebar.markdown("### 👤 User Profile")
+st.sidebar.markdown("<p style='font-weight:700; font-size:0.8rem; color:#4A5568; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>Profile</p>", unsafe_allow_html=True)
 
 from src.data.user_profiles import list_profiles, load_profile, save_profile, get_profile_summary
 from src.data.mal_parser import parse_mal_export, get_mal_export_summary
@@ -488,15 +551,15 @@ if st.session_state["active_profile"]:
     watched_count = len(profile.get("watched_ids", []))
     avg_rating = profile.get("stats", {}).get("avg_rating", 0)
     
-    st.sidebar.success(f"✓ **{profile['username']}** – {watched_count} watched")
+    st.sidebar.success(f"**{profile['username']}** · {watched_count} watched")
     
     # Show rating stats
     ratings_count = len(profile.get("ratings", {}))
     if ratings_count > 0:
-        st.sidebar.caption(f"⭐ {ratings_count} ratings • Avg: {avg_rating:.1f}/10")
+        st.sidebar.caption(f"{ratings_count} ratings · Avg {avg_rating:.1f}/10")
         
         # Show rating distribution (simple display)
-        if st.sidebar.checkbox("📊 Rating distribution", key="show_rating_dist", value=False):
+        if st.sidebar.checkbox("Rating distribution", key="show_rating_dist", value=False):
             ratings = profile.get("ratings", {})
             
             # Count by rating bucket
@@ -604,7 +667,7 @@ if st.session_state["active_profile"]:
                 except Exception as e:
                     st.error(f"Failed: {e}")
 else:
-    st.sidebar.info("💡 Import your MAL watchlist to hide watched anime")
+    st.sidebar.info("Import your MAL watchlist to hide watched anime")
     
     # Import MAL (expanded when no profile)
     with st.sidebar.expander("📥 Import from MAL", expanded=True):
@@ -684,7 +747,7 @@ else:
 # ============================================================================
 st.sidebar.markdown("---")
 ui_mode = str(st.session_state.get("ui_mode", "Seed-based"))
-st.sidebar.markdown("### 🎯 Personalization")
+st.sidebar.markdown("<p style='font-weight:700; font-size:0.8rem; color:#4A5568; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>Personalization</p>", unsafe_allow_html=True)
 
 
 def _ratings_signature(ratings_dict: dict) -> str:
@@ -874,7 +937,7 @@ else:
 # SIDEBAR: SEARCH & SEEDS (Section 3 - Discovery Tools)
 # ============================================================================
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔍 Search & Seeds")
+st.sidebar.markdown("<p style='font-weight:700; font-size:0.8rem; color:#4A5568; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>Search &amp; Seeds</p>", unsafe_allow_html=True)
 
 show_seeds_controls = ui_mode in {"Seed-based", "Personalized"}
 
@@ -958,7 +1021,7 @@ else:
 # SIDEBAR: FILTERS & DISPLAY (Section 4)
 # ============================================================================
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🎛️ Filters & Display")
+st.sidebar.markdown("<p style='font-weight:700; font-size:0.8rem; color:#4A5568; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>Filters &amp; Display</p>", unsafe_allow_html=True)
 
 # Top-N applies to both ranked results and Browse.
 top_n = st.sidebar.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N)))
@@ -968,7 +1031,7 @@ st.session_state["top_n"] = top_n
 browse_mode = bool(st.session_state.get("browse_mode", False))
 
 if browse_mode:
-    st.sidebar.info("💡 Browse: select at least one genre")
+    st.sidebar.caption("Browse mode: select at least one genre to see results.")
 
 default_sort_for_mode = "MAL Score" if browse_mode else "Match score"
 sort_options = ["MAL Score", "Year (Newest)", "Year (Oldest)", "Popularity"] if browse_mode else [
@@ -1056,52 +1119,36 @@ if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 o
         st.rerun()
 
 # Performance Metrics
-with st.sidebar.expander("⚡ Performance", expanded=False):
+with st.sidebar.expander("Performance", expanded=False):
     from src.app.profiling import get_last_timing
     try:
         last_timing = get_last_timing()
         if last_timing:
             latency_ms = last_timing.get("recommendations", 0) * 1000
-            status_color = "#27AE60" if latency_ms < 250 else "#E67E22" if latency_ms < 500 else "#E74C3C"
+            status_color = "#48BB78" if latency_ms < 250 else "#ECC94B" if latency_ms < 500 else "#FC8181"
             st.markdown(f"""
-            <div style='background: #F8F9FA; border-radius: 6px; padding: 12px; margin-bottom: 8px;'>
-                <p style='margin: 0; font-size: 0.85rem; color: #7F8C8D;'>Inference Time</p>
-                <p style='margin: 0; font-size: 1.3rem; font-weight: 600; color: {status_color};'>{latency_ms:.0f}ms</p>
+            <div style='background:#F7FAFC; border-radius:8px; padding:12px; margin-bottom:8px; border:1px solid #E2E8F0;'>
+                <p style='margin:0; font-size:0.78rem; color:#A0AEC0; text-transform:uppercase; letter-spacing:0.05em;'>Inference</p>
+                <p style='margin:0; font-size:1.2rem; font-weight:700; color:{status_color};'>{latency_ms:.0f}ms</p>
             </div>
             """, unsafe_allow_html=True)
         else:
-                st.caption(
-                    "No timing data yet — run a ranked mode first" if not browse_mode
-                    else "No timing data yet — timing is shown for ranked modes (Seed-based / Personalized)"
-                )
+            st.caption("Run a ranked mode to see timing data.")
     except Exception:
-        st.caption(
-            "Run a ranked mode to see metrics" if not browse_mode
-            else "Timing is shown for ranked modes (Seed-based / Personalized)"
-        )
-    
-    import sys
-    if hasattr(bundle, '__sizeof__'):
-        mem_mb = sys.getsizeof(bundle) / (1024 * 1024)
-        st.markdown(f"""
-        <div style='background: #F8F9FA; border-radius: 6px; padding: 12px;'>
-            <p style='margin: 0; font-size: 0.85rem; color: #7F8C8D;'>Bundle Size</p>
-            <p style='margin: 0; font-size: 1.3rem; font-weight: 600; color: #3498DB;'>{mem_mb:.1f}MB</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("Run a ranked mode to see metrics.")
 
 # ============================================================================
 # SIDEBAR: HELP & FAQ (Section 5 - Bottom)
 # ============================================================================
 st.sidebar.markdown("---")
-with st.sidebar.expander("💡 Quick Guide", expanded=False):
+with st.sidebar.expander("Quick Guide", expanded=False):
     st.markdown("""
-    <div style='font-size: 0.9rem; line-height: 1.8;'>
-    1️⃣ <b>Choose your mode</b> – Personalized / Seed-based / Browse<br>
-    2️⃣ <b>Seed-based</b> – Pick 1–5 seeds (or use the sample buttons)<br>
-    3️⃣ <b>Browse</b> – Pick ≥1 genre (filters apply; metadata-only)<br>
-    4️⃣ <b>Personalized</b> – Select a rated profile (no ratings → unavailable)<br>
-    5️⃣ <b>Refine</b> – Filters (and hybrid weights in ranked modes)
+    <div style='font-size: 0.88rem; line-height: 1.9; color: #4A5568;'>
+    <b>1.</b> Choose a mode &mdash; Personalized / Seed-based / Browse<br>
+    <b>2.</b> Seed-based &mdash; pick 1&ndash;5 seeds or try the sample buttons<br>
+    <b>3.</b> Browse &mdash; select genres to explore the catalog<br>
+    <b>4.</b> Personalized &mdash; load a rated profile to unlock<br>
+    <b>5.</b> Refine with filters, weights, and sort options
     </div>
     """, unsafe_allow_html=True)
 
@@ -1131,12 +1178,12 @@ st.session_state["selected_seed_titles"] = selected_seed_titles
 # Prominent seed indicator
 if selected_seed_ids and selected_seed_titles:
     if len(selected_seed_titles) == 1:
-        st.sidebar.success(f"🎯 **Active Seed**: {selected_seed_titles[0]}")
+        st.sidebar.success(f"**Active Seed:** {selected_seed_titles[0]}")
     else:
-        st.sidebar.success(f"🎯 **Active Seeds** ({len(selected_seed_titles)}):")
+        st.sidebar.success(f"**Active Seeds** ({len(selected_seed_titles)})")
         for title in selected_seed_titles:
-            st.sidebar.caption(f"• {title}")
-    if st.sidebar.button("✖ Clear All Seeds", key="clear_seed"):
+            st.sidebar.caption(f"· {title}")
+    if st.sidebar.button("Clear Seeds", key="clear_seed"):
         st.session_state["selected_seed_ids"] = []
         st.session_state["selected_seed_titles"] = []
         st.session_state["_default_seed_active"] = False
@@ -1144,7 +1191,7 @@ if selected_seed_ids and selected_seed_titles:
 else:
     if show_seeds_controls:
         # Sample search suggestions
-        st.sidebar.info("💡 **Try these popular titles:**")
+        st.sidebar.caption("**Try a popular title:**")
         sample_titles = ["Steins;Gate", "Cowboy Bebop", "Death Note", "Fullmetal Alchemist: Brotherhood"]
         available_samples = [t for t in sample_titles if t in available_titles]
         if available_samples:
@@ -1333,20 +1380,15 @@ st.markdown("---")
 # Browse mode handling
 if browse_mode:
     if genre_filter:
-        # Show which genres are being browsed
         genre_list_display = ", ".join(genre_filter[:3])
         if len(genre_filter) > 3:
             genre_list_display += f" +{len(genre_filter)-3} more"
-        st.subheader(f"📚 Browsing {genre_list_display}")
-        st.markdown(f"<p style='color: #7F8C8D; margin-top: -8px;'>Click any genre badge on cards to explore similar titles</p>", unsafe_allow_html=True)
+        st.subheader(f"Browsing: {genre_list_display}")
     else:
-        st.subheader("📚 Browse Anime by Genre")
+        st.subheader("Browse by Genre")
     
     if not genre_filter:
-        st.info(
-            "Pick ≥1 genre in Filters to start browsing. "
-            "Browse mode filters/sorts catalog metadata only (no ranking)."
-        )
+        st.info("Select at least one genre in the sidebar to start browsing.")
         recs = []
     else:
         # Browse mode: filter metadata directly via pipeline module
@@ -1387,21 +1429,20 @@ else:
     # Show banner if default seed is active
     if st.session_state.get("_default_seed_active", False) and selected_seed_ids and selected_seed_titles:
         st.info(
-            f"🎬 Showing recommendations based on **{selected_seed_titles[0]}** — "
-            "change the seed in the sidebar to explore!",
-            icon="💡"
+            f"Showing recommendations based on **{selected_seed_titles[0]}** — "
+            "change the seed in the sidebar to explore."
         )
     
     if selected_seed_ids and selected_seed_titles:
         if len(selected_seed_titles) == 1:
-            st.subheader(f"Similar to: {selected_seed_titles[0]}")
+            st.subheader(f"Similar to {selected_seed_titles[0]}")
         else:
             seed_display = ", ".join(selected_seed_titles[:3])
             if len(selected_seed_titles) > 3:
                 seed_display += f" +{len(selected_seed_titles)-3} more"
-            st.subheader(f"Blended from: {seed_display}")
+            st.subheader(f"Blended from {seed_display}")
     else:
-        st.subheader("Personalized recommendations" if ui_mode_main == "Personalized" else "Recommendations")
+        st.subheader("Your Recommendations" if ui_mode_main == "Personalized" else "Recommendations")
     user_index = 0  # demo user index (persona mapping to be added)
 
     # Phase 4 / Chunk A2: Candidate hygiene guardrails (ranked modes only).
@@ -1609,114 +1650,98 @@ def _coerce_genres(value) -> str:
     return str(value)
 
 if recs:
-    st.markdown(f"**Active scoring path:** {active_scoring_path}")
-    # Be explicit when personalization is enabled but blocked.
-    blocked_reason = st.session_state.get("personalization_blocked_reason")
-    if (
-        st.session_state.get("personalization_enabled", False)
-        and not personalization_applied
-        and blocked_reason
-    ):
-        st.warning(f"Personalization enabled but not applied: {blocked_reason}")
-    # Result count with total anime count badge
+    # Scoring path shown in expander for interested viewers
+    with st.expander("Scoring details", expanded=False):
+        st.caption(f"Active scoring path: {active_scoring_path}")
+        blocked_reason = st.session_state.get("personalization_blocked_reason")
+        if (
+            st.session_state.get("personalization_enabled", False)
+            and not personalization_applied
+            and blocked_reason
+        ):
+            st.caption(f"Personalization note: {blocked_reason}")
+
+    # Result count - clean, minimal
     total_anime = len(metadata)
-    result_count = len(recs)
-    filter_info = []
+    filter_parts = []
+    if genre_filter:
+        filter_parts.append(f"{len(genre_filter)} genre{'s' if len(genre_filter) > 1 else ''}")
     if type_filter:
-        filter_info.append(f"Type: {', '.join(type_filter)}")
-    if genre_filter:
-        filter_info.append(f"Genre: {', '.join(genre_filter[:3])}{'...' if len(genre_filter) > 3 else ''}")
-    if genre_filter:
-        filter_info.append(f"{len(genre_filter)} genre{'s' if len(genre_filter) > 1 else ''}")
+        filter_parts.append(", ".join(type_filter))
     if year_range[0] > 1960 or year_range[1] < 2025:
-        filter_info.append(f"{year_range[0]}-{year_range[1]}")
-    
-    filters_text = f" (filtered by {', '.join(filter_info)})" if filter_info else ""
-    
-    # Header with count badge
-    mode_icon = "📚" if browse_mode else "✨"
+        filter_parts.append(f"{year_range[0]}–{year_range[1]}")
+    filters_text = f"  ·  filtered by {', '.join(filter_parts)}" if filter_parts else ""
+
     mode_label = "Browsing" if browse_mode else "Showing"
     item_type = "titles" if browse_mode else "recommendations"
-    st.markdown(f"""
-    <div style='display: flex; align-items: center; gap: 12px; margin-bottom: 12px;'>
-        <h3 style='color: #2C3E50; margin: 0;'>{mode_icon} {mode_label} {len(recs)} {item_type}{filters_text}</h3>
-        <span style='background: #3498DB; color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.8rem; font-weight: 600;'>{total_anime:,} total anime</span>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Show exclusion count if profile active
+    st.markdown(
+        f"<div style='display:flex; align-items:baseline; gap:10px; margin-bottom:6px;'>"
+        f"<span style='font-size:1.15rem; font-weight:700; color:#1A1A2E;'>{len(recs)} {item_type}</span>"
+        f"<span style='font-size:0.82rem; color:#A0AEC0;'>of {total_anime:,}{filters_text}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
     if st.session_state["active_profile"]:
         watched_count = len(st.session_state["active_profile"].get("watched_ids", []))
-        st.markdown(f"""
-        <p style='color: #27AE60; font-size: 0.9rem; margin-top: -8px; margin-bottom: 8px;'>
-            ✓ Excluded {watched_count} already-watched anime
-        </p>
-        """, unsafe_allow_html=True)
-    
+        st.caption(f"Excluded {watched_count} already-watched titles")
+
     if sort_by != default_sort_for_mode:
-        st.markdown(f"<p style='color: #7F8C8D; font-size: 0.9rem; margin-top: -8px; margin-bottom: 20px;'>Sorted by: {sort_by}</p>", unsafe_allow_html=True)
-    
-    # Calculate diversity mix
+        st.caption(f"Sorted by {sort_by}")
+
+    # Diversity bar – compact horizontal indicator
     pop_count = sum(
-        1
-        for r in recs
-        if "Top 25%"
-        in str(
-            badge_payload(
-                is_in_training=_is_in_training(int(r["anime_id"])),
-                pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
-                user_genre_hist={},
-                item_genres=[],
-            ).get("popularity_band", "")
-        )
+        1 for r in recs
+        if "Top 25%" in str(badge_payload(
+            is_in_training=_is_in_training(int(r["anime_id"])),
+            pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
+            user_genre_hist={}, item_genres=[],
+        ).get("popularity_band", ""))
     )
     long_tail_count = sum(
-        1
-        for r in recs
-        if "Long-tail"
-        in str(
-            badge_payload(
-                is_in_training=_is_in_training(int(r["anime_id"])),
-                pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
-                user_genre_hist={},
-                item_genres=[],
-            ).get("popularity_band", "")
-        )
+        1 for r in recs
+        if "Long-tail" in str(badge_payload(
+            is_in_training=_is_in_training(int(r["anime_id"])),
+            pop_percentile=_pop_pct_for_anime_id(int(r["anime_id"])),
+            user_genre_hist={}, item_genres=[],
+        ).get("popularity_band", ""))
     )
     mid_count = len(recs) - pop_count - long_tail_count
-    
-    # Modern diversity visualization with gradient bar
     total = len(recs)
-    pop_pct = (pop_count / total * 100) if total > 0 else 0
-    mid_pct = (mid_count / total * 100) if total > 0 else 0
-    long_pct = (long_tail_count / total * 100) if total > 0 else 0
-    
-    # Build bar segments - only include non-zero categories
+
     bar_segments = []
     if pop_count > 0:
-        bar_segments.append(f'<div style="background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%); flex: {pop_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; min-height: 40px;">🔥 {pop_count}</div>')
+        bar_segments.append(
+            f'<div style="background:#FC8181; flex:{pop_count}; height:6px;" '
+            f'title="Popular: {pop_count}"></div>'
+        )
     if mid_count > 0:
-        bar_segments.append(f'<div style="background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%); flex: {mid_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; min-height: 40px;">📊 {mid_count}</div>')
+        bar_segments.append(
+            f'<div style="background:#63B3ED; flex:{mid_count}; height:6px;" '
+            f'title="Mid-range: {mid_count}"></div>'
+        )
     if long_tail_count > 0:
-        bar_segments.append(f'<div style="background: linear-gradient(135deg, #9B59B6 0%, #8E44AD 100%); flex: {long_tail_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; min-height: 40px;">🌟 {long_tail_count}</div>')
-    
-    # Fallback if no segments (shouldn't happen but just in case)
+        bar_segments.append(
+            f'<div style="background:#B794F4; flex:{long_tail_count}; height:6px;" '
+            f'title="Hidden gems: {long_tail_count}"></div>'
+        )
     if not bar_segments:
-        bar_segments.append(f'<div style="background: linear-gradient(135deg, #95A5A6 0%, #7F8C8D 100%); flex: 1; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; min-height: 40px;">📊 {len(recs)} Mixed</div>')
-    
-    bar_html = ''.join(bar_segments)
-    
-    mix_label = "Catalog Mix" if browse_mode else "Recommendation Mix"
+        bar_segments.append(f'<div style="background:#A0AEC0; flex:1; height:6px;"></div>')
+    bar_html = "".join(bar_segments)
+
+    mix_label = "Catalog mix" if browse_mode else "Recommendation mix"
     st.markdown(f"""
-    <div style="background: #F8F9FA; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-        <p style="color: #7F8C8D; font-size: 0.9rem; margin-bottom: 12px; font-weight: 500;">{mix_label}</p>
-        <div style="display: flex; height: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            {bar_html}
+    <div style="margin: 8px 0 20px 0;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <span style="font-size:0.75rem; color:#A0AEC0; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">{mix_label}</span>
+            <span style="font-size:0.72rem; color:#A0AEC0;">
+                <span style="color:#FC8181;">●</span> Popular {pop_count}
+                &nbsp;<span style="color:#63B3ED;">●</span> Mid {mid_count}
+                &nbsp;<span style="color:#B794F4;">●</span> Hidden gems {long_tail_count}
+            </span>
         </div>
-        <div style="display: flex; justify-content: space-between; margin-top: 12px; font-size: 0.8rem; color: #95A5A6;">
-            <span>Popular Titles</span>
-            <span>Balanced Mix</span>
-            <span>Hidden Gems</span>
+        <div style="display:flex; height:6px; border-radius:3px; overflow:hidden; background:#EDF2F7;">
+            {bar_html}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1832,15 +1857,11 @@ else:
                 )
             )
         else:
-            # Cold-start / seedless state — show prominent sample buttons
+            # Cold-start / seedless state
             st.markdown(
-                "<div style='background: linear-gradient(135deg, #E8F4F8 0%, #F0F8FF 100%); border-radius: 12px; "
-                "padding: 28px; margin: 28px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);'>"
-                "<h3 style='color: #2C3E50; margin: 0 0 10px 0;'>🎬 Get Started</h3>"
-                "<p style='color: #7F8C8D; font-size: 1.0rem; margin: 0 0 20px 0;'>"
-                "A hybrid anime recommender that ranks titles similar to your chosen seed title(s)."
-                "</p>"
-                "<p style='color: #2C3E50; font-weight: 600; margin: 0 0 16px 0;'>Try these popular titles:</p>"
+                "<div style='background:#F0EFFF; border-radius:12px; padding:32px; margin:24px 0; text-align:center;'>"
+                "<h3 style='color:#1A1A2E; margin:0 0 8px 0; font-weight:800;'>Get Started</h3>"
+                "<p style='color:#4A5568; font-size:1.0rem; margin:0 0 24px 0;'>Pick a seed title to discover similar anime</p>"
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -1861,14 +1882,14 @@ else:
             
             _available_samples = [t for t in sample_titles if t in _title_to_id]
             if _available_samples:
-                cols = st.columns(4)
+                cols = st.columns(len(_available_samples[:4]))
                 for i, sample in enumerate(_available_samples[:4]):
                     with cols[i]:
                         if st.button(
-                            f"🎯 {sample}",
+                            sample,
                             key=f"main_sample_{i}",
                             use_container_width=True,
-                            type="primary" if i == 3 else "secondary",  # Highlight FMAB
+                            type="primary" if i == 3 else "secondary",
                         ):
                             _aid = _title_to_id.get(sample)
                             if _aid:
@@ -1877,20 +1898,13 @@ else:
                                 st.session_state["_default_seed_active"] = False
                                 st.rerun()
             
-            st.markdown(
-                "<p style='color: #7F8C8D; text-align: center; margin-top: 20px;'>Or search for any title in the sidebar →</p>",
-                unsafe_allow_html=True,
-            )
+            st.caption("Or search for any title in the sidebar.")
 
 
 st.markdown("---")
-# Note: Old explanation panel removed - explanations now shown inline on cards
 render_diversity_panel(recs, metadata, is_browse=browse_mode)
 
-
-
 # Help / FAQ ---------------------------------------------------------------
-render_help_panel()
 render_help_panel(ui_mode=str(st.session_state.get("ui_mode", "Seed-based")))
 
-st.sidebar.caption("Prototype – performance instrumentation active.")
+st.sidebar.caption("MARS · My Anime Recommendation System")
