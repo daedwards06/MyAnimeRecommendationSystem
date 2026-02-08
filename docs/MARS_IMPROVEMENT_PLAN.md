@@ -626,9 +626,9 @@ REQUIREMENTS:
 **Why:** `print(f"[TYPE FILTER]...")` in production code is unprofessional.
 
 **Checklist:**
-- [ ] Search for all `print(` statements in `app/main.py` and `src/`
-- [ ] Replace debug prints with `logger.debug()` calls
-- [ ] Verify logging is configured at INFO level by default (DEBUG only when env var set)
+- [x] Search for all `print(` statements in `app/main.py` and `src/`
+- [x] Replace debug prints with `logger.debug()` calls
+- [x] Verify logging is configured at INFO level by default (DEBUG only when env var set)
 
 **Prompt for Claude Sonnet 4.5:**
 

@@ -7,9 +7,12 @@ This module provides filtering logic to exclude:
 """
 
 from __future__ import annotations
+import logging
 import re
 import pandas as pd
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Quality thresholds - relaxed to avoid over-filtering
 MIN_MEMBERS_COUNT = 200  # At least 200 MAL members (was 500)
@@ -196,9 +199,9 @@ def apply_quality_filters(
                 removed_reasons['missing_synopsis'] = removed_reasons.get('missing_synopsis', 0) + 1
     
     if verbose and removed_count > 0:
-        print(f"Quality filter removed {removed_count} recommendations:")
+        logger.debug(f"Quality filter removed {removed_count} recommendations:")
         for reason, count in removed_reasons.items():
-            print(f"  - {reason}: {count}")
+            logger.debug(f"  - {reason}: {count}")
     
     return filtered
 

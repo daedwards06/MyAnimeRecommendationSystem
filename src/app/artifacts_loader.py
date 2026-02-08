@@ -18,6 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 import json
+import logging
 import os
 import random
 import numpy as np
@@ -31,6 +32,8 @@ from .constants import (
     DEFAULT_MF_MODEL_STEM,
     DEFAULT_KNN_MODEL_STEM,
 )
+
+logger = logging.getLogger(__name__)
 
 
 ArtifactBundle = Dict[str, Any]
@@ -237,8 +240,8 @@ def _load_json_glob(root: Path, pattern: str) -> Dict[str, Any]:
             with f.open("r", encoding="utf-8") as fh:
                 out[f.stem] = json.load(fh)
         except Exception as e:  # noqa: BLE001
-            # Non-critical; skip with warning semantics via print.
-            print(f"[WARN] Could not load JSON artifact {f}: {e}")
+            # Non-critical; skip with warning semantics via logging.
+            logger.warning(f"Could not load JSON artifact {f}: {e}")
     return out
 
 

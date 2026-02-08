@@ -61,6 +61,13 @@ from src.app.scoring_pipeline import (
     finalize_explanation_shares,
 )
 
+# Configure logging: INFO level by default, DEBUG if env var is set
+log_level = logging.DEBUG if os.getenv("DEBUG_LOGGING") else logging.INFO
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 logger = logging.getLogger(__name__)
 from src.app.metadata_features import (
