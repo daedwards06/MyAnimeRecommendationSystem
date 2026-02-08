@@ -428,9 +428,32 @@ for key, default in {
     "view_mode": "list",
     "selected_seed_ids": [],
     "selected_seed_titles": [],
+    "_first_load_done": False,
+    "_default_seed_active": False,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
+
+# ============================================================================
+# FIRST-RUN EXPERIENCE: Auto-populate default seed
+# ============================================================================
+# On first load, auto-set Fullmetal Alchemist: Brotherhood as the default seed
+# This ensures portfolio reviewers see recommendations immediately.
+if (
+    not st.session_state.get("_first_load_done", False)
+    and not st.session_state.get("selected_seed_ids")
+    and str(st.session_state.get("ui_mode", "Seed-based")) == "Seed-based"
+    and not IMPORT_LIGHT
+):
+    # Find Fullmetal Alchemist: Brotherhood in metadata
+    _default_title = "Fullmetal Alchemist: Brotherhood"
+    _fmab_rows = metadata[metadata["title_display"] == _default_title]
+    if not _fmab_rows.empty:
+        _fmab_id = int(_fmab_rows.iloc[0]["anime_id"])
+        st.session_state["selected_seed_ids"] = [_fmab_id]
+        st.session_state["selected_seed_titles"] = [_default_title]
+        st.session_state["_default_seed_active"] = True
+    st.session_state["_first_load_done"] = True
 
 # ============================================================================
 # SIDEBAR: USER PROFILE (Section 1 - Top Priority)
@@ -1131,6 +1154,7 @@ if selected_seed_ids and selected_seed_titles:
     if st.sidebar.button("✖ Clear All Seeds", key="clear_seed"):
         st.session_state["selected_seed_ids"] = []
         st.session_state["selected_seed_titles"] = []
+        st.session_state["_default_seed_active"] = False
         st.rerun()
 else:
     if show_seeds_controls:
@@ -1152,6 +1176,7 @@ else:
                             current_titles.append(sample)
                             st.session_state["selected_seed_ids"] = current_ids
                             st.session_state["selected_seed_titles"] = current_titles
+                            st.session_state["_default_seed_active"] = False
                             st.rerun()
 
 
@@ -1373,6 +1398,15 @@ if browse_mode:
 else:
     # Recommendation mode (existing logic)
     ui_mode_main = str(st.session_state.get("ui_mode", "Seed-based"))
+    
+    # Show banner if default seed is active
+    if st.session_state.get("_default_seed_active", False) and selected_seed_ids and selected_seed_titles:
+        st.info(
+            f"🎬 Showing recommendations based on **{selected_seed_titles[0]}** — "
+            "change the seed in the sidebar to explore!",
+            icon="💡"
+        )
+    
     if selected_seed_ids and selected_seed_titles:
         if len(selected_seed_titles) == 1:
             st.subheader(f"Similar to: {selected_seed_titles[0]}")
@@ -1794,16 +1828,53 @@ else:
                 )
             )
         else:
-            # Cold-start / first-load clarity (mode-aware)
+            # Cold-start / seedless state — show prominent sample buttons
             st.markdown(
                 "<div style='background: linear-gradient(135deg, #E8F4F8 0%, #F0F8FF 100%); border-radius: 12px; "
                 "padding: 28px; margin: 28px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);'>"
-                "<h3 style='color: #2C3E50; margin: 0 0 10px 0;'>What this is</h3>"
-                "<p style='color: #7F8C8D; font-size: 1.0rem; margin: 0 0 10px 0;'>"
+                "<h3 style='color: #2C3E50; margin: 0 0 10px 0;'>🎬 Get Started</h3>"
+                "<p style='color: #7F8C8D; font-size: 1.0rem; margin: 0 0 20px 0;'>"
                 "A hybrid anime recommender that ranks titles similar to your chosen seed title(s)."
                 "</p>"
-                "<p style='color: #2C3E50; font-weight: 600; margin: 0;'>What next: Pick a sample seed or choose 1 title in <b>Search &amp; Seeds</b>.</p>"
+                "<p style='color: #2C3E50; font-weight: 600; margin: 0 0 16px 0;'>Try these popular titles:</p>"
                 "</div>",
+                unsafe_allow_html=True,
+            )
+            
+            # Show prominent sample buttons in main area
+            sample_titles = ["Steins;Gate", "Cowboy Bebop", "Death Note", "Fullmetal Alchemist: Brotherhood"]
+            # Get title_to_id mapping from the earlier code
+            _title_to_id = {}
+            for _, row in metadata.iterrows():
+                # Use same logic as sidebar
+                title_eng = row.get("title_english")
+                if title_eng and isinstance(title_eng, str) and title_eng.strip():
+                    _title_to_id[title_eng] = int(row["anime_id"])
+                else:
+                    title_disp = row.get("title_display")
+                    if title_disp and isinstance(title_disp, str) and title_disp.strip():
+                        _title_to_id[title_disp] = int(row["anime_id"])
+            
+            _available_samples = [t for t in sample_titles if t in _title_to_id]
+            if _available_samples:
+                cols = st.columns(4)
+                for i, sample in enumerate(_available_samples[:4]):
+                    with cols[i]:
+                        if st.button(
+                            f"🎯 {sample}",
+                            key=f"main_sample_{i}",
+                            use_container_width=True,
+                            type="primary" if i == 3 else "secondary",  # Highlight FMAB
+                        ):
+                            _aid = _title_to_id.get(sample)
+                            if _aid:
+                                st.session_state["selected_seed_ids"] = [_aid]
+                                st.session_state["selected_seed_titles"] = [sample]
+                                st.session_state["_default_seed_active"] = False
+                                st.rerun()
+            
+            st.markdown(
+                "<p style='color: #7F8C8D; text-align: center; margin-top: 20px;'>Or search for any title in the sidebar →</p>",
                 unsafe_allow_html=True,
             )
 
