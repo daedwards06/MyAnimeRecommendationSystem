@@ -712,9 +712,9 @@ REQUIREMENTS:
 **Why:** `locals().get("personalization_applied", False)` is fragile — if variable scoping changes, it silently returns the default instead of failing. Direct variable access with proper initialization is safer.
 
 **Checklist:**
-- [ ] Search for all `locals().get(` calls in app/main.py
-- [ ] Replace each with explicit variable initialization at the top of the relevant scope
-- [ ] Verify logic is preserved
+- [x] Search for all `locals().get(` calls in app/main.py
+- [x] Replace each with explicit variable initialization at the top of the relevant scope
+- [x] Verify logic is preserved
 
 **Prompt for Claude Sonnet 4.5:**
 
