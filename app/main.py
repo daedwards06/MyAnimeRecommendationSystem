@@ -25,27 +25,26 @@ if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
 # ── Project imports ──────────────────────────────────────────────────────────
-from src.app.artifacts_loader import build_artifacts  # noqa: E402
-from src.app.constants import PERSONAS_JSON  # noqa: E402
-from src.app.theme import get_theme  # noqa: E402
-
-from app.state import init_mode_state, init_session_state, setup_first_run  # noqa: E402
-from app.sidebar import render_sidebar  # noqa: E402
-from app.display import (  # noqa: E402
+from app.display import (
     inject_css,
+    render_empty_state,
+    render_footer,
     render_header,
     render_import_light_warning,
     render_onboarding_section,
     render_results,
-    render_empty_state,
-    render_footer,
 )
-from app.pipeline_runner import (  # noqa: E402
+from app.pipeline_runner import (
     RecommenderEngine,
     build_recommender_engine,
     render_artifact_load_failure,
     run_recommendations,
 )
+from app.sidebar import render_sidebar
+from app.state import init_mode_state, init_session_state, setup_first_run
+from src.app.artifacts_loader import build_artifacts
+from src.app.constants import PERSONAS_JSON
+from src.app.theme import get_theme
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 log_level = logging.DEBUG if os.getenv("DEBUG_LOGGING") else logging.INFO
@@ -97,7 +96,7 @@ if IMPORT_LIGHT:
 else:
     try:
         bundle = init_bundle()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         render_artifact_load_failure(e)
 
 metadata: pd.DataFrame = bundle["metadata"]

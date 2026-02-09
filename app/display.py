@@ -7,6 +7,8 @@ diversity mix bar, empty states, and the footer (diversity panel + help).
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import streamlit as st
@@ -18,11 +20,9 @@ from src.app.components.help import render_help_panel
 from src.app.components.instructions import render_onboarding
 from src.app.score_semantics import has_match_score
 
-from typing import TYPE_CHECKING, Callable
-
 if TYPE_CHECKING:
-    from app.sidebar import SidebarResult
     from app.pipeline_runner import PipelineRunResult
+    from app.sidebar import SidebarResult
 
 
 # ── CSS injection ────────────────────────────────────────────────────────────
@@ -30,13 +30,13 @@ if TYPE_CHECKING:
 
 def inject_css(theme: dict) -> None:
     """Inject custom CSS using design tokens from theme.
-    
+
     Args:
         theme: Theme dictionary from get_theme() containing colors, spacing, etc.
     """
     colors = theme["colors"]
     spacing = theme["spacing"]
-    
+
     st.markdown(
         f"""
 <style>
@@ -188,7 +188,7 @@ def inject_css(theme: dict) -> None:
 
 def render_header(ui_mode: str, theme: dict | None = None) -> None:
     """Render the mode-dependent page header.
-    
+
     Args:
         ui_mode: Current UI mode (Browse, Personalized, or Seed-based)
         theme: Optional theme dictionary for color tokens
@@ -196,9 +196,9 @@ def render_header(ui_mode: str, theme: dict | None = None) -> None:
     if theme is None:
         from src.app.theme import get_theme
         theme = get_theme()
-    
+
     text_muted = theme["colors"]["text_muted"]
-    
+
     if ui_mode == "Browse":
         st.markdown(
             "<h1 style='margin-bottom:0; font-weight:800;'>Anime Explorer</h1>"
@@ -241,22 +241,22 @@ def render_onboarding_section(ui_mode: str) -> None:
 def render_results(
     recs: list[dict],
     metadata: pd.DataFrame,
-    sidebar: "SidebarResult",
-    pipeline: "PipelineRunResult",
+    sidebar: SidebarResult,
+    pipeline: PipelineRunResult,
     *,
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
     theme: dict | None = None,
 ) -> None:
     """Render recommendation results: scoring details, count, mix bar, cards.
-    
+
     Args:
         theme: Optional theme dictionary for color tokens
     """
     if theme is None:
         from src.app.theme import get_theme
         theme = get_theme()
-    
+
     colors = theme["colors"]
     # Scoring path expander
     with st.expander("Scoring details", expanded=False):
@@ -281,7 +281,6 @@ def render_results(
         filter_parts.append(f"{sidebar.year_range[0]}–{sidebar.year_range[1]}")
     filters_text = f"  ·  filtered by {', '.join(filter_parts)}" if filter_parts else ""
 
-    mode_label = "Browsing" if sidebar.browse_mode else "Showing"
     item_type = "titles" if sidebar.browse_mode else "recommendations"
     st.markdown(
         f"<div style='display:flex; align-items:baseline; gap:10px; margin-bottom:6px;'>"
@@ -302,7 +301,7 @@ def render_results(
 
     # Diversity mix bar
     _render_mix_bar(
-        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn, 
+        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn,
         is_in_training_fn=is_in_training_fn, theme=theme
     )
 
@@ -319,14 +318,14 @@ def _render_mix_bar(
     theme: dict | None = None,
 ) -> None:
     """Render the compact horizontal diversity mix bar.
-    
+
     Args:
         theme: Optional theme dictionary for color tokens
     """
     if theme is None:
         from src.app.theme import get_theme
         theme = get_theme()
-    
+
     colors = theme["colors"]
     pop_count = sum(
         1
@@ -452,8 +451,8 @@ def _render_cards(
 
 
 def render_empty_state(
-    sidebar: "SidebarResult",
-    pipeline: "PipelineRunResult",
+    sidebar: SidebarResult,
+    pipeline: PipelineRunResult,
     metadata: pd.DataFrame,
 ) -> None:
     """Render the empty-state guidance when no results are available."""
