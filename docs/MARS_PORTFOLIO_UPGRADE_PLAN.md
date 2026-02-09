@@ -231,12 +231,12 @@ REQUIREMENTS:
 **Why:** `tests/conftest.py` currently only adds `sys.path`. Many test files independently create the same fixtures (mock metadata DataFrames, dummy models, sample ratings dicts). Centralising fixtures into `conftest.py` with `@pytest.fixture` eliminates duplication, makes tests more readable, and signals mature test engineering.
 
 **Checklist:**
-- [ ] Audit all test files for repeated setup patterns (DataFrames, model mocks, rating dicts)
-- [ ] Create shared fixtures in `tests/conftest.py`: `sample_metadata`, `mock_mf_model`, `mock_knn_model`, `sample_ratings`, `sample_seeds`
-- [ ] Refactor existing tests to use conftest fixtures instead of inline setup
-- [ ] Add a `pipeline_result_factory` fixture for tests that need `PipelineResult` instances
-- [ ] Verify all 210+ tests still pass after fixture consolidation
-- [ ] Remove duplicated setup code from individual test files
+- [x] Audit all test files for repeated setup patterns (DataFrames, model mocks, rating dicts)
+- [x] Create shared fixtures in `tests/conftest.py`: `sample_metadata`, `mock_mf_model`, `mock_knn_model`, `sample_ratings`, `sample_seeds`
+- [x] Refactor existing tests to use conftest fixtures instead of inline setup
+- [x] Add a `pipeline_result_factory` fixture for tests that need `PipelineResult` instances
+- [x] Verify all 210+ tests still pass after fixture consolidation
+- [x] Remove duplicated setup code from individual test files
 
 **Prompt for Claude Sonnet 4.5:**
 
