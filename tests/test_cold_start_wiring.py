@@ -20,18 +20,20 @@ def _read_repo_file(rel_path: str) -> str:
 
 def test_no_hard_coded_is_in_training_true():
     main_py = _read_repo_file("app/main.py")
+    pipeline_runner_py = _read_repo_file("app/pipeline_runner.py")
     cards_py = _read_repo_file("src/app/components/cards.py")
 
     assert "is_in_training=True" not in main_py
+    assert "is_in_training=True" not in pipeline_runner_py
     assert "is_in_training=True" not in cards_py
 
 
 def test_main_computes_training_membership_from_item_to_index():
-    main_py = _read_repo_file("app/main.py")
+    pipeline_runner_py = _read_repo_file("app/pipeline_runner.py")
 
     # We want the cold-start rule to be based on membership in item_to_index.
-    assert "item_to_index" in main_py
-    assert re.search(r"\bin\s+local_mf_model\.item_to_index\b", main_py) is not None
+    assert "item_to_index" in pipeline_runner_py
+    assert re.search(r"\bin\s+self\.mf_model\.item_to_index\b", pipeline_runner_py) is not None
 
 
 def test_cards_require_explicit_is_in_training_flag():
