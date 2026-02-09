@@ -25,42 +25,7 @@ from src.app.scoring_pipeline import (
     run_personalized_pipeline,
     run_seed_based_pipeline,
 )
-
-# ---------------------------------------------------------------------------
-# Mock Models
-# ---------------------------------------------------------------------------
-
-
-class MockMFModel:
-    """Mock MF model with minimal attributes required by the pipeline."""
-
-    def __init__(self, n_users: int = 3, n_items: int = 10, n_factors: int = 8):
-        np.random.seed(42)
-        self.P = np.random.randn(n_users, n_factors).astype(np.float32) * 0.1
-        self.Q = np.random.randn(n_items, n_factors).astype(np.float32) * 0.1
-        self.item_to_index = {i: i for i in range(n_items)}
-        self.index_to_item = {i: i for i in range(n_items)}
-        self.global_mean = 7.0
-        self.n_factors = n_factors
-
-    def predict_for_user(self, user_index: int, item_indices: list[int]) -> np.ndarray:
-        """Predict scores for a user and list of item indices."""
-        scores = self.global_mean + self.P[user_index] @ self.Q[item_indices].T
-        return scores
-
-    @property
-    def mf_stem(self) -> str:
-        """Return a mock stem for artifact versioning."""
-        return "mock_v1.0"
-
-
-class MockKNNModel:
-    """Mock kNN model (optional — pipeline works with knn=None)."""
-
-    def __init__(self, n_items: int = 10):
-        np.random.seed(43)
-        self.model = None  # Not needed for basic tests
-
+from conftest import MockMFModel, MockKNNModel
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -68,7 +33,7 @@ class MockKNNModel:
 
 
 @pytest.fixture
-def mock_metadata_df() -> pd.DataFrame:
+def sample_metadata() -> pd.DataFrame:
     """Small realistic metadata DataFrame for testing."""
     return pd.DataFrame(
         [
@@ -248,15 +213,13 @@ def mock_metadata_df() -> pd.DataFrame:
 
 @pytest.fixture
 def mock_mf_model() -> MockMFModel:
-    """Mock MF model with 3 users and 10 items."""
+    """Mock MF model with 3 users and 10 items (override conftest default)."""
     return MockMFModel(n_users=3, n_items=10, n_factors=8)
 
 
-@pytest.fixture
-def mock_knn_model() -> MockKNNModel | None:
-    """Mock kNN model (None is acceptable for most tests)."""
-    return None
+# Reuse mock_knn_model from conftest (it returns None by default)
 
+# Reuse mock_bundle from conftest (it will use sample_metadata and mock_mf_model)
 
 @pytest.fixture
 def mock_components(mock_mf_model: MockMFModel) -> HybridComponents:
@@ -282,10 +245,10 @@ def mock_recommender(mock_components: HybridComponents) -> HybridRecommender:
 
 
 @pytest.fixture
-def mock_bundle(mock_mf_model: MockMFModel, mock_metadata_df: pd.DataFrame) -> dict:
+def mock_bundle(mock_mf_model: MockMFModel, sample_metadata: pd.DataFrame) -> dict:
     """Mock artifact bundle."""
     return {
-        "metadata": mock_metadata_df,
+        "metadata": sample_metadata,
         "models": {
             "mf": mock_mf_model,
             "knn": None,
@@ -297,7 +260,7 @@ def mock_bundle(mock_mf_model: MockMFModel, mock_metadata_df: pd.DataFrame) -> d
 
 @pytest.fixture
 def mock_scoring_context(
-    mock_metadata_df: pd.DataFrame,
+    sample_metadata: pd.DataFrame,
     mock_bundle: dict,
     mock_recommender: HybridRecommender,
     mock_components: HybridComponents,
@@ -311,11 +274,11 @@ def mock_scoring_context(
     # Helper functions
     def pop_pct_fn(anime_id: int) -> float:
         """Mock popularity percentile."""
-        row = mock_metadata_df[mock_metadata_df["anime_id"] == anime_id]
+        row = sample_metadata[sample_metadata["anime_id"] == anime_id]
         if row.empty:
             return 0.0
         members = row.iloc[0]["members_count"]
-        max_members = mock_metadata_df["members_count"].max()
+        max_members = sample_metadata["members_count"].max()
         return float(members / max_members) if max_members > 0 else 0.0
 
     def is_in_training_fn(anime_id: int) -> bool:
@@ -323,7 +286,7 @@ def mock_scoring_context(
         return 1 <= anime_id <= 10
 
     return ScoringContext(
-        metadata=mock_metadata_df,
+        metadata=sample_metadata,
         bundle=mock_bundle,
         recommender=mock_recommender,
         components=mock_components,

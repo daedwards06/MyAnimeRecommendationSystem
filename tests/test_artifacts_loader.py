@@ -24,23 +24,11 @@ from src.app.artifacts_loader import (
     ArtifactContractError,
     build_artifacts,
 )
+from conftest import MockMFModel
 
 # ---------------------------------------------------------------------------
 # Mock Model Classes
 # ---------------------------------------------------------------------------
-
-
-class MockMFModel:
-    """Mock MF model with all required attributes."""
-
-    def __init__(self, n_users: int = 5, n_items: int = 10, n_factors: int = 8):
-        np.random.seed(42)
-        self.P = np.random.randn(n_users, n_factors).astype(np.float32) * 0.1
-        self.Q = np.random.randn(n_items, n_factors).astype(np.float32) * 0.1
-        self.item_to_index = {i: i for i in range(n_items)}
-        self.index_to_item = {i: i for i in range(n_items)}
-        self.global_mean = 7.0
-        self.n_factors = n_factors
 
 
 class IncompleteMFModel:

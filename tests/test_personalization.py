@@ -36,20 +36,7 @@ def mock_mf_model():
     return MockMFModel(n_items=100, n_factors=64)
 
 
-@pytest.fixture
-def sample_ratings():
-    """Fixture providing sample ratings."""
-    return {
-        0: 10,
-        1: 9,
-        2: 8,
-        3: 7,
-        5: 8,
-        10: 9,
-        15: 6,
-        20: 7,
-    }
-
+# Reuse sample_ratings from conftest (identical fixture)
 
 @pytest.fixture
 def metadata_df():
