@@ -104,11 +104,11 @@ REQUIREMENTS:
 **Why:** `theme.py` defines a complete design-token system (colors, spacing, typography, elevation) but the CSS in `main.py` hardcodes hex values directly. This is dead code — a code reviewer will see `from src.app.theme import get_theme` followed by zero usages. Either use it or remove it.
 
 **Checklist:**
-- [ ] Audit the CSS `<style>` block in `app/main.py` (or `app/display.py` after Task 1.1) for hardcoded colors/spacing
-- [ ] Replace hardcoded values with references to `get_theme()` tokens
-- [ ] Update `inject_css()` to accept a `theme` dict and interpolate tokens via f-string or `.format()`
-- [ ] Add at least one test verifying that `get_theme()` returns expected keys
-- [ ] Verify visual appearance is unchanged after wiring
+- [x] Audit the CSS `<style>` block in `app/main.py` (or `app/display.py` after Task 1.1) for hardcoded colors/spacing
+- [x] Replace hardcoded values with references to `get_theme()` tokens
+- [x] Update `inject_css()` to accept a `theme` dict and interpolate tokens via f-string or `.format()`
+- [x] Add at least one test verifying that `get_theme()` returns expected keys
+- [x] Verify visual appearance is unchanged after wiring
 
 **Prompt for Claude Sonnet 4.5:**
 

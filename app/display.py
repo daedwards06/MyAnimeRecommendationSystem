@@ -28,148 +28,155 @@ if TYPE_CHECKING:
 # ── CSS injection ────────────────────────────────────────────────────────────
 
 
-def inject_css() -> None:
-    """Inject custom CSS for a modern, polished aesthetic."""
+def inject_css(theme: dict) -> None:
+    """Inject custom CSS using design tokens from theme.
+    
+    Args:
+        theme: Theme dictionary from get_theme() containing colors, spacing, etc.
+    """
+    colors = theme["colors"]
+    spacing = theme["spacing"]
+    
     st.markdown(
-        """
+        f"""
 <style>
     /* ===== Global Layout ===== */
-    .main .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
+    .main .block-container {{
+        padding-top: {spacing['xl']}px;
+        padding-bottom: {spacing['xxl']}px;
         max-width: 1100px;
-    }
+    }}
 
     /* ===== Typography ===== */
-    h1 {
-        color: #1A1A2E;
+    h1 {{
+        color: {colors['text_primary']};
         font-weight: 800;
         letter-spacing: -0.02em;
         margin-bottom: 0.25rem;
-    }
-    h2 {
-        color: #1A1A2E;
+    }}
+    h2 {{
+        color: {colors['text_primary']};
         font-weight: 700;
         letter-spacing: -0.01em;
-    }
-    h3 {
-        color: #2D3748;
+    }}
+    h3 {{
+        color: {colors['text_dark']};
         font-weight: 600;
-    }
-    .stMarkdown { line-height: 1.65; }
+    }}
+    .stMarkdown {{ line-height: 1.65; }}
 
     /* ===== Sidebar ===== */
-    [data-testid="stSidebar"] {
-        background: #FAFBFC;
-        border-right: 1px solid #E2E8F0;
-    }
+    [data-testid="stSidebar"] {{
+        background: {colors['bg']};
+        border-right: 1px solid {colors['border']};
+    }}
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 {
+    [data-testid="stSidebar"] h3 {{
         font-size: 0.95rem;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: #4A5568;
-    }
+        color: {colors['text_secondary']};
+    }}
 
     /* ===== Buttons ===== */
-    .stButton > button {
+    .stButton > button {{
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.2s ease;
-        border: 1px solid #E2E8F0;
-    }
-    .stButton > button:hover {
+        border: 1px solid {colors['border']};
+    }}
+    .stButton > button:hover {{
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(108, 99, 255, 0.18);
-    }
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #6C63FF 0%, #5A52D5 100%);
+    }}
+    .stButton > button[kind="primary"] {{
+        background: linear-gradient(135deg, {colors['primary']} 0%, {colors['primary_dark']} 100%);
         border: none;
-    }
+    }}
 
     /* ===== Genre pill buttons ===== */
-    button[kind="secondary"] {
-        background-color: #F0EFFF !important;
-        color: #6C63FF !important;
-        border: 1px solid #D6D3FF !important;
-        padding: 4px 14px !important;
+    button[kind="secondary"] {{
+        background-color: {colors['primary_bg']} !important;
+        color: {colors['primary']} !important;
+        border: 1px solid {colors['primary_border']} !important;
+        padding: {spacing['xs']}px {spacing['md']}px !important;
         font-size: 0.78rem !important;
         border-radius: 20px !important;
         font-weight: 600 !important;
         min-height: 30px !important;
         height: 30px !important;
         letter-spacing: 0.02em !important;
-    }
-    button[kind="secondary"]:hover {
-        background-color: #6C63FF !important;
-        color: #FFFFFF !important;
-        border-color: #6C63FF !important;
+    }}
+    button[kind="secondary"]:hover {{
+        background-color: {colors['primary']} !important;
+        color: {colors['text_inverse']} !important;
+        border-color: {colors['primary']} !important;
         transform: translateY(-1px) !important;
         box-shadow: 0 3px 10px rgba(108, 99, 255, 0.25) !important;
-    }
+    }}
 
     /* ===== Containers / Cards ===== */
-    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {
-        border-radius: 12px !important;
-        border: 1px solid #E2E8F0 !important;
+    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {{
+        border-radius: {spacing['md']}px !important;
+        border: 1px solid {colors['border']} !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         transition: box-shadow 0.2s ease, transform 0.2s ease;
-    }
-    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"]:hover {
+    }}
+    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"]:hover {{
         box-shadow: 0 8px 24px rgba(0,0,0,0.08);
         transform: translateY(-2px);
-    }
+    }}
 
     /* ===== Expander ===== */
-    .streamlit-expanderHeader {
+    .streamlit-expanderHeader {{
         font-weight: 600;
-        color: #2D3748;
+        color: {colors['text_dark']};
         font-size: 0.9rem;
-    }
+    }}
 
     /* ===== Metrics ===== */
-    [data-testid="stMetric"] {
-        background: #F7FAFC;
-        border: 1px solid #E2E8F0;
+    [data-testid="stMetric"] {{
+        background: {colors['bg_alt']};
+        border: 1px solid {colors['border']};
         border-radius: 10px;
-        padding: 12px 16px;
-    }
-    [data-testid="stMetricLabel"] {
-        color: #4A5568;
+        padding: {spacing['md']}px {spacing['lg']}px;
+    }}
+    [data-testid="stMetricLabel"] {{
+        color: {colors['text_secondary']};
         font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-    }
+    }}
 
     /* ===== Dividers ===== */
-    hr {
+    hr {{
         border: none;
         height: 1px;
-        background: linear-gradient(90deg, transparent, #E2E8F0, transparent);
-        margin: 1.5rem 0;
-    }
+        background: linear-gradient(90deg, transparent, {colors['border']}, transparent);
+        margin: {spacing['xl']}px 0;
+    }}
 
     /* ===== Captions ===== */
-    [data-testid="stCaptionContainer"] {
-        color: #A0AEC0;
+    [data-testid="stCaptionContainer"] {{
+        color: {colors['text_muted']};
         font-size: 0.82rem;
-    }
+    }}
 
     /* ===== Radio group horizontal ===== */
-    .stRadio > div[role="radiogroup"] {
-        gap: 0.5rem;
-    }
+    .stRadio > div[role="radiogroup"] {{
+        gap: {spacing['sm']}px;
+    }}
 
     /* ===== Selectbox / Multiselect ===== */
-    .stSelectbox, .stMultiSelect {
+    .stSelectbox, .stMultiSelect {{
         border-radius: 8px;
-    }
+    }}
 
     /* ===== Hide default Streamlit branding ===== */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+    header {{visibility: hidden;}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -179,26 +186,37 @@ def inject_css() -> None:
 # ── Header ───────────────────────────────────────────────────────────────────
 
 
-def render_header(ui_mode: str) -> None:
-    """Render the mode-dependent page header."""
+def render_header(ui_mode: str, theme: dict | None = None) -> None:
+    """Render the mode-dependent page header.
+    
+    Args:
+        ui_mode: Current UI mode (Browse, Personalized, or Seed-based)
+        theme: Optional theme dictionary for color tokens
+    """
+    if theme is None:
+        from src.app.theme import get_theme
+        theme = get_theme()
+    
+    text_muted = theme["colors"]["text_muted"]
+    
     if ui_mode == "Browse":
         st.markdown(
             "<h1 style='margin-bottom:0; font-weight:800;'>Anime Explorer</h1>"
-            "<p style='color:#A0AEC0; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
+            f"<p style='color:{text_muted}; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
             "Browse the catalog by genre, type, and year</p>",
             unsafe_allow_html=True,
         )
     elif ui_mode == "Personalized":
         st.markdown(
             "<h1 style='margin-bottom:0; font-weight:800;'>Your Recommendations</h1>"
-            "<p style='color:#A0AEC0; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
+            f"<p style='color:{text_muted}; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
             "Ranked from your rated history</p>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
             "<h1 style='margin-bottom:0; font-weight:800;'>Anime Recommender</h1>"
-            "<p style='color:#A0AEC0; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
+            f"<p style='color:{text_muted}; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
             "Discover anime similar to titles you love</p>",
             unsafe_allow_html=True,
         )
@@ -228,8 +246,18 @@ def render_results(
     *,
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
+    theme: dict | None = None,
 ) -> None:
-    """Render recommendation results: scoring details, count, mix bar, cards."""
+    """Render recommendation results: scoring details, count, mix bar, cards.
+    
+    Args:
+        theme: Optional theme dictionary for color tokens
+    """
+    if theme is None:
+        from src.app.theme import get_theme
+        theme = get_theme()
+    
+    colors = theme["colors"]
     # Scoring path expander
     with st.expander("Scoring details", expanded=False):
         st.caption(f"Active scoring path: {pipeline.active_scoring_path}")
@@ -257,9 +285,9 @@ def render_results(
     item_type = "titles" if sidebar.browse_mode else "recommendations"
     st.markdown(
         f"<div style='display:flex; align-items:baseline; gap:10px; margin-bottom:6px;'>"
-        f"<span style='font-size:1.15rem; font-weight:700; color:#1A1A2E;'>"
+        f"<span style='font-size:1.15rem; font-weight:700; color:{colors['text_primary']};'>"
         f"{len(recs)} {item_type}</span>"
-        f"<span style='font-size:0.82rem; color:#A0AEC0;'>"
+        f"<span style='font-size:0.82rem; color:{colors['text_muted']};'>"
         f"of {total_anime:,}{filters_text}</span>"
         f"</div>",
         unsafe_allow_html=True,
@@ -273,7 +301,10 @@ def render_results(
         st.caption(f"Sorted by {sidebar.sort_by}")
 
     # Diversity mix bar
-    _render_mix_bar(recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn, is_in_training_fn=is_in_training_fn)
+    _render_mix_bar(
+        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn, 
+        is_in_training_fn=is_in_training_fn, theme=theme
+    )
 
     # Cards
     _render_cards(recs, metadata, pop_pct_fn=pop_pct_fn, is_in_training_fn=is_in_training_fn)
@@ -285,8 +316,18 @@ def _render_mix_bar(
     *,
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
+    theme: dict | None = None,
 ) -> None:
-    """Render the compact horizontal diversity mix bar."""
+    """Render the compact horizontal diversity mix bar.
+    
+    Args:
+        theme: Optional theme dictionary for color tokens
+    """
+    if theme is None:
+        from src.app.theme import get_theme
+        theme = get_theme()
+    
+    colors = theme["colors"]
     pop_count = sum(
         1
         for r in recs
@@ -316,21 +357,21 @@ def _render_mix_bar(
     bar_segments: list[str] = []
     if pop_count > 0:
         bar_segments.append(
-            f'<div style="background:#FC8181; flex:{pop_count}; height:6px;" '
+            f'<div style="background:{colors["popular"]}; flex:{pop_count}; height:6px;" '
             f'title="Popular: {pop_count}"></div>'
         )
     if mid_count > 0:
         bar_segments.append(
-            f'<div style="background:#63B3ED; flex:{mid_count}; height:6px;" '
+            f'<div style="background:{colors["midrange"]}; flex:{mid_count}; height:6px;" '
             f'title="Mid-range: {mid_count}"></div>'
         )
     if long_tail_count > 0:
         bar_segments.append(
-            f'<div style="background:#B794F4; flex:{long_tail_count}; height:6px;" '
+            f'<div style="background:{colors["longtail"]}; flex:{long_tail_count}; height:6px;" '
             f'title="Hidden gems: {long_tail_count}"></div>'
         )
     if not bar_segments:
-        bar_segments.append('<div style="background:#A0AEC0; flex:1; height:6px;"></div>')
+        bar_segments.append(f'<div style="background:{colors["text_muted"]}; flex:1; height:6px;"></div>')
     bar_html = "".join(bar_segments)
 
     mix_label = "Catalog mix" if browse_mode else "Recommendation mix"
@@ -338,14 +379,14 @@ def _render_mix_bar(
         f"""
     <div style="margin: 8px 0 20px 0;">
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-            <span style="font-size:0.75rem; color:#A0AEC0; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">{mix_label}</span>
-            <span style="font-size:0.72rem; color:#A0AEC0;">
-                <span style="color:#FC8181;">●</span> Popular {pop_count}
-                &nbsp;<span style="color:#63B3ED;">●</span> Mid {mid_count}
-                &nbsp;<span style="color:#B794F4;">●</span> Hidden gems {long_tail_count}
+            <span style="font-size:0.75rem; color:{colors['text_muted']}; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">{mix_label}</span>
+            <span style="font-size:0.72rem; color:{colors['text_muted']};">
+                <span style="color:{colors['popular']};">●</span> Popular {pop_count}
+                &nbsp;<span style="color:{colors['midrange']};">●</span> Mid {mid_count}
+                &nbsp;<span style="color:{colors['longtail']};">●</span> Hidden gems {long_tail_count}
             </span>
         </div>
-        <div style="display:flex; height:6px; border-radius:3px; overflow:hidden; background:#EDF2F7;">
+        <div style="display:flex; height:6px; border-radius:3px; overflow:hidden; background:{colors['border_light']};">
             {bar_html}
         </div>
     </div>

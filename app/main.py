@@ -112,9 +112,9 @@ init_mode_state()
 init_session_state()
 
 # ── CSS & header ─────────────────────────────────────────────────────────────
-inject_css()
+inject_css(theme)
 _ui_mode_for_header = str(st.session_state.get("ui_mode", "Seed-based"))
-render_header(_ui_mode_for_header)
+render_header(_ui_mode_for_header, theme)
 render_import_light_warning()
 render_onboarding_section(_ui_mode_for_header)
 
@@ -206,6 +206,7 @@ if pipeline_result.recs:
         pipeline_result,
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
+        theme=theme,
     )
 elif sidebar_state.browse_mode and sidebar_state.genre_filter:
     # Browse returned zero results

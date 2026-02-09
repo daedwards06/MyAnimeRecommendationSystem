@@ -8,13 +8,16 @@ from __future__ import annotations
 COLORS = {
     # Brand
     "primary": "#6C63FF",        # Indigo / main accent
+    "primary_dark": "#5A52D5",   # Darker variant for gradients
     "primary_light": "#A5A0FF",  # Lighter variant for hover/backgrounds
     "primary_bg": "#F0EFFF",     # Very light for tinted backgrounds
+    "primary_border": "#D6D3FF", # Border for primary elements
     "accent": "#FF6B6B",         # Coral for warm highlights
     "accent_alt": "#4ECDC4",     # Teal for secondary accent
 
     # Surfaces
     "bg": "#FAFBFC",
+    "bg_alt": "#F7FAFC",         # Slightly different light gray
     "surface": "#FFFFFF",
     "surface_alt": "#F0F2F6",
     "surface_elevated": "#FFFFFF",
@@ -24,6 +27,7 @@ COLORS = {
     # Text
     "text_primary": "#1A1A2E",
     "text_secondary": "#4A5568",
+    "text_dark": "#2D3748",      # Darker secondary text
     "text_muted": "#A0AEC0",
     "text_inverse": "#FFFFFF",
 
