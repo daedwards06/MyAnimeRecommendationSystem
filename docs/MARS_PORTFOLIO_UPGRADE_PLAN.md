@@ -24,14 +24,14 @@
 **Why:** A 1,931-line single-file Streamlit app is the number-one code smell a portfolio reviewer will notice. Splitting it into sidebar, state management, display, and pipeline-runner modules proves you understand separation of concerns and makes the codebase navigable.
 
 **Checklist:**
-- [ ] Create `app/sidebar.py` — extract sidebar sections (profile, personalization, search, filters, help): ~L505–1160
-- [ ] Create `app/state.py` — extract session-state initialisation, query-param helpers, `_qp_get()`, `_ratings_signature()`: ~L219–456, L457–504, L752
-- [ ] Create `app/display.py` — extract CSS injection, header rendering, card orchestration, diversity panel: ~L232–375, L1160–1931
-- [ ] Create `app/pipeline_runner.py` — extract the glue that calls `scoring_pipeline` and feeds results to display: ~L1160–1400
-- [ ] Update `app/main.py` to import and wire the extracted modules (<300 lines target)
-- [ ] Move `_coerce_genres()` at L1653 to use the canonical `src/utils/parsing.py` import (if it exists from the earlier plan's Task 5.1)
-- [ ] Verify all 210+ existing tests still pass
-- [ ] Verify the app runs end-to-end: `streamlit run app/main.py`
+- [x] Create `app/sidebar.py` — extract sidebar sections (profile, personalization, search, filters, help): ~L505–1160
+- [x] Create `app/state.py` — extract session-state initialisation, query-param helpers, `_qp_get()`, `_ratings_signature()`: ~L219–456, L457–504, L752
+- [x] Create `app/display.py` — extract CSS injection, header rendering, card orchestration, diversity panel: ~L232–375, L1160–1931
+- [x] Create `app/pipeline_runner.py` — extract the glue that calls `scoring_pipeline` and feeds results to display: ~L1160–1400
+- [x] Update `app/main.py` to import and wire the extracted modules (<300 lines target)
+- [x] Move `_coerce_genres()` at L1653 to use the canonical `src/utils/parsing.py` import (if it exists from the earlier plan's Task 5.1)
+- [x] Verify all 210+ existing tests still pass
+- [x] Verify the app runs end-to-end: `streamlit run app/main.py`
 
 **Prompt for Claude Sonnet 4.5:**
 
