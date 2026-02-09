@@ -668,15 +668,27 @@ def _render_search_seeds_section(metadata, result: SidebarResult) -> None:
 
 
 def _render_filters_display_section(metadata, result: SidebarResult) -> None:
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(
+    """Render filters section in sidebar.
+    
+    Note: Fragment optimization for this section requires restructuring to avoid
+    st.sidebar calls inside fragments. This is a known Streamlit limitation.
+    """
+    with st.sidebar:
+        _render_filters_display_fragment(metadata, result)
+
+
+@st.fragment
+def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
+    """Filter panel fragment - reruns independently without triggering pipeline."""
+    st.markdown("---")
+    st.markdown(
         "<p style='font-weight:700; font-size:0.8rem; color:#4A5568; "
         "letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>"
         "Filters &amp; Display</p>",
         unsafe_allow_html=True,
     )
 
-    top_n = st.sidebar.slider(
+    top_n = st.slider(
         "Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N))
     )
     st.session_state["top_n"] = top_n
@@ -684,7 +696,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
 
     browse_mode = bool(st.session_state.get("browse_mode", False))
     if browse_mode:
-        st.sidebar.caption("Browse mode: select at least one genre to see results.")
+        st.caption("Browse mode: select at least one genre to see results.")
 
     default_sort_for_mode = "MAL Score" if browse_mode else "Match score"
     result.default_sort_for_mode = default_sort_for_mode
@@ -697,7 +709,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
     current_sort = st.session_state.get("sort_by", default_sort_for_mode)
     if current_sort not in sort_options:
         current_sort = default_sort_for_mode
-    sort_by = st.sidebar.selectbox(
+    sort_by = st.selectbox(
         "Sort by",
         sort_options,
         index=sort_options.index(current_sort),
@@ -713,7 +725,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
             all_genres.update([str(g).strip() for g in genres_val if g])
     genre_options = sorted(list(all_genres))
 
-    genre_filter = st.sidebar.multiselect(
+    genre_filter = st.multiselect(
         "Filter by Genre",
         options=genre_options,
         default=st.session_state.get("genre_filter", []),
@@ -732,7 +744,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
         else ["TV", "Movie", "OVA", "Special", "ONA", "Music"]
     )
 
-    type_filter = st.sidebar.multiselect(
+    type_filter = st.multiselect(
         "Filter by Type",
         options=type_options,
         default=st.session_state.get("type_filter", []),
@@ -740,7 +752,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
     )
     result.type_filter = list(type_filter)
 
-    year_range = st.sidebar.slider(
+    year_range = st.slider(
         "Release Year Range",
         min_value=1960,
         max_value=2025,
@@ -759,7 +771,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
     st.session_state["year_max"] = year_range[1]
 
     # View mode toggle
-    view_mode = st.sidebar.radio(
+    view_mode = st.radio(
         "📊 View Mode",
         ["List", "Grid"],
         index=0 if st.session_state.get("view_mode", "list") == "list" else 1,
@@ -777,7 +789,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
         or year_range[1] < 2025
         or sort_by != default_sort_for_mode
     ):
-        if st.sidebar.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
+        if st.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
             st.session_state["sort_by"] = default_sort_for_mode
             st.session_state["genre_filter"] = []
             st.session_state["type_filter"] = []
@@ -856,7 +868,19 @@ def _render_seed_indicator(result: SidebarResult) -> None:
 
 
 def _render_performance_section() -> None:
-    with st.sidebar.expander("Performance", expanded=False):
+    """Render performance metrics in sidebar.
+    
+    Note: Fragment optimization for this section requires restructuring to avoid
+    st.sidebar calls inside fragments. This is a known Streamlit limitation.
+    """
+    with st.sidebar:
+        _render_performance_fragment()
+
+
+@st.fragment
+def _render_performance_fragment() -> None:
+    """Performance metrics fragment - reruns independently."""
+    with st.expander("Performance", expanded=False):
         from src.app.profiling import get_last_timing
 
         try:
@@ -879,3 +903,8 @@ def _render_performance_section() -> None:
                 st.caption("Run a ranked mode to see timing data.")
         except Exception:
             st.caption("Run a ranked mode to see metrics.")
+        
+        # Show pipeline timing from main flow
+        pipeline_ms = st.session_state.get("_pipeline_ms")
+        if pipeline_ms is not None:
+            st.caption(f"Last pipeline: {pipeline_ms:.0f}ms")

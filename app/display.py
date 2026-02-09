@@ -598,5 +598,15 @@ def render_footer(
     ui_mode: str,
 ) -> None:
     """Render the diversity panel and help/FAQ section."""
-    render_diversity_panel(recs, metadata, is_browse=browse_mode)
+    _render_diversity_panel_fragment(recs, metadata, is_browse=browse_mode)
     render_help_panel(ui_mode=ui_mode)
+
+
+@st.fragment
+def _render_diversity_panel_fragment(
+    recs: list[dict],
+    metadata: pd.DataFrame,
+    is_browse: bool = False,
+) -> None:
+    """Diversity panel fragment - reruns independently when expanded/collapsed."""
+    render_diversity_panel(recs, metadata, is_browse=is_browse)

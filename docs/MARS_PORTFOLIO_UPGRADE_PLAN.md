@@ -163,12 +163,12 @@ REQUIREMENTS:
 **Why:** Every widget interaction triggers a full rerun of all 1,931 lines (or the equivalent after splitting). `@st.fragment` (Streamlit ≥1.33) lets sidebar controls, filter panels, and the diversity panel rerun independently — noticeably faster UX and a modern Streamlit best-practice to showcase.
 
 **Checklist:**
-- [ ] Verify Streamlit version ≥1.33 in requirements.txt (current: 1.38 — good)
-- [ ] Wrap the sidebar rendering function in `@st.fragment`
-- [ ] Wrap the diversity/explanation panel in `@st.fragment`
-- [ ] Wrap the filter controls in `@st.fragment`
-- [ ] Test that changing a filter does NOT re-execute the full scoring pipeline
-- [ ] Measure before/after rerun latency with `st.session_state["_last_rerun_ms"]` timing
+- [x] Verify Streamlit version ≥1.33 in requirements.txt (current: 1.38 — good)
+- [x] Wrap the sidebar rendering function in `@st.fragment`
+- [x] Wrap the diversity/explanation panel in `@st.fragment`
+- [x] Wrap the filter controls in `@st.fragment`
+- [x] Test that changing a filter does NOT re-execute the full scoring pipeline
+- [x] Measure before/after rerun latency with `st.session_state["_last_rerun_ms"]` timing
 
 **Prompt for Claude Sonnet 4.5:**
 
