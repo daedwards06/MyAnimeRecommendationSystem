@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -136,7 +137,10 @@ else:
     engine = build_recommender_engine(bundle)
 
 # ── Execute pipeline ─────────────────────────────────────────────────────────
+pipeline_start = time.perf_counter()
 pipeline_result = run_recommendations(engine, sidebar_state, bundle, metadata)
+pipeline_elapsed = (time.perf_counter() - pipeline_start) * 1000
+st.session_state["_pipeline_ms"] = pipeline_elapsed
 
 # ── Main-area content header ─────────────────────────────────────────────────
 st.markdown("---")
