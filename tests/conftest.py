@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 
 class MockMFModel:
     """Mock matrix factorization model for testing.
-    
+
     Provides realistic attributes required by the recommendation pipeline:
     - P: user factors matrix
     - Q: item factors matrix
@@ -56,7 +56,7 @@ class MockMFModel:
 
 class MockKNNModel:
     """Mock k-nearest neighbors model for testing.
-    
+
     Minimal implementation - the pipeline handles knn=None gracefully.
     """
 
@@ -73,7 +73,7 @@ class MockKNNModel:
 @pytest.fixture
 def sample_metadata() -> pd.DataFrame:
     """Comprehensive metadata DataFrame with 10 diverse anime for testing.
-    
+
     Covers:
     - Popular titles (FMA, Steins;Gate, Attack on Titan)
     - Different types (TV, Movie)
@@ -291,7 +291,7 @@ def sample_metadata() -> pd.DataFrame:
 @pytest.fixture
 def sample_ratings() -> dict[int, float]:
     """Sample user ratings for 8 anime (IDs 0-20).
-    
+
     Mix of high ratings (9-10) and moderate ratings (6-8) to test
     weighted averaging and personalization.
     """
@@ -310,7 +310,7 @@ def sample_ratings() -> dict[int, float]:
 @pytest.fixture
 def sample_seeds() -> list[int]:
     """Default seed anime IDs for testing seed-based recommendations.
-    
+
     Uses popular well-connected anime (FMA:B, Steins;Gate, HxH).
     """
     return [1, 2, 3]
@@ -341,7 +341,7 @@ def mock_knn_model() -> MockKNNModel | None:
 @pytest.fixture
 def mock_bundle(mock_mf_model: MockMFModel, sample_metadata: pd.DataFrame) -> dict:
     """Mock artifact bundle with models and metadata.
-    
+
     Structure matches the return value of build_artifacts().
     """
     return {
@@ -356,9 +356,9 @@ def mock_bundle(mock_mf_model: MockMFModel, sample_metadata: pd.DataFrame) -> di
 
 
 @pytest.fixture
-def mock_components(mock_mf_model: MockMFModel) -> "HybridComponents":
+def mock_components(mock_mf_model: MockMFModel):
     """Mock HybridComponents for HybridRecommender.
-    
+
     Precomputes MF scores for all user-item pairs.
     Requires HybridComponents to be imported (deferred import to avoid circular deps).
     """
@@ -378,7 +378,7 @@ def mock_components(mock_mf_model: MockMFModel) -> "HybridComponents":
 
 
 @pytest.fixture
-def mock_recommender(mock_components: "HybridComponents") -> "HybridRecommender":
+def mock_recommender(mock_components):
     """Mock HybridRecommender instance ready for testing."""
     from src.app.recommender import HybridRecommender
 

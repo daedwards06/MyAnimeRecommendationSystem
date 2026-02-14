@@ -213,3 +213,6 @@ models/*.joblib
 
 # Windows shortcuts
 *.lnk
+
+#acrhive files
+archive/

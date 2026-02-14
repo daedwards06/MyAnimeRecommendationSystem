@@ -19,12 +19,12 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
+from conftest import MockMFModel
 
 from src.app.artifacts_loader import (
     ArtifactContractError,
     build_artifacts,
 )
-from conftest import MockMFModel
 
 # ---------------------------------------------------------------------------
 # Mock Model Classes

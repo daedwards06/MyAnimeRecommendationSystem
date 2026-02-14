@@ -16,6 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from conftest import MockMFModel
 
 from src.app.recommender import HybridComponents, HybridRecommender
 from src.app.scoring_pipeline import (
@@ -25,7 +26,6 @@ from src.app.scoring_pipeline import (
     run_personalized_pipeline,
     run_seed_based_pipeline,
 )
-from conftest import MockMFModel, MockKNNModel
 
 # ---------------------------------------------------------------------------
 # Fixtures
