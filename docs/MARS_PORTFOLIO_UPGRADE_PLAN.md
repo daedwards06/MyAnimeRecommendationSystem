@@ -231,12 +231,12 @@ REQUIREMENTS:
 **Why:** `tests/conftest.py` currently only adds `sys.path`. Many test files independently create the same fixtures (mock metadata DataFrames, dummy models, sample ratings dicts). Centralising fixtures into `conftest.py` with `@pytest.fixture` eliminates duplication, makes tests more readable, and signals mature test engineering.
 
 **Checklist:**
-- [x] Audit all test files for repeated setup patterns (DataFrames, model mocks, rating dicts)
-- [x] Create shared fixtures in `tests/conftest.py`: `sample_metadata`, `mock_mf_model`, `mock_knn_model`, `sample_ratings`, `sample_seeds`
-- [x] Refactor existing tests to use conftest fixtures instead of inline setup
-- [x] Add a `pipeline_result_factory` fixture for tests that need `PipelineResult` instances
-- [x] Verify all 210+ tests still pass after fixture consolidation
-- [x] Remove duplicated setup code from individual test files
+- [ ] Audit all test files for repeated setup patterns (DataFrames, model mocks, rating dicts)
+- [ ] Create shared fixtures in `tests/conftest.py`: `sample_metadata`, `mock_mf_model`, `mock_knn_model`, `sample_ratings`, `sample_seeds`
+- [ ] Refactor existing tests to use conftest fixtures instead of inline setup
+- [ ] Add a `pipeline_result_factory` fixture for tests that need `PipelineResult` instances
+- [ ] Verify all 210+ tests still pass after fixture consolidation
+- [ ] Remove duplicated setup code from individual test files
 
 **Prompt for Claude Sonnet 4.5:**
 
@@ -311,13 +311,13 @@ REQUIREMENTS:
 **Why:** The current pipeline optimises purely for relevance — there is no intra-list diversity mechanism. This means recommending Naruto can return 10 battle-shounen shows. MMR (Carbonell & Goldstein, 1998) is the gold-standard reranking method that trades off relevance and diversity. Implementing it signals you understand beyond-accuracy evaluation and real-world recommendation challenges.
 
 **Checklist:**
-- [ ] Add `mmr_rerank()` to `src/app/diversity.py`
-- [ ] Integrate MMR as an optional post-Stage-2 reranking step in `src/app/scoring_pipeline.py`
-- [ ] Add a `diversity_lambda` parameter (0.0 = pure relevance, 1.0 = max diversity, default 0.3)
-- [ ] Wire a Streamlit slider in the sidebar for diversity control
-- [ ] Add unit tests for `mmr_rerank()` with known-answer cases
-- [ ] Add integration test: same seeds, λ=0 vs λ=0.5 → different genre distributions
-- [ ] Update the diversity panel to show pre/post-MMR coverage comparison
+- [x] Add `mmr_rerank()` to `src/app/diversity.py`
+- [x] Integrate MMR as an optional post-Stage-2 reranking step in `src/app/scoring_pipeline.py`
+- [x] Add a `diversity_lambda` parameter (0.0 = pure relevance, 1.0 = max diversity, default 0.3)
+- [x] Wire a Streamlit slider in the sidebar for diversity control
+- [x] Add unit tests for `mmr_rerank()` with known-answer cases
+- [x] Add integration test: same seeds, λ=0 vs λ=0.5 → different genre distributions
+- [x] Update the diversity panel to show pre/post-MMR coverage comparison
 
 **Prompt for Claude Sonnet 4.5:**
 

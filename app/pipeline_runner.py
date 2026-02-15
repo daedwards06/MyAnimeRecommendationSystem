@@ -23,12 +23,12 @@ from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
 from src.app.recommender import HybridComponents, HybridRecommender
 from src.app.scoring_pipeline import (
     ScoringContext,
-    run_seed_based_pipeline,
-    run_personalized_pipeline,
-    run_browse_pipeline,
-    blend_personalized_and_seed,
     apply_post_filters,
+    blend_personalized_and_seed,
     finalize_explanation_shares,
+    run_browse_pipeline,
+    run_personalized_pipeline,
+    run_seed_based_pipeline,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ def build_recommender_engine(bundle: dict) -> RecommenderEngine:
         item_ids = np.asarray(
             [int(index_to_item[i]) for i in range(n_items_mf)], dtype=np.int64
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         render_artifact_load_failure(
             ArtifactContractError(
                 "MF model index_to_item is not a contiguous 0..N-1 mapping.",
@@ -192,7 +192,7 @@ def build_recommender_engine(bundle: dict) -> RecommenderEngine:
         demo_user_index = 0
         demo_scores = float(mf_model.global_mean) + (p[demo_user_index] @ q.T)
         mf_scores = np.asarray(demo_scores, dtype=np.float32).reshape(1, -1)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         render_artifact_load_failure(
             ArtifactContractError(
                 "Failed computing demo MF scores from MF artifact.",
@@ -289,6 +289,7 @@ def _run_browse(
         sort_by=sidebar.sort_by,
         default_sort_for_mode=sidebar.default_sort_for_mode,
         top_n=sidebar.top_n,
+        mmr_lambda=sidebar.mmr_lambda,
         pop_pct_fn=engine.pop_pct_for_anime_id,
         watched_ids=(
             {
@@ -357,12 +358,11 @@ def _run_ranked(
     # Hygiene exclusion set (once per run).
     ranked_hygiene_exclude_ids = build_ranked_candidate_hygiene_exclude_ids(metadata)
 
-    with st.spinner("🔍 Finding recommendations..."):
-        with latency_timer("recommendations"):
-            recs, personalization_applied = _execute_pipeline(
-                engine, sidebar, bundle, metadata,
-                n_requested, ranked_hygiene_exclude_ids,
-            )
+    with st.spinner("🔍 Finding recommendations..."), latency_timer("recommendations"):
+        recs, personalization_applied = _execute_pipeline(
+            engine, sidebar, bundle, metadata,
+            n_requested, ranked_hygiene_exclude_ids,
+        )
 
     result.recs = recs
     result.personalization_applied = personalization_applied
@@ -461,6 +461,7 @@ def _execute_pipeline(
         default_sort_for_mode=sidebar.default_sort_for_mode,
         n_requested=n_requested,
         top_n=sidebar.top_n,
+        mmr_lambda=sidebar.mmr_lambda,
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
         mf_model=_mf_model,

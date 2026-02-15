@@ -79,6 +79,10 @@ from src.app.constants import (
     USE_MEAN_USER_CF,
     compute_quality_factor,
 )
+from src.app.diversity import (
+    genre_jaccard_similarity,
+    mmr_rerank,
+)
 from src.app.explanations import format_explanation
 from src.app.franchise_cap import apply_franchise_cap
 from src.app.metadata_features import (
@@ -248,6 +252,10 @@ class ScoringContext:
 
     top_n: int = DEFAULT_TOP_N
     """Final number of results to return after filters."""
+
+    # --- Diversity controls --------------------------------------------------
+    mmr_lambda: float | None = None
+    """MMR diversity parameter (0=max diversity, 1=pure relevance, None=disabled)."""
 
     # --- Browse mode inputs --------------------------------------------------
     browse_mode: bool = False
@@ -1468,6 +1476,25 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     else:
         recs = scored[:n_requested]
 
+    # Apply MMR diversification if enabled
+    # MMR runs AFTER franchise cap but BEFORE final top-N selection
+    if ctx.mmr_lambda is not None and 0.0 <= ctx.mmr_lambda < 0.999:
+        try:
+            # Create a similarity function that captures metadata context
+            def genre_sim_fn(a: dict, b: dict) -> float:
+                return genre_jaccard_similarity(a, b, metadata=ctx.metadata)
+
+            # Apply MMR reranking
+            recs = mmr_rerank(
+                candidates=recs,
+                similarity_fn=genre_sim_fn,
+                lambda_param=float(ctx.mmr_lambda),
+                top_n=int(n_requested),
+            )
+        except Exception as e:
+            logger.warning("MMR reranking failed: %s", e)
+            # Fall back to non-MMR results on error
+
     # Downstream enforcement diagnostics
     try:
         top20 = recs[:20]
@@ -1653,6 +1680,26 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
         result.personalization_blocked_reason = f"Personalization failed at scoring time: {e}"
 
     result.personalization_applied = personalization_applied
+
+    # Apply MMR diversification if enabled
+    # MMR runs after all personalization logic but before final return
+    if ctx.mmr_lambda is not None and 0.0 <= ctx.mmr_lambda < 0.999 and result.ranked_items:
+        try:
+            # Create a similarity function that captures metadata context
+            def genre_sim_fn(a: dict, b: dict) -> float:
+                return genre_jaccard_similarity(a, b, metadata=ctx.metadata)
+
+            # Apply MMR reranking
+            result.ranked_items = mmr_rerank(
+                candidates=result.ranked_items,
+                similarity_fn=genre_sim_fn,
+                lambda_param=float(ctx.mmr_lambda),
+                top_n=int(n_requested),
+            )
+        except Exception as e:
+            logger.warning("MMR reranking failed in personalized pipeline: %s", e)
+            # Fall back to non-MMR results on error
+
     result.timing["total"] = time.monotonic() - t0
     return result
 

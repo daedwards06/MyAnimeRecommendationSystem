@@ -7,18 +7,16 @@ display options, and help/FAQ.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 import numpy as np
 import streamlit as st
 
+from app.state import ratings_signature
 from src.app.constants import DEFAULT_TOP_N, SEED_RANKING_MODE
 from src.app.diversity import build_user_genre_hist
 from src.app.recommender import choose_weights
-
-from app.state import ratings_signature
-
 
 # ── Return type ──────────────────────────────────────────────────────────────
 
@@ -40,6 +38,7 @@ class SidebarResult:
     sort_by: str = "Match score"
     default_sort_for_mode: str = "Match score"
     top_n: int = DEFAULT_TOP_N
+    mmr_lambda: float | None = None
     view_mode: str = "list"
     show_seeds_controls: bool = True
     title_to_id: dict[str, int] = field(default_factory=dict)
@@ -169,8 +168,8 @@ def _render_profile_section(metadata) -> None:
         unsafe_allow_html=True,
     )
 
+    from src.data.mal_parser import get_mal_export_summary, parse_mal_export
     from src.data.user_profiles import list_profiles, load_profile, save_profile
-    from src.data.mal_parser import parse_mal_export, get_mal_export_summary
 
     # Initialise session state for profile
     if "active_profile" not in st.session_state:
@@ -180,7 +179,7 @@ def _render_profile_section(metadata) -> None:
 
     # Profile selector
     available_profiles = list_profiles()
-    profile_options = ["(none)"] + available_profiles
+    profile_options = ["(none)", *available_profiles]
 
     current_selection = "(none)"
     if st.session_state["active_profile"]:
@@ -522,7 +521,7 @@ def _refresh_user_embedding(bundle: dict, ratings: dict) -> None:
                     method="weighted_average",
                     normalize=True,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 st.session_state["user_embedding"] = None
                 st.session_state["personalization_blocked_reason"] = (
                     f"Failed generating user embedding: {e}"
@@ -669,7 +668,7 @@ def _render_search_seeds_section(metadata, result: SidebarResult) -> None:
 
 def _render_filters_display_section(metadata, result: SidebarResult) -> None:
     """Render filters section in sidebar.
-    
+
     Note: Fragment optimization for this section requires restructuring to avoid
     st.sidebar calls inside fragments. This is a known Streamlit limitation.
     """
@@ -693,6 +692,28 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
     )
     st.session_state["top_n"] = top_n
     result.top_n = top_n
+
+    # Diversity control (MMR lambda parameter)
+    mmr_enabled = st.checkbox(
+        "Enable diversity reranking",
+        value=st.session_state.get("mmr_enabled", False),
+        help="Use MMR (Maximal Marginal Relevance) to balance relevance with genre diversity",
+    )
+    st.session_state["mmr_enabled"] = mmr_enabled
+
+    if mmr_enabled:
+        mmr_lambda = st.slider(
+            "Diversity strength",
+            min_value=0.0,
+            max_value=1.0,
+            value=st.session_state.get("mmr_lambda", 0.3),
+            step=0.1,
+            help="Lower = more diverse genres, Higher = focus on relevance (0.3 is balanced)",
+        )
+        st.session_state["mmr_lambda"] = mmr_lambda
+        result.mmr_lambda = float(mmr_lambda)
+    else:
+        result.mmr_lambda = None
 
     browse_mode = bool(st.session_state.get("browse_mode", False))
     if browse_mode:
@@ -731,13 +752,13 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         default=st.session_state.get("genre_filter", []),
         help="Applies in all modes. In Browse, select at least one genre to see titles.",
     )
-    
+
     # In Browse mode, trigger full rerun when genre selection changes
     prev_genre_filter = st.session_state.get("genre_filter", [])
     if browse_mode and list(genre_filter) != prev_genre_filter:
         st.session_state["genre_filter"] = genre_filter
         st.rerun()
-    
+
     result.genre_filter = list(genre_filter)
 
     # Type filter
@@ -757,13 +778,13 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         default=st.session_state.get("type_filter", []),
         help="Applies in all modes to the displayed list (TV, Movie, OVA, etc.)",
     )
-    
+
     # In Browse mode, trigger full rerun when type selection changes
     prev_type_filter = st.session_state.get("type_filter", [])
     if browse_mode and list(type_filter) != prev_type_filter:
         st.session_state["type_filter"] = type_filter
         st.rerun()
-    
+
     result.type_filter = list(type_filter)
 
     year_range = st.slider(
@@ -776,7 +797,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         ),
         help="Applies in all modes to the displayed list",
     )
-    
+
     # In Browse mode, trigger full rerun when year range changes
     prev_year_min = st.session_state.get("year_min", 1960)
     prev_year_max = st.session_state.get("year_max", 2025)
@@ -784,7 +805,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         st.session_state["year_min"] = year_range[0]
         st.session_state["year_max"] = year_range[1]
         st.rerun()
-    
+
     result.year_range = (year_range[0], year_range[1])
 
     st.session_state["sort_by"] = sort_by
@@ -892,7 +913,7 @@ def _render_seed_indicator(result: SidebarResult) -> None:
 
 def _render_performance_section() -> None:
     """Render performance metrics in sidebar.
-    
+
     Note: Fragment optimization for this section requires restructuring to avoid
     st.sidebar calls inside fragments. This is a known Streamlit limitation.
     """
@@ -926,7 +947,7 @@ def _render_performance_fragment() -> None:
                 st.caption("Run a ranked mode to see timing data.")
         except Exception:
             st.caption("Run a ranked mode to see metrics.")
-        
+
         # Show pipeline timing from main flow
         pipeline_ms = st.session_state.get("_pipeline_ms")
         if pipeline_ms is not None:

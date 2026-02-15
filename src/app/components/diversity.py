@@ -25,6 +25,24 @@ def render_diversity_panel(recs: list[dict], metadata: pd.DataFrame, *, is_brows
         genre_ratio = genre_exposure_ratio(recs, safe_metadata)
         avg_nov = average_novelty(recs)
 
+        # Check if MMR was applied
+        mmr_enabled = st.session_state.get("mmr_enabled", False)
+        mmr_lambda = st.session_state.get("mmr_lambda", 0.3)
+
+        # Show MMR status badge if enabled
+        if mmr_enabled:
+            st.markdown(
+                f"<div style='background-color: #1A1A2E; padding: 8px 12px; "
+                f"border-radius: 4px; margin-bottom: 12px; border-left: 3px solid #4ECDC4;'>"
+                f"<span style='font-weight: 600; color: #4ECDC4;'>🎯 MMR Diversification Active</span> "
+                f"<span style='color: #B0B0B0;'>• λ = {mmr_lambda:.1f}</span> "
+                f"<span style='color: #888; font-size: 0.85em;'>"
+                f"({'High diversity' if mmr_lambda < 0.4 else 'Balanced' if mmr_lambda < 0.7 else 'Relevance-focused'})"
+                f"</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Coverage", f"{cov:.2f}")
