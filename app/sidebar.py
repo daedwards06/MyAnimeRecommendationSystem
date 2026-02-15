@@ -731,6 +731,13 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         default=st.session_state.get("genre_filter", []),
         help="Applies in all modes. In Browse, select at least one genre to see titles.",
     )
+    
+    # In Browse mode, trigger full rerun when genre selection changes
+    prev_genre_filter = st.session_state.get("genre_filter", [])
+    if browse_mode and list(genre_filter) != prev_genre_filter:
+        st.session_state["genre_filter"] = genre_filter
+        st.rerun()
+    
     result.genre_filter = list(genre_filter)
 
     # Type filter
@@ -750,6 +757,13 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         default=st.session_state.get("type_filter", []),
         help="Applies in all modes to the displayed list (TV, Movie, OVA, etc.)",
     )
+    
+    # In Browse mode, trigger full rerun when type selection changes
+    prev_type_filter = st.session_state.get("type_filter", [])
+    if browse_mode and list(type_filter) != prev_type_filter:
+        st.session_state["type_filter"] = type_filter
+        st.rerun()
+    
     result.type_filter = list(type_filter)
 
     year_range = st.slider(
@@ -762,6 +776,15 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         ),
         help="Applies in all modes to the displayed list",
     )
+    
+    # In Browse mode, trigger full rerun when year range changes
+    prev_year_min = st.session_state.get("year_min", 1960)
+    prev_year_max = st.session_state.get("year_max", 2025)
+    if browse_mode and (year_range[0] != prev_year_min or year_range[1] != prev_year_max):
+        st.session_state["year_min"] = year_range[0]
+        st.session_state["year_max"] = year_range[1]
+        st.rerun()
+    
     result.year_range = (year_range[0], year_range[1])
 
     st.session_state["sort_by"] = sort_by
