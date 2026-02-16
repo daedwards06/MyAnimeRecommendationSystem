@@ -128,6 +128,7 @@ The app loads with a default seed and shows recommendations immediately — no s
 | Topic | Link |
 |-------|------|
 | Evaluation & ablation | [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) |
+| Model card | [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md) |
 | Personalization guide | [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) |
 | Watchlist import | [`docs/user_guide_watchlist.md`](docs/user_guide_watchlist.md) |
 | Data catalog | [`docs/data_catalog.md`](docs/data_catalog.md) |

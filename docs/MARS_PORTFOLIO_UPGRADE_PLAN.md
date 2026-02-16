@@ -494,11 +494,11 @@ REQUIREMENTS:
 **Why:** Model cards (Mitchell et al., 2019) are an industry best-practice for documenting ML models. Having one for your recommendation system signals awareness of responsible AI practices and model governance. It's a low-effort, high-impression-value document.
 
 **Checklist:**
-- [ ] Create `docs/MODEL_CARD.md` following the standard format
-- [ ] Document: model architecture, training data, evaluation metrics, limitations, ethical considerations
-- [ ] Include real numbers from experiments/metrics/ and reports/
-- [ ] Add a "Limitations & Known Issues" section (honest — shows maturity)
-- [ ] Link from README.md
+- [x] Create `docs/MODEL_CARD.md` following the standard format
+- [x] Document: model architecture, training data, evaluation metrics, limitations, ethical considerations
+- [x] Include real numbers from experiments/metrics/ and reports/
+- [x] Add a "Limitations & Known Issues" section (honest — shows maturity)
+- [x] Link from README.md
 
 **Prompt for Claude Sonnet 4.5:**
 
