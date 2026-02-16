@@ -221,6 +221,7 @@ def mock_mf_model() -> MockMFModel:
 
 # Reuse mock_bundle from conftest (it will use sample_metadata and mock_mf_model)
 
+
 @pytest.fixture
 def mock_components(mock_mf_model: MockMFModel) -> HybridComponents:
     """Mock HybridComponents for recommender."""
@@ -271,6 +272,7 @@ def mock_scoring_context(
     This fixture provides a minimal but complete context for testing the
     seed-based pipeline. Tests can override specific attributes as needed.
     """
+
     # Helper functions
     def pop_pct_fn(anime_id: int) -> float:
         """Mock popularity percentile."""
@@ -380,9 +382,7 @@ class TestSeedBasedPipeline:
             action_count = 0
             for item in result.ranked_items:
                 anime_id = item["anime_id"]
-                row = mock_scoring_context.metadata[
-                    mock_scoring_context.metadata["anime_id"] == anime_id
-                ].iloc[0]
+                row = mock_scoring_context.metadata[mock_scoring_context.metadata["anime_id"] == anime_id].iloc[0]
                 genres = str(row["genres"])
                 if "Action" in genres:
                     action_count += 1
@@ -400,9 +400,7 @@ class TestSeedBasedPipeline:
             movie_count = 0
             for item in result.ranked_items:
                 anime_id = item["anime_id"]
-                row = mock_scoring_context.metadata[
-                    mock_scoring_context.metadata["anime_id"] == anime_id
-                ].iloc[0]
+                row = mock_scoring_context.metadata[mock_scoring_context.metadata["anime_id"] == anime_id].iloc[0]
                 if row["type"] == "Movie":
                     movie_count += 1
             # Should have at least one movie or be empty if filter is strict
@@ -418,9 +416,7 @@ class TestSeedBasedPipeline:
             in_range_count = 0
             for item in result.ranked_items:
                 anime_id = item["anime_id"]
-                row = mock_scoring_context.metadata[
-                    mock_scoring_context.metadata["anime_id"] == anime_id
-                ].iloc[0]
+                row = mock_scoring_context.metadata[mock_scoring_context.metadata["anime_id"] == anime_id].iloc[0]
                 year = row["year"]
                 if 2010 <= year <= 2015:
                     in_range_count += 1
@@ -471,9 +467,7 @@ class TestSeedBasedPipeline:
 class TestPersonalizedPipeline:
     """Tests for run_personalized_pipeline()."""
 
-    def test_personalized_with_valid_embedding(
-        self, mock_scoring_context: ScoringContext, mock_mf_model: MockMFModel
-    ):
+    def test_personalized_with_valid_embedding(self, mock_scoring_context: ScoringContext, mock_mf_model: MockMFModel):
         """Personalized pipeline returns results when user_embedding is valid."""
         # Generate a valid user embedding
         user_embedding = mock_mf_model.P[0].copy()
@@ -502,9 +496,7 @@ class TestPersonalizedPipeline:
         # Personalization should not be applied if embedding is None
         assert result.personalization_applied is False
 
-    def test_personalized_excludes_watched(
-        self, mock_scoring_context: ScoringContext, mock_mf_model: MockMFModel
-    ):
+    def test_personalized_excludes_watched(self, mock_scoring_context: ScoringContext, mock_mf_model: MockMFModel):
         """Personalized pipeline excludes watched IDs."""
         user_embedding = mock_mf_model.P[1].copy()
         mock_scoring_context.user_embedding = user_embedding
@@ -537,13 +529,66 @@ class TestBrowsePipeline:
         assert isinstance(result, PipelineResult)
         assert len(result.ranked_items) > 0
 
+    def test_seedless_excludes_banned_genres(self, mock_scoring_context: ScoringContext):
+        """Seedless path should exclude explicit genres (public demo safety)."""
+        md = mock_scoring_context.metadata.copy()
+        md["genres"] = "Hentai|Action"
+        mock_scoring_context.metadata = md
+
+        mock_scoring_context.seed_ids = []
+        mock_scoring_context.seed_titles = []
+
+        result = run_seed_based_pipeline(mock_scoring_context)
+
+        assert isinstance(result, PipelineResult)
+        assert result.ranked_items == []
+
+    def test_seedless_excludes_ecchi_and_erotica(self, mock_scoring_context: ScoringContext):
+        """Seedless path should also exclude Ecchi/Erotica (public demo safety)."""
+        for g in ["Ecchi", "Erotica"]:
+            md = mock_scoring_context.metadata.copy()
+            md["genres"] = f"{g}|Action"
+            mock_scoring_context.metadata = md
+            mock_scoring_context.seed_ids = []
+            mock_scoring_context.seed_titles = []
+
+            result = run_seed_based_pipeline(mock_scoring_context)
+
+            assert isinstance(result, PipelineResult)
+            assert result.ranked_items == []
+
         for item in result.ranked_items:
             anime_id = item["anime_id"]
-            row = mock_scoring_context.metadata[
-                mock_scoring_context.metadata["anime_id"] == anime_id
-            ].iloc[0]
+            row = mock_scoring_context.metadata[mock_scoring_context.metadata["anime_id"] == anime_id].iloc[0]
             genres = str(row["genres"])
             assert "Action" in genres
+
+    def test_browse_excludes_banned_genres(self, mock_scoring_context: ScoringContext):
+        """Browse pipeline should exclude explicit genres (public demo safety)."""
+        md = mock_scoring_context.metadata.copy()
+        md["genres"] = "Hentai|Action"
+        mock_scoring_context.metadata = md
+        mock_scoring_context.browse_mode = True
+        mock_scoring_context.genre_filter = ["Action"]
+
+        result = run_browse_pipeline(mock_scoring_context)
+
+        assert isinstance(result, PipelineResult)
+        assert result.ranked_items == []
+
+    def test_browse_excludes_ecchi_and_erotica(self, mock_scoring_context: ScoringContext):
+        """Browse pipeline should also exclude Ecchi/Erotica (public demo safety)."""
+        for g in ["Ecchi", "Erotica"]:
+            md = mock_scoring_context.metadata.copy()
+            md["genres"] = f"{g}|Action"
+            mock_scoring_context.metadata = md
+            mock_scoring_context.browse_mode = True
+            mock_scoring_context.genre_filter = ["Action"]
+
+            result = run_browse_pipeline(mock_scoring_context)
+
+            assert isinstance(result, PipelineResult)
+            assert result.ranked_items == []
 
     def test_browse_respects_type_filter(self, mock_scoring_context: ScoringContext):
         """Browse pipeline respects type filter."""
@@ -554,9 +599,7 @@ class TestBrowsePipeline:
 
         for item in result.ranked_items:
             anime_id = item["anime_id"]
-            row = mock_scoring_context.metadata[
-                mock_scoring_context.metadata["anime_id"] == anime_id
-            ].iloc[0]
+            row = mock_scoring_context.metadata[mock_scoring_context.metadata["anime_id"] == anime_id].iloc[0]
             assert row["type"] == "TV"
 
 
@@ -568,9 +611,7 @@ class TestBrowsePipeline:
 class TestFranchiseCap:
     """Tests for franchise cap behavior in discovery mode."""
 
-    def test_franchise_cap_limits_same_franchise_in_discovery(
-        self, mock_scoring_context: ScoringContext
-    ):
+    def test_franchise_cap_limits_same_franchise_in_discovery(self, mock_scoring_context: ScoringContext):
         """Franchise cap should limit same-franchise entries in discovery mode."""
         mock_scoring_context.seed_ranking_mode = "discovery"
         mock_scoring_context.seed_ids = [4]  # Attack on Titan
@@ -579,9 +620,7 @@ class TestFranchiseCap:
         result = run_seed_based_pipeline(mock_scoring_context)
 
         # Count how many "Attack on Titan" titles appear (anime_id 4 and 10)
-        aot_count = sum(
-            1 for item in result.ranked_items if item["anime_id"] in {4, 10}
-        )
+        aot_count = sum(1 for item in result.ranked_items if item["anime_id"] in {4, 10})
 
         # In discovery mode, franchise cap should limit duplicates
         # (exact behavior depends on FRANCHISE_CAP_TOP20 constant)

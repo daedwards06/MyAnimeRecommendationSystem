@@ -82,9 +82,7 @@ def render_sidebar(
     st.session_state["query"] = result.query
     st.session_state["weight_mode"] = result.weight_mode
     st.session_state["top_n"] = result.top_n
-    st.query_params.update(
-        {"q": result.query, "wm": result.weight_mode, "n": str(result.top_n)}
-    )
+    st.query_params.update({"q": result.query, "wm": result.weight_mode, "n": str(result.top_n)})
 
     result.weights = choose_weights(result.weight_mode)
 
@@ -190,19 +188,14 @@ def _render_profile_section(metadata) -> None:
     selected_profile = st.sidebar.selectbox(
         "Active Profile",
         options=profile_options,
-        index=(
-            profile_options.index(current_selection)
-            if current_selection in profile_options
-            else 0
-        ),
+        index=(profile_options.index(current_selection) if current_selection in profile_options else 0),
         help="Select a profile to hide already-watched titles from results",
         label_visibility="collapsed",
     )
 
     # Load profile when selection changes
     if selected_profile != "(none)" and (
-        not st.session_state["active_profile"]
-        or st.session_state["active_profile"].get("username") != selected_profile
+        not st.session_state["active_profile"] or st.session_state["active_profile"].get("username") != selected_profile
     ):
         profile_data = load_profile(selected_profile)
         if profile_data:
@@ -245,20 +238,32 @@ def _render_profile_stats(metadata, save_profile, load_profile, parse_mal_export
 
     # Import MAL (collapsed by default)
     _render_mal_import(
-        metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary,
-        expanded=False, key_suffix="",
+        metadata,
+        save_profile,
+        load_profile,
+        parse_mal_export,
+        get_mal_export_summary,
+        expanded=False,
+        key_suffix="",
     )
 
 
 def _render_profile_import_cta(metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary) -> None:
     st.sidebar.info("Import your MAL watchlist to hide watched anime")
     _render_mal_import(
-        metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary,
-        expanded=True, key_suffix="_no_profile",
+        metadata,
+        save_profile,
+        load_profile,
+        parse_mal_export,
+        get_mal_export_summary,
+        expanded=True,
+        key_suffix="_no_profile",
     )
 
 
-def _render_mal_import(metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary, *, expanded, key_suffix) -> None:
+def _render_mal_import(
+    metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary, *, expanded, key_suffix
+) -> None:
     with st.sidebar.expander("📥 Import from MAL", expanded=expanded):
         st.caption("Update your watchlist & ratings" if not key_suffix else "Get started by importing your watchlist")
 
@@ -314,10 +319,7 @@ def _render_mal_import(metadata, save_profile, load_profile, parse_mal_export, g
 
         if st.session_state.get("parsed_mal_data"):
             parsed = st.session_state["parsed_mal_data"]
-            st.caption(
-                f"✓ {parsed['stats']['total_watched']} matched • "
-                f"{parsed['stats']['rated_count']} rated"
-            )
+            st.caption(f"✓ {parsed['stats']['total_watched']} matched • {parsed['stats']['rated_count']} rated")
 
             if parsed.get("unmatched") and not key_suffix:
                 st.warning(f"⚠️ {len(parsed['unmatched'])} unmatched")
@@ -421,9 +423,7 @@ def _render_personalization_section(bundle: dict, metadata) -> None:
     else:
         if not st.session_state.get("active_profile"):
             st.sidebar.warning("Personalized mode unavailable: select a profile")
-            st.sidebar.caption(
-                "Fix: Choose an **Active Profile** (top of sidebar) and add at least one rating."
-            )
+            st.sidebar.caption("Fix: Choose an **Active Profile** (top of sidebar) and add at least one rating.")
             st.session_state["personalization_enabled"] = False
             st.session_state["personalization_blocked_reason"] = "No active profile selected."
         elif not profile_has_ratings:
@@ -523,9 +523,7 @@ def _refresh_user_embedding(bundle: dict, ratings: dict) -> None:
                 )
             except Exception as e:
                 st.session_state["user_embedding"] = None
-                st.session_state["personalization_blocked_reason"] = (
-                    f"Failed generating user embedding: {e}"
-                )
+                st.session_state["personalization_blocked_reason"] = f"Failed generating user embedding: {e}"
                 st.sidebar.error("Personalization unavailable: embedding failed")
             else:
                 try:
@@ -628,9 +626,9 @@ def _render_search_seeds_section(metadata, result: SidebarResult) -> None:
             "Goal: Completion (more from franchise)",
             "Goal: Discovery (similar vibes)",
         ]
-        _mode_default = str(
-            st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE) or SEED_RANKING_MODE
-        ).strip().lower()
+        _mode_default = (
+            str(st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE) or SEED_RANKING_MODE).strip().lower()
+        )
         _goal_index = 0 if _mode_default != "discovery" else 1
         _goal_label = st.sidebar.radio(
             "Seed goal",
@@ -644,9 +642,7 @@ def _render_search_seeds_section(metadata, result: SidebarResult) -> None:
                 "using a deterministic title-overlap cap."
             ),
         )
-        st.session_state["seed_ranking_mode"] = (
-            "discovery" if "Discovery" in str(_goal_label) else "completion"
-        )
+        st.session_state["seed_ranking_mode"] = "discovery" if "Discovery" in str(_goal_label) else "completion"
 
     # Convert selected titles to IDs
     selected_seed_ids: list[int] = []
@@ -687,9 +683,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         unsafe_allow_html=True,
     )
 
-    top_n = st.slider(
-        "Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N))
-    )
+    top_n = st.slider("Top N", 5, 30, int(st.session_state.get("top_n", DEFAULT_TOP_N)))
     st.session_state["top_n"] = top_n
     result.top_n = top_n
 
@@ -744,14 +738,25 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
             all_genres.update([g.strip() for g in genres_val.split("|") if g.strip()])
         elif hasattr(genres_val, "__iter__") and not isinstance(genres_val, str):
             all_genres.update([str(g).strip() for g in genres_val if g])
-    genre_options = sorted(list(all_genres))
+    # Public demo safety: exclude explicit genres from UI
+    banned_genres_lower = {"hentai", "ecchi", "erotica"}
+    genre_options = sorted([g for g in all_genres if str(g).strip().lower() not in banned_genres_lower])
+
+    default_genres = st.session_state.get("genre_filter", [])
+    if isinstance(default_genres, (list, tuple)):
+        default_genres = [g for g in default_genres if str(g).strip().lower() not in banned_genres_lower]
+    else:
+        default_genres = []
 
     genre_filter = st.multiselect(
         "Filter by Genre",
         options=genre_options,
-        default=st.session_state.get("genre_filter", []),
+        default=default_genres,
         help="Applies in all modes. In Browse, select at least one genre to see titles.",
     )
+
+    # Sanitize selection defensively (e.g., old session state or query params)
+    genre_filter = [g for g in list(genre_filter) if str(g).strip().lower() not in banned_genres_lower]
 
     # In Browse mode, trigger full rerun when genre selection changes
     prev_genre_filter = st.session_state.get("genre_filter", [])
@@ -766,11 +771,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
     for type_val in metadata["type"].dropna() if "type" in metadata.columns else []:
         if type_val and isinstance(type_val, str):
             all_types.add(type_val.strip())
-    type_options = (
-        sorted(list(all_types))
-        if all_types
-        else ["TV", "Movie", "OVA", "Special", "ONA", "Music"]
-    )
+    type_options = sorted(list(all_types)) if all_types else ["TV", "Movie", "OVA", "Special", "ONA", "Music"]
 
     type_filter = st.multiselect(
         "Filter by Type",
@@ -826,13 +827,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
     result.view_mode = st.session_state["view_mode"]
 
     # Clear filters button
-    if (
-        genre_filter
-        or type_filter
-        or year_range[0] > 1960
-        or year_range[1] < 2025
-        or sort_by != default_sort_for_mode
-    ):
+    if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != default_sort_for_mode:
         if st.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
             st.session_state["sort_by"] = default_sort_for_mode
             st.session_state["genre_filter"] = []
@@ -931,9 +926,7 @@ def _render_performance_fragment() -> None:
             last_timing = get_last_timing()
             if last_timing:
                 latency_ms = last_timing.get("recommendations", 0) * 1000
-                status_color = (
-                    "#48BB78" if latency_ms < 250 else "#ECC94B" if latency_ms < 500 else "#FC8181"
-                )
+                status_color = "#48BB78" if latency_ms < 250 else "#ECC94B" if latency_ms < 500 else "#FC8181"
                 st.markdown(
                     f"""
             <div style='background:#F7FAFC; border-radius:8px; padding:12px; margin-bottom:8px; border:1px solid #E2E8F0;'>

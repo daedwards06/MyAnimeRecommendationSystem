@@ -151,14 +151,106 @@ from src.utils import parse_pipe_set
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Public-demo safety: genre exclusions
+# ---------------------------------------------------------------------------
+
+_BANNED_DISPLAY_GENRES_LOWER: set[str] = {"hentai", "ecchi", "erotica"}
+
+
+def _parse_genres_to_lower_set(genres_val: Any) -> set[str]:
+    """Parse a genres value (pipe-delimited string or iterable) to a lowercase set."""
+    if genres_val is None:
+        return set()
+    if isinstance(genres_val, str):
+        return {g.strip().lower() for g in genres_val.split("|") if g and g.strip()}
+    if hasattr(genres_val, "__iter__") and not isinstance(genres_val, (str, bytes)):
+        out: set[str] = set()
+        for g in genres_val:
+            if g is None:
+                continue
+            gs = str(g).strip()
+            if gs:
+                out.add(gs.lower())
+        return out
+    try:
+        s = str(genres_val).strip()
+        return {s.lower()} if s else set()
+    except Exception:
+        return set()
+
+
+def _is_banned_for_public_demo(anime_id: int, metadata_by_id: pd.DataFrame) -> bool:
+    """Return True if the item has any banned display genre (case-insensitive)."""
+    try:
+        row = metadata_by_id.loc[int(anime_id)]
+    except Exception:
+        return False
+
+    genres_val = None
+    try:
+        genres_val = row.get("genres") if isinstance(row, pd.Series) else None
+    except Exception:
+        genres_val = None
+
+    genres_lower = _parse_genres_to_lower_set(genres_val)
+    return bool(genres_lower & _BANNED_DISPLAY_GENRES_LOWER)
+
+
+def _filter_banned_from_ranked_items(
+    ranked_items: list[dict[str, Any]],
+    metadata: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    """Filter ranked items for public demo safety.
+
+    Currently excludes items tagged with 'Hentai', 'Ecchi', or 'Erotica'.
+    """
+    if not ranked_items:
+        return ranked_items
+    if metadata is None or metadata.empty or "anime_id" not in metadata.columns:
+        return ranked_items
+
+    metadata_by_id = metadata.set_index("anime_id", drop=False)
+    kept: list[dict[str, Any]] = []
+    for rec in ranked_items:
+        try:
+            aid = int(rec.get("anime_id"))
+        except Exception:
+            continue
+        if _is_banned_for_public_demo(aid, metadata_by_id):
+            continue
+        kept.append(rec)
+    return kept
+
+
 # ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
 
 _TITLE_STOP = {
-    "the", "and", "of", "to", "a", "an", "in", "on", "for", "with",
-    "movie", "film", "tv", "ova", "ona", "special", "season", "part",
-    "episode", "eps", "edition", "new",
+    "the",
+    "and",
+    "of",
+    "to",
+    "a",
+    "an",
+    "in",
+    "on",
+    "for",
+    "with",
+    "movie",
+    "film",
+    "tv",
+    "ova",
+    "ona",
+    "special",
+    "season",
+    "part",
+    "episode",
+    "eps",
+    "edition",
+    "new",
 }
 
 
@@ -168,6 +260,7 @@ def _title_tokens(s: str) -> set[str]:
     cleaned = "".join((ch if ch.isalnum() else " ") for ch in raw)
     toks = [t for t in cleaned.split() if len(t) >= 3 and t not in _TITLE_STOP]
     return set(toks)
+
 
 # Removed _parse_str_set - now using canonical version from src.utils.parsing as parse_pipe_set
 
@@ -333,6 +426,7 @@ class PipelineResult:
 # Internal helpers (pure functions migrated from app/main.py)
 # ---------------------------------------------------------------------------
 
+
 def _topk_sim_stats(
     sim_map: dict[int, float],
     k: int,
@@ -354,7 +448,7 @@ def _topk_sim_stats(
         except Exception:
             continue
     vals.sort(reverse=True)
-    top = vals[:max(0, int(k))]
+    top = vals[: max(0, int(k))]
     if not top:
         return {"count": 0, "mean": 0.0, "p95": 0.0}
     arr = np.asarray(top, dtype=np.float64)
@@ -373,7 +467,7 @@ def _conf_score(stats: dict, min_sim: float, high_sim: float) -> float:
 
 def _neighbor_coherence(pool: list[dict], k: int = 50) -> dict:
     """Compute neighborhood coherence statistics for confidence gating."""
-    top = pool[:max(0, int(k))]
+    top = pool[: max(0, int(k))]
     if not top:
         return {"count": 0, "weighted_overlap_mean": 0.0, "seed_coverage_mean": 0.0, "any_genre_match_frac": 0.0}
     overlaps = [float(it.get("weighted_overlap", 0.0)) for it in top]
@@ -401,6 +495,7 @@ def _coherence_score(stats: dict) -> float:
 # ---------------------------------------------------------------------------
 # Browse pipeline
 # ---------------------------------------------------------------------------
+
 
 def run_browse_pipeline(ctx: ScoringContext) -> PipelineResult:
     """Browse-by-genre mode — metadata-only, no ranking model involved.
@@ -430,6 +525,10 @@ def run_browse_pipeline(ctx: ScoringContext) -> PipelineResult:
             item_genres = {g.strip() for g in row_genres_val.split("|") if g.strip()}
         elif hasattr(row_genres_val, "__iter__") and not isinstance(row_genres_val, str):
             item_genres = {str(g).strip() for g in row_genres_val if g}
+
+        # Public demo safety: exclude banned genres (case-insensitive)
+        if _parse_genres_to_lower_set(row_genres_val) & _BANNED_DISPLAY_GENRES_LOWER:
+            continue
 
         # Genre match
         if not any(gf in item_genres for gf in ctx.genre_filter):
@@ -495,7 +594,7 @@ def run_browse_pipeline(ctx: ScoringContext) -> PipelineResult:
     else:
         browse_results.sort(key=lambda x: x["_mal_score"], reverse=True)
 
-    result.ranked_items = browse_results[:min(ctx.top_n, len(browse_results))]
+    result.ranked_items = browse_results[: min(ctx.top_n, len(browse_results))]
     result.timing["total"] = time.monotonic() - t0
     return result
 
@@ -503,6 +602,7 @@ def run_browse_pipeline(ctx: ScoringContext) -> PipelineResult:
 # ---------------------------------------------------------------------------
 # Seed-based pipeline
 # ---------------------------------------------------------------------------
+
 
 def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     """Full Stage 0 → Stage 1 → Stage 2 → post-processing pipeline.
@@ -537,7 +637,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
                 weights=weights,
                 exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
             )
-            result.ranked_items = recs
+            result.ranked_items = _filter_banned_from_ranked_items(recs, metadata)
         result.timing["total"] = time.monotonic() - t0
         return result
 
@@ -574,9 +674,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             for genre in seed_genres:
                 genre_weights[genre] = genre_weights.get(genre, 0) + 1
 
-    seed_title_token_map: dict[str, set[str]] = {
-        str(t): _title_tokens(str(t)) for t in (selected_seed_titles or [])
-    }
+    seed_title_token_map: dict[str, set[str]] = {str(t): _title_tokens(str(t)) for t in (selected_seed_titles or [])}
 
     seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
 
@@ -614,9 +712,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 
     if semantic_mode in {"tfidf", "both"} and synopsis_tfidf_artifact is not None:
         try:
-            synopsis_sims_by_id = compute_seed_similarity_map(
-                synopsis_tfidf_artifact, seed_ids=selected_seed_ids
-            )
+            synopsis_sims_by_id = compute_seed_similarity_map(synopsis_tfidf_artifact, seed_ids=selected_seed_ids)
         except Exception:
             synopsis_sims_by_id = {}
 
@@ -770,8 +866,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         weighted_overlap = raw_overlap / max_possible_overlap if max_possible_overlap > 0 else 0.0
 
         overlap_per_seed = {
-            seed_title: len(seed_genres & item_genres)
-            for seed_title, seed_genres in seed_genre_map.items()
+            seed_title: len(seed_genres & item_genres) for seed_title, seed_genres in seed_genre_map.items()
         }
         num_seeds_matched = sum(1 for count in overlap_per_seed.values() if count > 0)
         seed_coverage = num_seeds_matched / num_seeds
@@ -948,12 +1043,8 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             int(x.get("anime_id", 0)),
         )
     )
-    stage1_forced_neural_pool.sort(
-        key=lambda x: (-float(x.get("synopsis_neural_sim", 0.0)), int(x.get("anime_id", 0)))
-    )
-    stage1_fallback_pool.sort(
-        key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0)))
-    )
+    stage1_forced_neural_pool.sort(key=lambda x: (-float(x.get("synopsis_neural_sim", 0.0)), int(x.get("anime_id", 0))))
+    stage1_fallback_pool.sort(key=lambda x: (-float(x.get("stage1_score", 0.0)), int(x.get("anime_id", 0))))
 
     # Confidence gating
     pool_a: list[dict] = []
@@ -967,13 +1058,27 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     semantic_conf_tier = "none"
     semantic_conf_score = 0.0
     if semantic_mode in {"embeddings", "both"} and synopsis_embeddings_artifact is not None and embed_sims_by_id:
-        stats = _topk_sim_stats(embed_sims_by_id, k=50, exclude_ids=ranked_hygiene_exclude_ids, seed_ids=seed_ids_set, watched_ids=watched_ids_set)
+        stats = _topk_sim_stats(
+            embed_sims_by_id,
+            k=50,
+            exclude_ids=ranked_hygiene_exclude_ids,
+            seed_ids=seed_ids_set,
+            watched_ids=watched_ids_set,
+        )
         if int(stats.get("count", 0)) > 0:
-            sim_conf = _conf_score(stats, float(SYNOPSIS_EMBEDDINGS_MIN_SIM), float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD))
+            sim_conf = _conf_score(
+                stats, float(SYNOPSIS_EMBEDDINGS_MIN_SIM), float(SYNOPSIS_EMBEDDINGS_HIGH_SIM_THRESHOLD)
+            )
             coh_conf = _coherence_score(_neighbor_coherence(stage1_embed_pool, k=50))
             semantic_conf_score = float(0.70 * float(sim_conf) + 0.30 * float(coh_conf))
     elif semantic_mode in {"tfidf", "both"} and synopsis_tfidf_artifact is not None and synopsis_sims_by_id:
-        stats = _topk_sim_stats(synopsis_sims_by_id, k=50, exclude_ids=ranked_hygiene_exclude_ids, seed_ids=seed_ids_set, watched_ids=watched_ids_set)
+        stats = _topk_sim_stats(
+            synopsis_sims_by_id,
+            k=50,
+            exclude_ids=ranked_hygiene_exclude_ids,
+            seed_ids=seed_ids_set,
+            watched_ids=watched_ids_set,
+        )
         if int(stats.get("count", 0)) > 0:
             sim_conf = _conf_score(stats, float(SYNOPSIS_TFIDF_MIN_SIM), float(SYNOPSIS_TFIDF_HIGH_SIM_THRESHOLD))
             coh_conf = _coherence_score(_neighbor_coherence(stage1_tfidf_pool, k=50))
@@ -1154,7 +1259,9 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         meta_affinity = float(c.get("metadata_affinity", 0.0))
         meta_bonus = 0.0
         if meta_affinity > 0.0:
-            coef = float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
+            coef = (
+                float(METADATA_AFFINITY_COLD_START_COEF) if hybrid_val == 0.0 else float(METADATA_AFFINITY_TRAINED_COEF)
+            )
             meta_bonus = float(coef) * float(meta_affinity)
 
         synopsis_tfidf_sim = float(c.get("synopsis_tfidf_sim", 0.0))
@@ -1357,7 +1464,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             + float(demo_bonus)
             + float(theme_bonus)
         )
-        raw_pop = (STAGE2_POPULARITY_BOOST_WEIGHT * popularity_boost)
+        raw_pop = STAGE2_POPULARITY_BOOST_WEIGHT * popularity_boost
         used_components: list[str] = ["knn", "pop"]
         if aid in id_to_index:
             idx = id_to_index[aid]
@@ -1413,20 +1520,22 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         }
         explanation.update(shares)
 
-        scored.append({
-            "anime_id": aid,
-            "score": score,
-            "explanation": explanation,
-            "_title_display": str(mrow.get("title_display") or mrow.get("title_primary") or ""),
-            "_title_overlap": float(c.get("title_overlap", 0.0)),
-            "_synopsis_neural_sim": float(synopsis_neural_sim),
-            "_raw_components": raw_components,
-            "_used_components": used_components,
-            "_explanation_meta": {
-                "seed_titles": selected_seed_titles,
-                "seeds_matched": num_seeds_matched,
-            },
-        })
+        scored.append(
+            {
+                "anime_id": aid,
+                "score": score,
+                "explanation": explanation,
+                "_title_display": str(mrow.get("title_display") or mrow.get("title_primary") or ""),
+                "_title_overlap": float(c.get("title_overlap", 0.0)),
+                "_synopsis_neural_sim": float(synopsis_neural_sim),
+                "_raw_components": raw_components,
+                "_used_components": used_components,
+                "_explanation_meta": {
+                    "seed_titles": selected_seed_titles,
+                    "seeds_matched": num_seeds_matched,
+                },
+            }
+        )
 
     scored.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
 
@@ -1476,6 +1585,9 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     else:
         recs = scored[:n_requested]
 
+    # Public demo safety: exclude banned genres before diversification and display
+    recs = _filter_banned_from_ranked_items(recs, metadata)
+
     # Apply MMR diversification if enabled
     # MMR runs AFTER franchise cap but BEFORE final top-N selection
     if ctx.mmr_lambda is not None and 0.0 <= ctx.mmr_lambda < 0.999:
@@ -1506,11 +1618,13 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
         top50_in_stage0 = 0
 
     try:
-        result.stage0_enforcement.update({
-            "final_scored_candidate_count": int(final_scored_candidate_count),
-            "top20_in_stage0_count": int(top20_in_stage0),
-            "top50_in_stage0_count": int(top50_in_stage0),
-        })
+        result.stage0_enforcement.update(
+            {
+                "final_scored_candidate_count": int(final_scored_candidate_count),
+                "top20_in_stage0_count": int(top20_in_stage0),
+                "top50_in_stage0_count": int(top50_in_stage0),
+            }
+        )
     except Exception:
         pass
 
@@ -1524,6 +1638,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 # ---------------------------------------------------------------------------
 # Personalized pipeline
 # ---------------------------------------------------------------------------
+
 
 def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
     """Personalized recommendation path using user embedding.
@@ -1558,7 +1673,9 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
     elif user_embedding is None:
         result.personalization_blocked_reason = "User embedding is not available."
     elif cached_meta.get("mf_stem") != mf_stem:
-        result.personalization_blocked_reason = "User embedding was generated from a different MF artifact; rerun to refresh."
+        result.personalization_blocked_reason = (
+            "User embedding was generated from a different MF artifact; rerun to refresh."
+        )
     elif ctx.personalization_blocked_reason:
         result.personalization_blocked_reason = ctx.personalization_blocked_reason
 
@@ -1681,6 +1798,10 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
 
     result.personalization_applied = personalization_applied
 
+    # Public demo safety: exclude banned genres before diversification and return
+    if result.ranked_items:
+        result.ranked_items = _filter_banned_from_ranked_items(result.ranked_items, metadata)
+
     # Apply MMR diversification if enabled
     # MMR runs after all personalization logic but before final return
     if ctx.mmr_lambda is not None and 0.0 <= ctx.mmr_lambda < 0.999 and result.ranked_items:
@@ -1719,16 +1840,10 @@ def blend_personalized_and_seed(
     seed_scores = {rec["anime_id"]: rec["score"] for rec in seed_recs}
 
     personalized_raw = {
-        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-        for rec in personalized_recs
+        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0}) for rec in personalized_recs
     }
-    seed_raw = {
-        rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0})
-        for rec in seed_recs
-    }
-    personalized_used = {
-        rec["anime_id"]: rec.get("_used_components", []) for rec in personalized_recs
-    }
+    seed_raw = {rec["anime_id"]: rec.get("_raw_components", {"mf": 0.0, "knn": 0.0, "pop": 0.0}) for rec in seed_recs}
+    personalized_used = {rec["anime_id"]: rec.get("_used_components", []) for rec in personalized_recs}
     seed_used = {rec["anime_id"]: rec.get("_used_components", []) for rec in seed_recs}
 
     all_anime_ids = set(personalized_scores.keys()) | set(seed_scores.keys())
@@ -1757,12 +1872,14 @@ def blend_personalized_and_seed(
             key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
         )
 
-        blended.append({
-            "anime_id": aid,
-            "score": final_score,
-            "_raw_components": raw_components,
-            "_used_components": used_components,
-        })
+        blended.append(
+            {
+                "anime_id": aid,
+                "score": final_score,
+                "_raw_components": raw_components,
+                "_used_components": used_components,
+            }
+        )
 
     blended.sort(key=lambda x: x["score"], reverse=True)
     return blended[:n_requested]
@@ -1771,6 +1888,7 @@ def blend_personalized_and_seed(
 # ---------------------------------------------------------------------------
 # Post-pipeline filters & explanation formatting
 # ---------------------------------------------------------------------------
+
 
 def apply_post_filters(
     recs: list[dict],
@@ -1852,7 +1970,9 @@ def apply_post_filters(
             except KeyError:
                 continue
             rec_copy = rec.copy()
-            rec_copy["_mal_score"] = float(row.get("mal_score")) if isinstance(row, pd.Series) and pd.notna(row.get("mal_score")) else 0
+            rec_copy["_mal_score"] = (
+                float(row.get("mal_score")) if isinstance(row, pd.Series) and pd.notna(row.get("mal_score")) else 0
+            )
             rec_copy["_year"] = 0
             aired_from = row.get("aired_from") if isinstance(row, pd.Series) else None
             if aired_from and isinstance(aired_from, str):
@@ -1874,7 +1994,7 @@ def apply_post_filters(
         recs = enriched
 
     # Final trim to requested top_n
-    recs = recs[:ctx.top_n]
+    recs = recs[: ctx.top_n]
     return recs
 
 
