@@ -231,12 +231,12 @@ REQUIREMENTS:
 **Why:** `tests/conftest.py` currently only adds `sys.path`. Many test files independently create the same fixtures (mock metadata DataFrames, dummy models, sample ratings dicts). Centralising fixtures into `conftest.py` with `@pytest.fixture` eliminates duplication, makes tests more readable, and signals mature test engineering.
 
 **Checklist:**
-- [ ] Audit all test files for repeated setup patterns (DataFrames, model mocks, rating dicts)
-- [ ] Create shared fixtures in `tests/conftest.py`: `sample_metadata`, `mock_mf_model`, `mock_knn_model`, `sample_ratings`, `sample_seeds`
-- [ ] Refactor existing tests to use conftest fixtures instead of inline setup
-- [ ] Add a `pipeline_result_factory` fixture for tests that need `PipelineResult` instances
-- [ ] Verify all 210+ tests still pass after fixture consolidation
-- [ ] Remove duplicated setup code from individual test files
+- [x] Audit all test files for repeated setup patterns (DataFrames, model mocks, rating dicts)
+- [x] Create shared fixtures in `tests/conftest.py`: `sample_metadata`, `mock_mf_model`, `mock_knn_model`, `sample_ratings`, `sample_seeds`
+- [x] Refactor existing tests to use conftest fixtures instead of inline setup
+- [x] Add a `pipeline_result_factory` fixture for tests that need `PipelineResult` instances
+- [x] Verify all 210+ tests still pass after fixture consolidation
+- [x] Remove duplicated setup code from individual test files
 
 **Prompt for Claude Sonnet 4.5:**
 
@@ -401,16 +401,16 @@ REQUIREMENTS:
 **Why:** Only 1 notebook exists (`01_eda_data_quality.ipynb`). A "pipeline walkthrough" notebook that loads models, runs each stage step-by-step, visualises score distributions and embedding spaces, and explains design decisions is the highest-impact portfolio artifact after the README. Interviewers will open it.
 
 **Checklist:**
-- [ ] Create `notebooks/02_pipeline_walkthrough.ipynb`
-- [ ] Section 1: Load data & models, show dataset summary stats
-- [ ] Section 2: Stage 0 demo — show candidate generation for a seed, visualise overlap between generators
-- [ ] Section 3: Stage 1 demo — show admission gating, plot score distributions pre/post filtering
-- [ ] Section 4: Stage 2 demo — show hybrid scoring, plot per-signal contributions
-- [ ] Section 5: Post-processing — show franchise cap, MMR (if Task 2.1 done), final ranking
-- [ ] Section 6: Embedding space visualisation — t-SNE/UMAP of synopsis embeddings colored by genre
-- [ ] Section 7: Ablation — run pipeline with/without each signal, table of metric impacts
-- [ ] Add markdown cells with clear narrative explaining decisions and trade-offs
-- [ ] Ensure notebook runs end-to-end in <60 seconds
+- [x] Create `notebooks/02_pipeline_walkthrough.ipynb`
+- [x] Section 1: Load data & models, show dataset summary stats
+- [x] Section 2: Stage 0 demo — show candidate generation for a seed, visualise overlap between generators
+- [x] Section 3: Stage 1 demo — show admission gating, plot score distributions pre/post filtering
+- [x] Section 4: Stage 2 demo — show hybrid scoring, plot per-signal contributions
+- [x] Section 5: Post-processing — show franchise cap, MMR (if Task 2.1 done), final ranking
+- [x] Section 6: Embedding space visualisation — t-SNE/UMAP of synopsis embeddings colored by genre
+- [x] Section 7: Ablation — run pipeline with/without each signal, table of metric impacts
+- [x] Add markdown cells with clear narrative explaining decisions and trade-offs
+- [x] Ensure notebook runs end-to-end in <60 seconds
 
 **Prompt for Claude Sonnet 4.5:**
 
