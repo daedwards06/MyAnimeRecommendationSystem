@@ -15,7 +15,7 @@ Ensure the following files/folders are in your repository:
 ```
 ├── .streamlit/
 │   └── config.toml          # Streamlit configuration
-├── .python-version          # Python 3.11 (required for PyArrow compatibility)
+├── .python-version          # Python 3.11.9 (preference for Streamlit Cloud)
 ├── app/
 │   ├── main.py              # Entry point
 │   ├── sidebar.py
@@ -43,7 +43,8 @@ Ensure the following files/folders are in your repository:
 
 **Important:** 
 - Total repository size must be < 1 GB for Streamlit Cloud.
-- Python 3.11 is required (specified in `.python-version`) due to PyArrow compatibility issues with Python 3.13.
+- Using FastParquet instead of PyArrow for Python 3.13 compatibility.
+- `.python-version` specifies Python 3.11.9 as preference (fallback to 3.13 works with FastParquet).
 
 ## File Size Summary
 
@@ -162,12 +163,14 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 
 ## Known Deployment Gotchas
 
-### 1. Python Version Compatibility (CRITICAL)
+### 1. Python Version & Parquet Library (CRITICAL)
 - **Symptom:** Deployment fails with `ModuleNotFoundError: No module named 'pkg_resources'` when installing PyArrow
-- **Cause:** Streamlit Cloud defaults to Python 3.13, but PyArrow < 17.0.0 requires `pkg_resources` (removed in Python 3.12+)
+- **Cause:** Streamlit Cloud may default to Python 3.13, but PyArrow < 18 has build issues on Python 3.13
 - **Solution:** 
-  - Created `.python-version` file with content `3.11` to pin Python version
-  - Updated PyArrow to 17.0.0 in `requirements.txt`
+  - **Switched to FastParquet** instead of PyArrow for parquet file support
+  - FastParquet has pre-built wheels for all Python versions and doesn't require compilation
+  - Created `.python-version` file with `3.11.9` as preference (Streamlit Cloud support varies)
+  - Added `packages.txt` with system dependencies as fallback
   - **This fix is already applied in the repository**
 
 ### 2. Model Loading Time
