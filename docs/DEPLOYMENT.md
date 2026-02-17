@@ -15,6 +15,7 @@ Ensure the following files/folders are in your repository:
 ```
 ├── .streamlit/
 │   └── config.toml          # Streamlit configuration
+├── .python-version          # Python 3.11 (required for PyArrow compatibility)
 ├── app/
 │   ├── main.py              # Entry point
 │   ├── sidebar.py
@@ -40,7 +41,9 @@ Ensure the following files/folders are in your repository:
 └── README.md
 ```
 
-**Important:** Total repository size must be < 1 GB for Streamlit Cloud.
+**Important:** 
+- Total repository size must be < 1 GB for Streamlit Cloud.
+- Python 3.11 is required (specified in `.python-version`) due to PyArrow compatibility issues with Python 3.13.
 
 ## File Size Summary
 
@@ -159,12 +162,20 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 
 ## Known Deployment Gotchas
 
-### 1. Model Loading Time
+### 1. Python Version Compatibility (CRITICAL)
+- **Symptom:** Deployment fails with `ModuleNotFoundError: No module named 'pkg_resources'` when installing PyArrow
+- **Cause:** Streamlit Cloud defaults to Python 3.13, but PyArrow < 17.0.0 requires `pkg_resources` (removed in Python 3.12+)
+- **Solution:** 
+  - Created `.python-version` file with content `3.11` to pin Python version
+  - Updated PyArrow to 17.0.0 in `requirements.txt`
+  - **This fix is already applied in the repository**
+
+### 2. Model Loading Time
 - **Symptom:** App shows "Please wait..." for 30-60 seconds on first load
 - **Cause:** Loading ~440 MB of models from disk
 - **Solution:** Normal behavior. Models are cached after first load.
 
-### 2. Memory Limits
+### 3. Memory Limits
 - **Limit:** Streamlit Cloud free tier has 1 GB RAM
 - **Current usage:** ~600-800 MB with all models loaded
 - **If exceeded:** Consider:
@@ -172,17 +183,17 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
   - Lazy loading (load models only when needed)
   - Upgrading to paid tier
 
-### 3. Session State Resets
+### 4. Session State Resets
 - **Symptom:** User ratings disappear on page reload
 - **Cause:** Streamlit session state is in-memory only
 - **Solution:** Expected behavior. For persistence, add database backend (future enhancement).
 
-### 4. Cold Starts
+### 5. Cold Starts
 - **Symptom:** App is slow after 5+ minutes of inactivity
 - **Cause:** Streamlit Cloud spins down idle apps
 - **Solution:** Normal for free tier. First request wakes the app (~10 seconds).
 
-### 5. Path Issues
+### 6. Path Issues
 - **Symptom:** FileNotFoundError for data/models
 - **Cause:** Using absolute paths or `os.getcwd()`
 - **Solution:** Use relative paths from project root:
