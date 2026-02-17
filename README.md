@@ -2,6 +2,7 @@
 
 ![CI](https://github.com/daedwards06/MyAnimeRecommendationSystem/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem/graph/badge.svg)](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/daedwards06/MyAnimeRecommendationSystem/main/app/main.py)
 
 A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and 210 automated tests.
 
@@ -127,6 +128,7 @@ The app loads with a default seed and shows recommendations immediately — no s
 
 | Topic | Link |
 |-------|------|
+| **Deployment to Streamlit Cloud** | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
 | Evaluation & ablation | [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) |
 | Model card | [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md) |
 | Personalization guide | [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) |

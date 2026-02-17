@@ -1,32 +1,28 @@
 ############################################################
-# Phase 5 App Runtime Requirements
-# Pruned set for Streamlit deployment (low memory footprint).
-# Training/experimentation libs retained if small; heavy ones optional.
-# (If deploying minimal app only, comment out heavier libs below.)
+# Production Runtime Requirements
+# For Streamlit Cloud deployment - minimal footprint.
+# Development/testing dependencies are in requirements-dev.txt
 ############################################################
 
+# Core Streamlit App
 streamlit==1.38.0
+
+# Data Processing
 pandas==2.2.2
 numpy==1.26.4
+pyarrow==16.1.0
+
+# Machine Learning
 scikit-learn==1.5.2
 joblib==1.4.2
-pyarrow==16.1.0
-rapidfuzz==3.9.4
-Pillow==10.4.0  # image thumbnail processing for enrich_images pipeline
-httpx==0.27.2   # HTTP client (already listed below but kept for clarity near image deps)
 
-# Optional (enable embeddings content path). Comment out to slim further.
-
-# NOTE (Phase 5): torch/transformers are intentionally NOT included in the
-# Windows runtime requirements. Neural embeddings are built offline in WSL2 and
-# consumed on Windows via serialized artifacts.
-# See: requirements-wsl-neural.txt
-
-# Dev / evaluation (can be excluded in minimal prod):
-matplotlib==3.9.2
-seaborn==0.13.2
+# Visualization (used in taste profile panel)
 plotly==5.24.1
-optuna==3.6.1
-pytest==8.3.2
-pytest-cov==5.0.0
-ruff==0.15.0
+
+# Utility Libraries
+rapidfuzz==3.9.4
+Pillow==10.4.0
+httpx==0.27.2
+
+# NOTE: Neural embeddings (torch/transformers) are built offline in WSL2 and
+# consumed via serialized artifacts. See: requirements-wsl-neural.txt

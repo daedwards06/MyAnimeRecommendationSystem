@@ -1,0 +1,7 @@
+# Git LFS tracking for large model files
+# Models larger than 100MB must be tracked with LFS for GitHub
+# Item-kNN models (~181 MB each)
+models/item_knn_*.joblib filter=lfs diff=lfs merge=lfs -text
+# Track all joblib files larger than common size
+# (optional - uncomment if other models grow beyond 100MB)
+# models/*.joblib filter=lfs diff=lfs merge=lfs -text

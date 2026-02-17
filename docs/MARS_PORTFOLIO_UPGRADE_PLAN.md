@@ -584,15 +584,15 @@ REQUIREMENTS:
 **Why:** A live URL in your README is the single biggest credibility signal for a Streamlit project. Recruiters won't clone and run your code — they'll click a link. Streamlit Community Cloud is free, integrates directly with GitHub, and handles the infrastructure.
 
 **Checklist:**
-- [ ] Verify all data files needed at runtime are committed or downloadable (parquet, joblib models)
-- [ ] Check model file sizes — Streamlit Cloud has a 1GB repo limit and 1GB RAM limit
-- [ ] Create `.streamlit/config.toml` with appropriate settings (theme, server config)
-- [ ] Add `packages.txt` if any system-level dependencies are needed
-- [ ] Ensure `requirements.txt` has pinned versions and no unnecessary packages
-- [ ] Test local deployment first: `streamlit run app/main.py` in a fresh venv
-- [ ] Deploy to Streamlit Community Cloud via GitHub
-- [ ] Add the live URL to README.md as a prominent badge/button
-- [ ] Test the deployed app: first load, search, recommendations, all 3 modes
+- [x] Verify all data files needed at runtime are committed or downloadable (parquet, joblib models)
+- [x] Check model file sizes — Streamlit Cloud has a 1GB repo limit and 1GB RAM limit
+- [x] Create `.streamlit/config.toml` with appropriate settings (theme, server config)
+- [x] Add `packages.txt` if any system-level dependencies are needed (not needed for this project)
+- [x] Ensure `requirements.txt` has pinned versions and no unnecessary packages
+- [x] Test local deployment first: `streamlit run app/main.py` in a fresh venv
+- [ ] Deploy to Streamlit Community Cloud via GitHub (ready to deploy - manual step)
+- [x] Add the live URL to README.md as a prominent badge/button (placeholder URL added)
+- [ ] Test the deployed app: first load, search, recommendations, all 3 modes (after deployment)
 
 **Prompt for Claude Sonnet 4.5:**
 

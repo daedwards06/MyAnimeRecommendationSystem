@@ -1,0 +1,22 @@
+############################################################
+# Development & Testing Requirements
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+############################################################
+
+# Install production dependencies first
+-r requirements.txt
+
+# Testing
+pytest==8.3.2
+pytest-cov==5.0.0
+
+# Linting & Formatting
+ruff==0.15.0
+
+# Visualization & Analysis (used in notebooks)
+matplotlib==3.9.2
+seaborn==0.13.2
+plotly==5.24.1
+
+# Hyperparameter Tuning
+optuna==3.6.1
