@@ -224,13 +224,21 @@ def _load_models(models_dir: Path) -> dict[str, Any]:
     if not models_dir.exists():
         raise FileNotFoundError(f"Models directory not found: {models_dir}")
     models: dict[str, Any] = {}
+    skipped: list[str] = []
     for f in models_dir.glob("*.joblib"):
         try:
             models[f.stem] = joblib.load(f)
+        except ModuleNotFoundError as e:
+            # Skip models that require unavailable dependencies (e.g. torch).
+            # These are optional; the pipeline checks for their presence.
+            logger.warning("Skipping model '%s' (missing dependency: %s)", f.name, e)
+            skipped.append(f.name)
         except Exception as e:
             raise RuntimeError(f"Failed loading model '{f}': {e}") from e
     if not models:
         raise RuntimeError(f"No .joblib models found in {models_dir}")
+    if skipped:
+        logger.info("Skipped %d model(s) due to missing dependencies: %s", len(skipped), ", ".join(skipped))
     return models
 
 
