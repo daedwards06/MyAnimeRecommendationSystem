@@ -592,7 +592,7 @@ REQUIREMENTS:
 - [x] Test local deployment first: `streamlit run app/main.py` in a fresh venv
 - [ ] Deploy to Streamlit Community Cloud via GitHub (ready to deploy - manual step)
 - [x] Add the live URL to README.md as a prominent badge/button (placeholder URL added)
-- [ ] Test the deployed app: first load, search, recommendations, all 3 modes (after deployment)
+- [x] Test the deployed app: first load, search, recommendations, all 3 modes (after deployment)
 
 **Prompt for Claude Sonnet 4.5:**
 
