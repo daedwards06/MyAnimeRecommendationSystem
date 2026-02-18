@@ -2,29 +2,32 @@
 # Production Runtime Requirements
 # For Streamlit Cloud deployment - minimal footprint.
 # Development/testing dependencies are in requirements-dev.txt
+#
+# NOTE: Using >= constraints (not ==) so pip can resolve to
+# versions with pre-built wheels for the target Python.
+# Streamlit Cloud uses Python 3.13 which requires newer
+# releases of packages with C extensions.
 ############################################################
 
 # Core Streamlit App
-streamlit==1.38.0
+streamlit>=1.38.0
 
 # Data Processing
-pandas==2.2.2
-numpy==1.26.4
-# Use fastparquet as alternative to pyarrow for Python 3.13 compatibility
-fastparquet==2024.11.0
-python-snappy==0.7.3
+pandas>=2.2.2
+numpy>=1.26.4
+pyarrow>=16.1.0
 
 # Machine Learning
-scikit-learn==1.5.2
-joblib==1.4.2
+scikit-learn>=1.5.2
+joblib>=1.4.2
 
 # Visualization (used in taste profile panel)
-plotly==5.24.1
+plotly>=5.24.1
 
 # Utility Libraries
-rapidfuzz==3.9.4
-Pillow==10.4.0
-httpx==0.27.2
+rapidfuzz>=3.9.4
+Pillow>=10.4.0
+httpx>=0.27.2
 
 # NOTE: Neural embeddings (torch/transformers) are built offline in WSL2 and
 # consumed via serialized artifacts. See: requirements-wsl-neural.txt
