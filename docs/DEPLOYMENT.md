@@ -233,6 +233,25 @@ git push origin main
 Streamlit Cloud auto-deploys on every push to `main`. 
 You can also manually trigger a reboot from the app dashboard.
 
+## Refreshing Data & Models
+
+To add newly released anime to the deployed app:
+
+1. **Run the refresh pipeline locally:**
+   ```powershell
+   python scripts/refresh_catalog.py            # full refresh
+   python scripts/refresh_catalog.py --season 2026 winter  # specific season
+   ```
+2. **Commit updated artifacts:**
+   ```powershell
+   git add data/processed/ models/
+   git commit -m "Refresh catalog: YYYY-MM"
+   git push origin main
+   ```
+3. Streamlit Cloud auto-deploys on push.
+
+> **Note:** The `sentence-transformers` package is only needed for offline neural embedding builds (WSL2). The production `requirements.txt` excludes it — `build_features.py` skips embeddings gracefully when it's not installed.
+
 ## Rollback on Errors
 
 If a deployment breaks the app:

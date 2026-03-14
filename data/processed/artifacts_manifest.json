@@ -1,26 +1,19 @@
 {
-  "data_version": "2025-11-14-tagfix",
+  "data_version": null,
   "vectorizer_path": "data\\processed\\features\\tfidf_vectorizer.joblib",
   "artifacts": {
     "interactions": 7813730,
-    "items": 13037,
+    "items": 13062,
     "user_features": 73515,
     "user_index": 73515,
     "item_index": 11200,
-    "tfidf_features": 1170
+    "tfidf_features": 1171
   },
-  "models": [
-    {
-      "knn": "models\\item_knn_sklearn_v2025.11.21_202756.joblib",
-      "mf": "models\\mf_sgd_v2025.11.21_202756.joblib",
-      "created_utc": "2025-11-21T20:52:44+00:00"
-    }
-  ],
   "synopsis_tfidf": [
     {
-      "stem": "synopsis_tfidf_v2025.12.30_195311",
-      "path": "models/synopsis_tfidf_v2025.12.30_195311.joblib",
-      "created_utc": "2025-12-30T19:53:11+00:00",
+      "stem": "synopsis_tfidf_v2026.03.14_001647",
+      "path": "models/synopsis_tfidf_v2026.03.14_001647.joblib",
+      "created_utc": "2026-03-14T00:16:47+00:00",
       "schema": "synopsis_tfidf_v1",
       "vocab_size": 30000,
       "vectorizer_params": {
@@ -43,9 +36,9 @@
   ],
   "synopsis_embeddings": [
     {
-      "stem": "synopsis_embeddings_v2025.12.31_161712",
-      "path": "models/synopsis_embeddings_v2025.12.31_161712.joblib",
-      "created_utc": "2025-12-31T16:17:12+00:00",
+      "stem": "synopsis_embeddings_v2026.03.14_001718",
+      "path": "models/synopsis_embeddings_v2026.03.14_001718.joblib",
+      "created_utc": "2026-03-14T00:17:18+00:00",
       "schema": "synopsis_embeddings_v1",
       "model_name": "tfidf_svd_256",
       "model_library_versions": {
@@ -63,8 +56,15 @@
       "dim": 256,
       "normalized": true,
       "config_hash": "8a471e9a8fe1f4ca9161665b35f663f0f30c5251246ae9498e546a341ca99a6a",
-      "anime_ids_hash": "9f39648c44c2b65a274e18f9a594413c992aa578e966c2c80f251a2785571352",
-      "build_timestamp_utc": "2025-12-31T16:17:13+00:00"
+      "anime_ids_hash": "b4ead5c8d9adb5d89966cd833bab6d3b11ea2d73776d398bdc812ac9555eab22",
+      "build_timestamp_utc": "2026-03-14T00:17:20+00:00"
+    }
+  ],
+  "models": [
+    {
+      "knn": "models\\item_knn_sklearn_v2026.03.14_002417.joblib",
+      "mf": "models\\mf_sgd_v2026.03.14_002417.joblib",
+      "created_utc": "2026-03-14T00:50:16+00:00"
     }
   ]
 }

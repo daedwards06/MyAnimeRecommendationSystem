@@ -1,6 +1,6 @@
 # Simple task runner (works in Git Bash; on Windows PowerShell, prefer the explicit commands shown in README)
 
-.PHONY: setup test app fetch-jikan features discover-new lint fmt venv-minimal venv-kernel venv-all phase4-artifacts
+.PHONY: setup test app fetch-jikan features discover-new refresh-all refresh-season lint fmt venv-minimal venv-kernel venv-all phase4-artifacts
 
 # Create .venv and install full project requirements
 setup:
@@ -38,6 +38,14 @@ features:
 
 discover-new:
 	. .venv/Scripts/activate && python scripts/discover_new_ids.py --baseline data/raw/anime.csv --out data/raw/new_anime_ids_$$(date +%Y%m%d).txt --sources seasons_now seasons_upcoming top --top-pages 5
+
+# End-to-end catalog refresh: discover → fetch → features → artifacts → models → images
+refresh-all:
+	. .venv/Scripts/activate && python scripts/refresh_catalog.py
+
+# Refresh a specific season only (e.g. make refresh-season YEAR=2026 SEASON=winter)
+refresh-season:
+	. .venv/Scripts/activate && python scripts/refresh_catalog.py --season $(YEAR) $(SEASON)
 
 lint:
 	ruff check src/ tests/

@@ -267,10 +267,19 @@ def _render_mal_import(
     with st.sidebar.expander("📥 Import from MAL", expanded=expanded):
         st.caption("Update your watchlist & ratings" if not key_suffix else "Get started by importing your watchlist")
 
+        # Inline instructions so first-time visitors know how to get their XML
+        st.markdown(
+            "**How to get your XML export:**\n"
+            "1. Log in at [myanimelist.net](https://myanimelist.net)\n"
+            "2. Go to [Export](https://myanimelist.net/panel.php?go=export)\n"
+            "3. Click **Export My List** and save the `.xml` file\n"
+            "4. Upload it below",
+            help="The export includes all anime on your list (Completed, Watching, etc.).",
+        )
+
         uploaded_file = st.file_uploader(
             "Upload MAL XML Export",
             type=["xml"],
-            help="Export your list from MyAnimeList.net" if not key_suffix else "Export from MyAnimeList.net",
             label_visibility="collapsed",
             key=f"mal_uploader{key_suffix}",
         )

@@ -52,7 +52,6 @@ from src.data.cleaning import (
 )
 from src.data.persist import to_parquet
 from src.features import tags as feat_tags
-from src.features import embeddings as feat_emb
 from src.features import signals as feat_signals
 from src.features import cold_start as feat_cold
 from src.features import user_features as feat_user
@@ -166,17 +165,23 @@ def main() -> None:
     feat_tags.save_tfidf_vectorizer(vec, vec_path)
     print(f"[save] TF-IDF vectorizer: {vec_path}")
 
-    # Optional: embeddings if synopsis exists
+    # Optional: embeddings if synopsis exists (requires torch + sentence-transformers)
     if "synopsis" in meta.columns:
-        print("[feat] synopsis sentence-transformer embeddings")
-        emb = feat_emb.generate_or_update_item_embeddings(
-            meta,
-            id_col="anime_id",
-            text_col="synopsis",
-            out_path=Path("data/processed/item_features_embeddings.parquet"),
-            batch_size=int(args.embed_batch),
-        )
-        print(f"[save] item_features_embeddings.parquet ({len(emb)} rows)")
+        try:
+            from src.features import embeddings as feat_emb
+        except ImportError:
+            print("[skip] sentence-transformers not installed; skipping embeddings generation")
+            feat_emb = None  # type: ignore[assignment]
+        if feat_emb is not None:
+            print("[feat] synopsis sentence-transformer embeddings")
+            emb = feat_emb.generate_or_update_item_embeddings(
+                meta,
+                id_col="anime_id",
+                text_col="synopsis",
+                out_path=Path("data/processed/item_features_embeddings.parquet"),
+                batch_size=int(args.embed_batch),
+            )
+            print(f"[save] item_features_embeddings.parquet ({len(emb)} rows)")
     else:
         print("[warn] 'synopsis' column not found in metadata; skipping embeddings generation")
 

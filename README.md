@@ -95,7 +95,25 @@ streamlit run app/main.py
 
 The app loads with a default seed and shows recommendations immediately — no setup needed.
 
-**Optional — Personalization:** Import your [MyAnimeList export](https://myanimelist.net/panel.php?go=export) via the sidebar to get CF-based recommendations from your own ratings. See [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) for the full walkthrough.
+**Optional — Personalization:** Import your [MyAnimeList export](https://myanimelist.net/panel.php?go=export) via the sidebar to get CF-based recommendations from your own ratings. The app shows inline export instructions right next to the upload widget. See [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) for the full walkthrough.
+
+## Updating the Anime Catalog
+
+The catalog ships with 13,000+ titles. To add newly aired anime (e.g., a new season's premieres):
+
+```bash
+# Full refresh — discover new IDs from Jikan, fetch metadata, rebuild all artifacts:
+python scripts/refresh_catalog.py
+
+# Or target a specific season:
+python scripts/refresh_catalog.py --season 2026 winter
+
+# Makefile shortcuts:
+make refresh-all
+make refresh-season YEAR=2026 SEASON=winter
+```
+
+The refresh pipeline runs 7 steps automatically: discover → fetch metadata → build features → synopsis TF-IDF → synopsis embeddings → retrain CF models → enrich images. Use `--skip-models`, `--skip-synopsis`, or `--skip-images` to skip expensive steps. See [`docs/data_catalog.md`](docs/data_catalog.md) for the full data lineage.
 
 ## Project Structure
 
@@ -114,6 +132,12 @@ The app loads with a default seed and shows recommendations immediately — no s
 │   ├── eval/                    # Metrics (NDCG, MAP, coverage, Gini, graded relevance)
 │   ├── features/                # Feature engineering, embeddings, scaling
 │   └── data/                    # Data loading, MAL parser, user profiles
+├── scripts/
+│   ├── refresh_catalog.py       # End-to-end catalog refresh (discover → retrain)
+│   ├── fetch_jikan.py           # Fetch metadata from Jikan API
+│   ├── discover_new_ids.py      # Find new MAL IDs missing from catalog
+│   ├── build_features.py        # Feature engineering orchestrator
+│   └── save_artifacts.py        # Retrain & save CF models
 ├── tests/                       # 210 tests across 22 files
 ├── reports/                     # Evaluation reports, ablation studies
 ├── models/                      # Trained model artifacts (.joblib, .gitignored)
@@ -122,7 +146,7 @@ The app loads with a default seed and shows recommendations immediately — no s
 
 ## Tech Stack
 
-**ML/Data:** NumPy, pandas, scikit-learn, Optuna | **Embeddings:** sentence-transformers (all-MiniLM-L6-v2) | **App:** Streamlit | **Search:** RapidFuzz | **CI:** GitHub Actions, pytest
+**ML/Data:** NumPy, pandas, scikit-learn, Optuna | **Embeddings:** sentence-transformers (all-MiniLM-L6-v2, optional — offline build only) | **App:** Streamlit | **Search:** RapidFuzz | **CI:** GitHub Actions, pytest
 
 ## Documentation
 

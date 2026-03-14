@@ -7,7 +7,7 @@ This guide shows you how to import your MyAnimeList (MAL) watchlist into the rec
 If you have a MAL account with your watch history, importing it will:
 - ✅ **Automatically exclude** anime you've already seen from recommendations
 - ✅ **Save time** by showing only fresh suggestions you haven't watched
-- ✅ **Store your ratings** for future personalization features (Phase B)
+- ✅ **Store your ratings** for [personalized recommendations](user_guide_personalization.md)
 - ✅ **Keep your data private** - profiles are stored locally and never uploaded
 
 ## Quick Start (3 Steps)
@@ -158,8 +158,8 @@ You can manually edit this file if needed (use a text editor).
 - Try reloading the app (`Ctrl+R` in browser)
 
 ### "Too many unmatched anime"
-- This is normal for newer anime (released 2024-2025)
-- Our dataset was built in late 2024 and may not include latest releases
+- This is normal for very recent anime not yet in the catalog
+- The catalog can be refreshed with `python scripts/refresh_catalog.py` (see [Data Catalog](data_catalog.md))
 - Unmatched anime won't appear in recommendations anyway (not in database)
 
 ## FAQ

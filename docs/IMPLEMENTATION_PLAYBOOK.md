@@ -13,16 +13,24 @@ How to use:
 
 **Project:** Anime Recommendation System (Streamlit portfolio app)
 
-**Primary goal right now:** Phase 5 (neural synopsis embeddings built in WSL2, consumed on Windows)
+**Primary goal right now:** Portfolio polish & maintainability
 
-**Current phase:** Phase 5
+**Current phase:** Phase 5 (complete) → Portfolio hardening
 
-**Last updated:** 2026-02-03
+**Last updated:** 2026-03-14
 
 **Current blockers (if any):**
-- None (app now fails loudly if artifacts are missing/invalid).
+- None.
 
-**What changed last session (short):**
+**What changed last session (2026-03-14):**
+- Created `scripts/refresh_catalog.py` — end-to-end catalog refresh pipeline (discover → fetch → build features → synopsis artifacts → retrain CF models → enrich images).
+- Added `make refresh-all` and `make refresh-season` Makefile targets.
+- Made `scripts/build_features.py` gracefully skip `sentence-transformers` embeddings via lazy import (fixes crash on Windows without torch).
+- Added inline MAL XML export instructions directly in the Streamlit sidebar (`app/sidebar.py`) so portfolio visitors see how to get their export without leaving the app.
+- Ran first catalog refresh: discovered 25 new anime IDs, fetched metadata (catalog 13,037 → 13,062), rebuilt all features and retrained models.
+- Updated docs: README.md, DATA_SOURCES.md, data_catalog.md, user_guide_watchlist.md, DEPLOYMENT.md, IMPLEMENTATION_PLAYBOOK.md.
+
+**What changed previous session (2026-02-03):**
 - Phase 5: Implemented a **demographic-aware semantic admission override** (Stage 1) for **shounen↔shounen** pairs so strong neural semantic neighbors can enter the Stage 1 shortlist even when genre overlap gates would block them.
   - Centralized in [src/app/semantic_admission.py](src/app/semantic_admission.py) (new lane: `demo_shounen`; token normalizer; shounen-only).
   - Wired into Streamlit Stage 1 neural admission in [app/main.py](app/main.py) and the golden harness in [scripts/evaluate_phase4_golden.py](scripts/evaluate_phase4_golden.py).

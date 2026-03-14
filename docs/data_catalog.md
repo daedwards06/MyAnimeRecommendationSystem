@@ -101,9 +101,12 @@ This catalog documents all data assets used in the anime recommendation system, 
 
 ## Transformation Lineage
 1. Raw Kaggle CSVs ingested into `data/raw/`.
-2. Cleaning pipeline normalizes interactions → `data/processed/interactions_*.parquet`.
-3. Jikan enrichment fetched via `scripts/fetch_jikan.py` → `data/raw/jikan/*.json` → merged into `anime_metadata.parquet`.
-4. Feature engineering script builds multi-hot, TF-IDF, and embeddings → saved under `data/processed/features/`.
+2. `scripts/discover_new_ids.py` discovers post-snapshot MAL IDs from Jikan seasonal/top endpoints.
+3. `scripts/fetch_jikan.py` fetches metadata → `data/raw/jikan/*.json` → appended to `anime_metadata.parquet`.
+4. `scripts/build_features.py` cleans interactions, builds multi-hot, TF-IDF, popularity/recency signals, cold-start flags, and user features → `data/processed/`. Embeddings generation is skipped gracefully when `sentence-transformers` is not installed.
+5. `scripts/build_synopsis_tfidf_artifact.py` and `scripts/build_synopsis_embeddings_artifact.py` produce versioned `.joblib` similarity artifacts in `models/`.
+6. `scripts/save_artifacts.py` retrains kNN + FunkSVD CF models → `models/`.
+7. **`scripts/refresh_catalog.py`** orchestrates steps 2–6 end-to-end. Convenience targets: `make refresh-all`, `make refresh-season YEAR=YYYY SEASON=xxx`.
 
 ## Quality & Validation Checks
 | Check | Asset | Method | Threshold/Rule |
@@ -115,13 +118,13 @@ This catalog documents all data assets used in the anime recommendation system, 
 | Embedding coverage | synopsis_embeddings | Count rows vs items | >=95% items |
 
 ## Update Policy Notes
-- Ratings: Static snapshot for reproducibility.
-- Jikan: Refresh monthly; version `anime_metadata_YYYYMM.parquet`.
-- Features: Recompute only when metadata changes significantly.
+- **Ratings:** Static snapshot for reproducibility.
+- **Jikan:** Refresh monthly via `make refresh-all` or `python scripts/refresh_catalog.py`. Versioned snapshots: `anime_metadata_YYYYMM.parquet`.
+- **Features:** Automatically rebuilt by the refresh pipeline. Use `--skip-models` or `--skip-synopsis` to skip expensive steps.
 
 ## Open Questions (Fill as project evolves)
 - Are there temporal signals strong enough to warrant time-decay in scoring?
 - Should we incorporate user watch status beyond ratings?
 - Will we add review sentiment as a feature layer?
 
-**Last Updated:** 2025-11-10
+**Last Updated:** 2026-03-14
