@@ -211,7 +211,12 @@ def _prune_metadata(df: pd.DataFrame) -> pd.DataFrame:
         if snippet is None:
             work["synopsis_snippet"] = ""
         else:
-            work["synopsis_snippet"] = snippet.apply(lambda s: (s[:240] + "…") if len(s) > 240 else s)
+            def _truncate(s: object) -> str:
+                if not isinstance(s, str):
+                    s = str(s) if s is not None and not (isinstance(s, float) and np.isnan(s)) else ""
+                return (s[:240] + "…") if len(s) > 240 else s
+
+            work["synopsis_snippet"] = snippet.apply(_truncate)
 
     # Ensure optional columns exist to avoid KeyError on selection
     for c in MIN_METADATA_COLUMNS:
@@ -283,7 +288,17 @@ def build_artifacts(
 
     metadata_path = data_dir_p / METADATA_PARQUET
     metadata_raw = _safe_parquet(metadata_path)
-    metadata = _prune_metadata(metadata_raw)
+    try:
+        metadata = _prune_metadata(metadata_raw)
+    except Exception as e:
+        raise ArtifactContractError(
+            "Failed to process metadata parquet.",
+            details=[
+                f"Error: {e}",
+                f"Source: {metadata_path}",
+                "Fix: regenerate data/processed/anime_metadata.parquet.",
+            ],
+        ) from e
 
     if "anime_id" not in metadata.columns or metadata["anime_id"].isna().all():
         raise ArtifactContractError(
@@ -315,12 +330,17 @@ def build_artifacts(
     # instead of a single arbitrary user (index 0). This makes CF contribution
     # represent average community preferences rather than one user's taste.
     if hasattr(mf_model, "P") and mf_model.P is not None:
-        mean_user_P = np.mean(mf_model.P, axis=0)  # shape: [n_factors]
-        models["mf_mean_user_vector"] = mean_user_P
-        # Precompute mean-user scores for all items for efficiency
-        global_mean = getattr(mf_model, "global_mean", 0.0)
-        mean_user_scores = float(global_mean) + (mean_user_P @ mf_model.Q.T)  # shape: [n_items]
-        models["mf_mean_user_scores"] = mean_user_scores.astype(np.float32)
+        try:
+            mean_user_P = np.mean(mf_model.P, axis=0)  # shape: [n_factors]
+            models["mf_mean_user_vector"] = mean_user_P
+            # Precompute mean-user scores for all items for efficiency
+            global_mean = getattr(mf_model, "global_mean", 0.0)
+            mean_user_scores = float(global_mean) + (mean_user_P @ mf_model.Q.T)  # shape: [n_items]
+            models["mf_mean_user_scores"] = mean_user_scores.astype(np.float32)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to precompute mean-user MF scores: %s", e)
+            models["mf_mean_user_vector"] = None
+            models["mf_mean_user_scores"] = None
     else:
         models["mf_mean_user_vector"] = None
         models["mf_mean_user_scores"] = None
