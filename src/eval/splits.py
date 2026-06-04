@@ -17,17 +17,12 @@ def build_validation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         if val_df.empty:
             return df, df
         return train_df, val_df
-    rng = random.Random(RANDOM_SEED)
     work = df.copy()
     if "timestamp" in work.columns:
         work = work.sort_values(["user_id", "timestamp"])  # ascending
         val_rows = work.groupby("user_id", group_keys=False).tail(1)
     else:
-        val_rows = (
-            work.groupby("user_id", group_keys=False)
-            .apply(lambda g: g.sample(1, random_state=rng.randint(0, 1_000_000)))
-            .reset_index(drop=True)
-        )
+        val_rows = work.groupby("user_id", group_keys=False).sample(1, random_state=RANDOM_SEED)
     val_pairs = set(zip(val_rows["user_id"], val_rows["anime_id"]))
     train_df = work[~work.apply(lambda r: (r["user_id"], r["anime_id"]) in val_pairs, axis=1)]
     return train_df, val_rows
