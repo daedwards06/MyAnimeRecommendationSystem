@@ -337,7 +337,7 @@ def build_artifacts(
             global_mean = getattr(mf_model, "global_mean", 0.0)
             mean_user_scores = float(global_mean) + (mean_user_P @ mf_model.Q.T)  # shape: [n_items]
             models["mf_mean_user_scores"] = mean_user_scores.astype(np.float32)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("Failed to precompute mean-user MF scores: %s", e)
             models["mf_mean_user_vector"] = None
             models["mf_mean_user_scores"] = None
