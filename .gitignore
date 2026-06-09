@@ -215,3 +215,20 @@ data/user_profiles/*.json
 
 #acrhive files
 archive/
+
+# Poster image cache — served from the remote CDN at runtime (see
+# src/app/components/cards.py). Regenerate locally with scripts/enrich_images.py.
+data/processed/images/
+
+# Jikan API response cache — loose per-id files. The cache is committed in
+# compact form as data/raw/jikan.tar.gz (extract to restore for offline refresh).
+data/raw/jikan/
+
+# Timestamped evaluation run outputs. Canonical summaries are kept under reports/
+# (phase4_evaluation.md, phase4_ablation.md, phase3_summary.md).
+experiments/metrics/
+reports/phase4_golden_queries_*
+reports/artifacts/phase4_golden_queries_*
+reports/jikan_feature_probe_*
+reports/artifacts/jikan_feature_probe_*
+reports/quality_factor_mode_comparison_*

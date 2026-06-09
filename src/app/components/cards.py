@@ -32,52 +32,80 @@ def _render_placeholder_box(label: str):
         unsafe_allow_html=True,
     )
 
-def _render_image_streamlit(thumb_rel: str | None, title_display: str):
-    """Render image using Streamlit's native image component."""
-    if not thumb_rel:
-        _render_placeholder_box("No Image")
-        st.caption(f"{title_display} (no image available)")
-        return
+def _clean_url(value) -> str | None:
+    """Return a usable http(s) URL string, or None for NaN/empty/non-string values."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value.startswith(("http://", "https://")):
+        return None
+    return value
 
-    # Resolve base path robustly relative to repo root, not CWD
-    try:
-        repo_root = Path(__file__).resolve().parents[3]
-    except Exception:
-        repo_root = Path(".").resolve()
-    base_processed = repo_root / "data" / "processed"
 
-    rel_path = Path(str(thumb_rel))
-    img_path = rel_path if rel_path.is_absolute() else base_processed / rel_path
+def _render_image_streamlit(
+    thumb_rel: str | None, title_display: str, remote_url: str | None = None
+):
+    """Render a poster via Streamlit's native image component.
+
+    Resolution order:
+    1. Local optimized thumbnail (``data/processed/images/posters/*_thumb.webp``)
+       when present — fastest, smallest payload.
+    2. Remote CDN URL (``poster_url`` from metadata) — used when the local
+       thumbnail is absent, e.g. on a slim deployment that does not ship the
+       image cache. Streamlit fetches it directly from MyAnimeList's CDN.
+    3. Placeholder box when neither is available.
+    """
     debug = False
     try:
         debug = bool(st.session_state.get("__IMG_DEBUG__", False))
     except Exception:
         debug = False
 
-    if debug:
-        try:
-            st.text(f"[img debug] rel={thumb_rel} | resolved={img_path} | exists={img_path.exists()}")
-        except Exception:
-            pass
+    remote = _clean_url(remote_url)
 
-    if img_path.exists():
+    # 1. Local thumbnail (preferred when shipped).
+    if thumb_rel:
         try:
-            # Use Streamlit's native image component
-            st.image(str(img_path), width=180, caption=title_display)
+            repo_root = Path(__file__).resolve().parents[3]
+        except Exception:
+            repo_root = Path(".").resolve()
+        base_processed = repo_root / "data" / "processed"
+        rel_path = Path(str(thumb_rel))
+        img_path = rel_path if rel_path.is_absolute() else base_processed / rel_path
+
+        if debug:
+            try:
+                st.text(f"[img debug] rel={thumb_rel} | resolved={img_path} | exists={img_path.exists()}")
+            except Exception:
+                pass
+
+        if img_path.exists():
+            try:
+                st.image(str(img_path), width=180, caption=title_display)
+                if debug:
+                    st.caption(f"[img ok local] {img_path}")
+                return
+            except Exception as e:
+                if debug:
+                    st.caption(f"[img error local] {img_path}: {e}")
+                # fall through to remote / placeholder
+
+    # 2. Remote CDN fallback.
+    if remote:
+        try:
+            st.image(remote, width=180, caption=title_display)
             if debug:
-                st.caption(f"[img ok] {img_path}")
+                st.caption(f"[img ok remote] {remote}")
             return
         except Exception as e:
-            _render_placeholder_box("Image Error")
-            st.caption(f"{title_display} (failed to render)")
             if debug:
-                st.caption(f"[img error] {img_path}: {e}")
-            return
+                st.caption(f"[img error remote] {remote}: {e}")
 
-    _render_placeholder_box("Missing")
-    st.caption(f"{title_display} (image missing)")
+    # 3. Nothing available.
+    _render_placeholder_box("No Image")
+    st.caption(f"{title_display} (no image available)")
     if debug:
-        st.caption(f"[img missing] {img_path}")
+        st.caption(f"[img missing] thumb={thumb_rel} remote={remote_url}")
 
 def render_card_grid(
     row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
@@ -122,7 +150,7 @@ def render_card_grid(
     container = st.container(border=True)
     with container:
         # Image
-        _render_image_streamlit(thumb, title_display)
+        _render_image_streamlit(thumb, title_display, row.get("poster_url"))
 
         # Title + score
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
@@ -296,7 +324,7 @@ def render_card(
         col_img, col_content = st.columns([1, 3])
 
         with col_img:
-            _render_image_streamlit(thumb, title_display)
+            _render_image_streamlit(thumb, title_display, row.get("poster_url"))
 
         with col_content:
             # Title + match score on same line

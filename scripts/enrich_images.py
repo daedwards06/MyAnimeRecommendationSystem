@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover
 BASE_URL = "https://api.jikan.moe/v4"
 PROCESSED_PATH = Path("data/processed/anime_metadata.parquet")
 IMAGES_DIR = Path("data/processed/images/posters")
+JIKAN_CACHE_DIR = Path("data/raw/jikan")
 FIELDS_NEW = [
     "poster_url",
     "poster_thumb_url",
@@ -64,11 +65,25 @@ def save_metadata(df: pd.DataFrame) -> None:
     df.to_parquet(PROCESSED_PATH, index=False)
 
 
+def poster_url_from_cache(anime_id: int) -> str | None:
+    """Best remote poster URL from the cached Jikan record at ``JIKAN_CACHE_DIR``."""
+    path = JIKAN_CACHE_DIR / f"{anime_id}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    data = payload.get("data", payload) if isinstance(payload, dict) else {}
+    return extract_image_info(data).get("poster_url")
+
+
 def repair_from_files(df: pd.DataFrame) -> pd.DataFrame:
     """Repair metadata from existing files on disk.
 
     - Detect thumbnails in `IMAGES_DIR/*_thumb.webp`
     - If present, set `poster_thumb_url` relative path
+    - Backfill `poster_url` from the cached Jikan record (remote CDN fallback)
     - If matching original exists, compute md5 and set `image_md5`
     - Set `image_last_fetched` from file mtime (UTC ISO)
     - Ensure `image_attribution` is populated
@@ -89,6 +104,12 @@ def repair_from_files(df: pd.DataFrame) -> pd.DataFrame:
             continue
         # Update fields
         existing.at[aid, "poster_thumb_url"] = rel
+        # Backfill remote CDN url if missing (used as fallback when thumb absent)
+        cur_url = existing.at[aid, "poster_url"] if "poster_url" in existing.columns else None
+        if not (isinstance(cur_url, str) and cur_url.startswith("http")):
+            url = poster_url_from_cache(aid)
+            if url:
+                existing.loc[aid, "poster_url"] = url
         # Attribution default
         if pd.isna(existing.at[aid, "image_attribution"]) if "image_attribution" in existing.columns else True:
             existing.loc[aid, "image_attribution"] = "Images via Jikan / MyAnimeList"
