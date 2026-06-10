@@ -37,6 +37,7 @@ MIN_METADATA_COLUMNS = [
     "synopsis",
     "synopsis_snippet",
     "poster_thumb_url",
+    "poster_url",  # remote CDN fallback when local thumbnail isn't shipped
     "streaming",
     "mal_score",
     "episodes",
