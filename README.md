@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem/graph/badge.svg)](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem)
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://myanimerecommendationsystem-x6rqm6vqjmbr2ij8i8yk3b.streamlit.app)
 
-A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and 210 automated tests.
+A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and 246 automated tests.
 
 <!-- To update: run the app (streamlit run app/main.py), search for a popular title, take a screenshot, save to app/assets/demo_screenshot.png -->
 ![MARS Demo](app/assets/demo_screenshot.png)
@@ -23,31 +23,34 @@ A **hybrid recommendation engine** that combines collaborative filtering, conten
 
 ## Results
 
-### Evaluation Metrics
+All evaluations rank over the **full 13K-item catalog** (no pre-filtered shortlist), seeded (`seed=42`) for reproducibility. See [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) and the [model card](docs/MODEL_CARD.md#metrics) for protocol details, cold-start analysis, and caveats.
 
-Evaluated on a temporal split (300 users, full 13K-item candidate space — no pre-filtered shortlist):
+### Ablation — lift over baseline (K=10)
+
+The headline result: the hybrid model delivers a **+43% NDCG** and **+61% MAP** lift over a popularity-only baseline.
+
+| Variant | NDCG@10 | MAP@10 | vs. Popularity |
+|---------|---------|--------|----------------|
+| **Hybrid (MF + kNN + content)** | **0.044** | **0.030** | **+43% NDCG · +61% MAP** |
+| Popularity baseline | 0.031 | 0.018 | (baseline) |
+| Content-only (TF-IDF) | 0.025 | 0.021 | — |
+
+### Temporal split (heuristic robustness check)
 
 | Metric | @5 | @10 | @20 |
 |--------|-----|------|------|
-| **NDCG** | 0.440 | 0.438 | 0.445 |
-| **MAP** | 0.153 | 0.090 | 0.074 |
+| NDCG | 0.440 | 0.438 | 0.445 |
+| MAP | 0.153 | 0.090 | 0.074 |
 
-> **Note:** These metrics reflect ranking over the *entire catalog* (13K items), not a small pre-selected candidate set. Full-catalog NDCG values in the 0.4 range are competitive for open-domain recommendation. Ablation studies show +43% NDCG lift and +61% MAP lift over a popularity-only baseline.
+> **Caveat:** this split approximates chronological order from *synthetic* timestamps (no real interaction dates in the snapshot), so these values may be inflated by ordering artifacts. Treat them as a heuristic robustness check, not a headline accuracy claim — the ablation lift above is the more defensible comparison.
 
-| Beyond Accuracy | @10 |
-|-----------------|-----|
-| **Gini Index** | 0.50 |
-| **Coverage** | 0.18% |
+### Beyond-accuracy (@10)
 
-### Ablation Highlights
+| Coverage | Gini |
+|----------|------|
+| 0.18% | 0.50 |
 
-| Variant | NDCG@10 | vs. Popularity Baseline |
-|---------|---------|------------------------|
-| Hybrid (MF + kNN + content) | **0.438** | **+43% lift** |
-| Content-only (TF-IDF) | 0.025 | — |
-| Popularity baseline | 0.031 | (baseline) |
-
-See [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) for full metric curves, cold-start analysis, and ablation details.
+Low top-10 coverage reflects real popularity concentration — a known limitation tracked in the model card.
 
 ## Architecture
 
@@ -118,10 +121,10 @@ The refresh pipeline runs 7 steps automatically: discover → fetch metadata →
 ## Project Structure
 
 ```
-├── app/main.py                  # Streamlit UI (1,900 lines)
+├── app/main.py                  # Streamlit entry point (UI lives in src/app/components/)
 ├── src/
 │   ├── app/
-│   │   ├── scoring_pipeline.py  # Pure-Python 3-stage pipeline (1,800 lines)
+│   │   ├── scoring_pipeline.py  # Pure-Python 3-stage pipeline (~2,000 lines)
 │   │   ├── artifacts_loader.py  # Model loading + validation
 │   │   ├── constants.py         # All scoring weights & thresholds
 │   │   ├── recommender.py       # Hybrid CF blending
@@ -138,10 +141,10 @@ The refresh pipeline runs 7 steps automatically: discover → fetch metadata →
 │   ├── discover_new_ids.py      # Find new MAL IDs missing from catalog
 │   ├── build_features.py        # Feature engineering orchestrator
 │   └── save_artifacts.py        # Retrain & save CF models
-├── tests/                       # 210 tests across 22 files
+├── tests/                       # 246 tests across 23 files
 ├── reports/                     # Evaluation reports, ablation studies
-├── models/                      # Trained model artifacts (.joblib, .gitignored)
-└── data/                        # Raw, interim, processed data (.gitignored)
+├── models/                      # Trained model artifacts (.joblib, gitignored)
+└── data/                        # Processed parquets + samples tracked; image & Jikan caches gitignored
 ```
 
 ## Tech Stack
@@ -159,6 +162,4 @@ The refresh pipeline runs 7 steps automatically: discover → fetch metadata →
 | Watchlist import | [`docs/user_guide_watchlist.md`](docs/user_guide_watchlist.md) |
 | Data catalog | [`docs/data_catalog.md`](docs/data_catalog.md) |
 | Scoring pipeline design | [`docs/scoring_pipeline_integration_guide.md`](docs/scoring_pipeline_integration_guide.md) |
-| Improvement roadmap | [`docs/MARS_IMPROVEMENT_PLAN.md`](docs/MARS_IMPROVEMENT_PLAN.md) |
-
-```
+| Data sources & licensing | [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) |
