@@ -5,6 +5,87 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-09-16 — One CF trainer; offline evaluation gets its own train-split artifacts
+
+**Status:** Adopted
+
+**Context.** Task 0.3 left a gap: `scripts/train_mf_sgd.py` and `scripts/train_knn_sklearn.py`
+wrote `*_v1.0.joblib`, a stem nothing read any more. Looking at why they existed turned up two
+findings.
+
+First, they held nothing worth keeping. Their "tuned" hyperparameters — `n_factors=64, lr=0.005,
+reg=0.05, n_epochs=10` for MF; `normalize_items/center_ratings/popularity_weight=0.02` for kNN —
+are byte-for-byte the class defaults, so `save_artifacts.py`'s bare `FunkSVDRecommender()`
+already produced the same recipe. (This also explains the difference between `mf_sgd_v1.0` and
+the served stem recorded in the entry below: same recipe, a catalog six days apart, not a
+configuration change.)
+
+Second, and the reason this is not a cleanup: **`save_artifacts.py` fits on the full
+`interactions.parquet`, and the eval scripts then scored those artifacts against a holdout
+carved out of the same table.** `build_validation` finds no `split` or `timestamp` column, so it
+takes the random per-user holdout branch; MF and kNN had therefore trained on every validation
+pair they were scored on. Popularity is computed from `train_df` inside the eval script, so it
+was scored honestly. The `_v1.0` path had the same leak, so this predates Task 0.3.
+
+**How much it actually moved the numbers: not measurably.** The first draft of this entry assumed
+the leak inflated the published figures. It was measured instead — same 120K-row slice, same
+holdout, same 300 users, MF fit with and without the validation rows, three seeds:
+
+| Seed | Fit on train+val | Fit on train only | Delta |
+|---|---|---|---|
+| 42 | 0.029901 | 0.031274 | −0.001373 |
+| 7 | 0.026845 | 0.030940 | −0.004094 |
+| 1234 | 0.031765 | 0.031834 | −0.000069 |
+
+NDCG@10; mean delta −0.0018 against a between-seed spread of 0.0040. The model that saw the
+validation rows was never the better one, and the difference sits below SGD seed noise. That is
+what a single held-out rating per user should do: one extra observation among ~100 per user, with
+`lr=0.005`, ten epochs and L2 regularization, is not enough to surface that item in a top-10 out
+of 5,397. Leakage bites when a model can memorize; this configuration cannot.
+
+Limits of that measurement: MF only, a 1.5% slice, one held-out item per user. kNN is unmeasured.
+
+**Decision.** One trainer, two splits, two destinations:
+
+| Command | Fits on | Writes to | Used by |
+|---|---|---|---|
+| `python scripts/save_artifacts.py` | all interactions | `models/`, timestamped | the app |
+| `python scripts/save_artifacts.py --split train` | train split only | `experiments/artifacts/` (git-ignored) | offline evaluation |
+
+`src/eval/eval_artifacts.py` owns fitting and caching; the seven eval scripts call
+`load_eval_models(train_df)` and no longer touch `models/` at all. The cache carries a
+fingerprint sidecar (`n_rows`, `n_users`, `n_items` of the split it was fit from) and refits on a
+mismatch, so a stale artifact cannot be scored silently. `train_mf_sgd.py` and
+`train_knn_sklearn.py` are deleted.
+
+**Why these shapes.** Serving a model trained on everything is correct; measuring it that way is
+not — the two needs genuinely want different artifacts, so the fix is two outputs, not one
+compromise. Refitting per eval run would be honest but slow enough to discourage running the
+evaluation, hence the cache; a fingerprint is what keeps the cache from reintroducing a quieter
+version of the same bug.
+
+The eval artifacts must live outside `models/`. The loader globs `startswith("mf_")`, so an
+`mf_sgd_trainsplit_*.joblib` sitting beside the served one would make MF selection ambiguous and
+fail the app at startup — the failure Task 0.3 just removed. `test_eval_artifacts.py` asserts the
+two directories stay distinct.
+
+A `--split full` run prints the `MF_MODEL_STEM` / `KNN_MODEL_STEM` lines to paste rather than
+rewriting `src/models/constants.py`, so repointing the served model stays a reviewed one-line
+diff instead of a side effect of retraining.
+
+**Consequence for Task 0.4.** Run `save_artifacts.py --split train` before the cohort run, and
+expect the numbers to land close to where they are. The reason to do it is not that the old
+figures are inflated — measured, they are not — but that "the model trained on the rows it was
+scored against" is a question a reviewer can ask about a portfolio project and the answer has to
+be "it didn't". Task 0.4 is regenerating every number anyway, so the correct-by-construction
+version costs one command.
+
+**What would change this.** A real temporal split (a `timestamp` column in
+`interactions.parquet`) would let train/val be defined once in the data rather than reconstructed
+per run, and the fingerprint cache could key on the split label instead of its shape.
+
+---
+
 ## 2026-09-16 — One artifact stem per model family; six duplicate/stale `.joblib` files pruned
 
 **Status:** Adopted

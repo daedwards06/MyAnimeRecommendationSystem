@@ -23,7 +23,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -31,7 +31,6 @@ if str(ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
-from joblib import load
 
 from src.app.artifacts_loader import build_artifacts, set_determinism
 from src.app.recommender import HybridComponents, HybridRecommender, choose_weights
@@ -125,13 +124,11 @@ from src.app.semantic_admission import (
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
 from src.eval.splits import build_validation, sample_user_ids
+from src.eval.eval_artifacts import load_eval_models
 
 from src.models.baselines import popularity_scores
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, MF_MODEL_STEM
+from src.models.constants import DATA_PROCESSED_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, DEFAULT_HYBRID_WEIGHTS
 from src.models.data_loader import load_interactions
-from src.models.hybrid import weighted_blend
-from src.models.knn_sklearn import ItemKNNRecommender
-from src.models.mf_sgd import FunkSVDRecommender
 
 
 REPORTS_DIR = Path("reports")
@@ -181,19 +178,8 @@ def _run_headline_metrics(*, k: int, sample_users: int, w_mf: float, w_knn: floa
     train_df, val_df = build_validation(interactions)
     users = sample_user_ids(val_df["user_id"].astype(int).unique().tolist(), sample_users)
 
-    # Load or fit models (offline-eval harness; not app inference)
-    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
-    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
-
-    if knn_path.exists():
-        knn_model: ItemKNNRecommender = load(knn_path)
-    else:
-        knn_model = ItemKNNRecommender().fit(train_df)
-
-    if mf_path.exists():
-        mf_model: FunkSVDRecommender = load(mf_path)
-    else:
-        mf_model = FunkSVDRecommender().fit(train_df)
+    # Train-split artifacts: the served models in models/ trained on the val rows.
+    knn_model, mf_model = load_eval_models(train_df)
 
     train_hist = train_df.groupby("user_id")["anime_id"].apply(set).to_dict()
     val_hist = val_df.groupby("user_id")["anime_id"].apply(set).to_dict()

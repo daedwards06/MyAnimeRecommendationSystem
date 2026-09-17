@@ -186,22 +186,35 @@ streamlit run app/main.py   # visual: app boots; "Scoring details" shows the ste
 ```
 
 **Checklist:**
-- [ ] Decide the surviving stems: MF and kNN `v2025.11.21_202756` (identical bytes to the
+- [x] Decide the surviving stems: MF and kNN `v2025.11.21_202756` (identical bytes to the
       2026.03 files; the app already prefers them), synopsis TF-IDF / embeddings `v2026.03.14`
       (latest catalog), neural `v2026.01.31`; write the decision in `docs/decisions.md`
-- [ ] `git rm` the other six `.joblib` files; keep `models/.gitkeep`
-- [ ] Add `MF_MODEL_STEM` / `KNN_MODEL_STEM` to `src/models/constants.py`; `src/app/constants.py`
+- [x] `git rm` the other six `.joblib` files; keep `models/.gitkeep`
+- [x] Add `MF_MODEL_STEM` / `KNN_MODEL_STEM` to `src/models/constants.py`; `src/app/constants.py`
       re-exports them; every script above imports the constant instead of a literal
-- [ ] `_select_model_stem`: confirm that one candidate per family resolves without env vars;
+- [x] `_select_model_stem`: confirm that one candidate per family resolves without env vars;
       if the synopsis families were only loading because of an env override, remove the need
-- [ ] `docs/DEPLOYMENT.md`: update sizes (~250 MB of LFS instead of ~650 MB) and the artifact list
-- [ ] Tests: a test that the stem constants match a file in `models/` when the directory is
+- [x] `docs/DEPLOYMENT.md`: update sizes (~250 MB of LFS instead of ~650 MB) and the artifact list
+- [x] Tests: a test that the stem constants match a file in `models/` when the directory is
       present (skips in CI)
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 
 ## Task 0.4: One Cohort, One Script — Rebuild the Evaluation Table
+
+> **Precondition added 2026-09-16 (after Task 0.3).** The artifacts in `models/` are fit on the
+> full interaction table, and `build_validation` carves its holdout out of that same table, so
+> every MF / kNN / hybrid metric published so far was scored against rows the model trained on.
+> Offline evaluation now uses train-split artifacts: run
+> `python scripts/save_artifacts.py --split train` **before** the cohort run below.
+>
+> This is a methodology fix, not a numbers fix — measured across three seeds on a 120K-row slice,
+> the model that saw the validation rows scored no higher than the one that did not (mean NDCG@10
+> delta −0.0018, between-seed spread 0.0040). Do not expect the provisional figures quoted in this
+> task to move much; do expect to be able to say the split was clean. See `docs/decisions.md`,
+> "One CF trainer; offline evaluation gets its own train-split artifacts".
+
 
 **Why:** *(premise corrected 2026-09-16 — the original was wrong in a way that widens this
 task.)* The README's `+43% NDCG / +61% MAP` is not a hybrid run compared against an unmatched
@@ -315,7 +328,13 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 - [ ] Fix the one ruff error in `app/`; add `app/` to the CI lint line; leave `scripts/` out
       (394 errors, its own item in Phase 3)
 - [ ] Move `scripts/test_*.py` to `scripts/archive/` (git-ignored) or delete; any that contain
-      real assertions become tests under `tests/`
+      real assertions become tests under `tests/`. Five of the seven read personal or
+      now-untracked data - `test_explanations.py`, `test_mal_parser.py`,
+      `test_personalized_integration.py`, `test_profile_loading.py`, `test_user_embedding.py`
+      reference `data/raw/animelist_*.xml` or `data/user_profiles/*.json`, neither of which
+      exists in a fresh clone since Task 0.2. Anything promoted to `tests/` must build a
+      synthetic fixture instead of reading the owner's export. (`test_mal_parser.py` has no
+      assertions at all - it prints a parse of a hardcoded personal XML; archive it.)
 - [ ] `git rm -r --cached app/assets/archive`; fold the still-useful ideas from
       `UX_Suggestions.md` into `docs/ui_design.md` § Backlog before removing it
 - [ ] `docs/index.md`: replace the placeholder with a one-screen table of contents linking
@@ -809,8 +828,12 @@ Recorded so they are not lost. None block the phases above.
 - **Hugging Face Spaces mirror** of the Streamlit app so the demo does not sleep; decision
   recorded in Task 0.1.
 - **Git history rewrite** to drop `data/raw/rating.csv` and the MAL XMLs from history
-  (`git filter-repo`); shrinks the pack from ~800 MB. Owner decision: it rewrites every
-  commit hash and requires a force-push.
+  (`git filter-repo`); shrinks the pack from ~800 MB. **Task 0.2 untracked these files but
+  deliberately did not touch history**, so a rewrite is now the only remaining step: the
+  98.8 MB blob and the owner's MAL username are still in every clone and on GitHub.
+  Untracking stops the repo growing, it does not shrink it. Owner decision: it rewrites every
+  commit hash and requires a force-push. Weigh it on the username, not the size - the size is
+  merely no longer getting worse, whereas the username is published and stays published.
 - **Lint `scripts/`** (394 ruff errors, 352 auto-fixable); add to CI when green.
 - **Ruff format** the tree (`ruff format --check src/ tests/` would reformat 50 files) in one
   commit with no logic changes.

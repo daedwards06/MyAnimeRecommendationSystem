@@ -3,7 +3,6 @@ import argparse
 import json
 from pathlib import Path
 from datetime import datetime, timezone
-import random
 import itertools
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,14 +11,12 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 import numpy as np
-from joblib import load
 
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, KNN_MODEL_STEM, MF_MODEL_STEM
+from src.models.constants import DATA_PROCESSED_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS
 from src.eval.splits import build_validation, sample_user_ids
+from src.eval.eval_artifacts import load_eval_models
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.models.baselines import popularity_scores
-from src.models.knn_sklearn import ItemKNNRecommender
-from src.models.mf_sgd import FunkSVDRecommender
 
 
 def _build_validation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -48,11 +45,8 @@ def main(k: int, sample_users: int, grid_mf: list[float], grid_knn: list[float],
     train_df, val_df = _build_validation(interactions)
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
 
-    # Load or fit models
-    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
-    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
-    knn_model: ItemKNNRecommender = load(knn_path) if knn_path.exists() else ItemKNNRecommender().fit(train_df)
-    mf_model: FunkSVDRecommender = load(mf_path) if mf_path.exists() else FunkSVDRecommender().fit(train_df)
+    # Train-split artifacts: the served models in models/ trained on the val rows.
+    knn_model, mf_model = load_eval_models(train_df)
 
     # Histories and base scores
     train_hist = train_df.groupby("user_id")["anime_id"].apply(set).to_dict()

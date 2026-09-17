@@ -234,6 +234,7 @@ data/raw/jikan/
 # Timestamped evaluation run outputs. Canonical summaries are kept under reports/
 # (phase4_evaluation.md, phase4_ablation.md, phase3_summary.md).
 experiments/metrics/
+experiments/artifacts/
 reports/phase4_golden_queries_*
 reports/artifacts/phase4_golden_queries_*
 reports/jikan_feature_probe_*

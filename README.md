@@ -154,7 +154,7 @@ The refresh pipeline runs 7 steps automatically: discover → fetch metadata →
 │   ├── fetch_jikan.py           # Fetch metadata from Jikan API
 │   ├── discover_new_ids.py      # Find new MAL IDs missing from catalog
 │   ├── build_features.py        # Feature engineering orchestrator
-│   └── save_artifacts.py        # Retrain & save CF models
+│   └── save_artifacts.py        # Retrain CF models (--split full serves, --split train evaluates)
 ├── tests/                       # 246 tests across 23 files
 ├── reports/                     # Evaluation reports, ablation studies
 ├── models/                      # Trained model artifacts (.joblib, gitignored)

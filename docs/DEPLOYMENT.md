@@ -69,6 +69,10 @@ are dropped silently. Replace the artifact and update the constant in the same c
 `APP_MF_MODEL_STEM` / `APP_KNN_MODEL_STEM` / `APP_SYNOPSIS_TFIDF_STEM` /
 `APP_SYNOPSIS_EMBEDDINGS_STEM` / `APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM` to disambiguate.
 
+Offline evaluation does **not** use these artifacts: it fits its own on the train split, under
+`experiments/artifacts/` (git-ignored, never deployed). Keep them there — a `*_trainsplit.joblib`
+in `models/` would make selection ambiguous and fail the app at startup.
+
 Verify with:
 
 ```powershell

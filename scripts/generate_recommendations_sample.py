@@ -21,21 +21,18 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
-import json
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import normalize
-from joblib import load
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, DEFAULT_SAMPLE_USERS, TOP_K_DEFAULT, DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, MF_MODEL_STEM
+from src.models.constants import DATA_PROCESSED_DIR, DEFAULT_SAMPLE_USERS, TOP_K_DEFAULT, DEFAULT_HYBRID_WEIGHTS
 from src.eval.splits import build_validation, sample_user_ids
+from src.eval.eval_artifacts import load_eval_models
 from src.models.baselines import popularity_scores
-from src.models.mf_sgd import FunkSVDRecommender
-from src.models.knn_sklearn import ItemKNNRecommender
 from src.models.hybrid import weighted_blend
 
 OUT_RECS = DATA_PROCESSED_DIR / "recommendations_sample.parquet"
@@ -79,17 +76,8 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float):
     train_df, val_df = build_validation(interactions)
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
 
-    # Load / fit models
-    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
-    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
-    if mf_path.exists():
-        mf_model: FunkSVDRecommender = load(mf_path)
-    else:
-        mf_model = FunkSVDRecommender().fit(train_df)
-    if knn_path.exists():
-        knn_model: ItemKNNRecommender = load(knn_path)
-    else:
-        knn_model = ItemKNNRecommender().fit(train_df)
+    # Train-split artifacts: the served models in models/ trained on the val rows.
+    knn_model, mf_model = load_eval_models(train_df)
 
     pop_series = popularity_scores(train_df)
     pop_scores_global = {int(i): float(s) for i, s in pop_series.items()}

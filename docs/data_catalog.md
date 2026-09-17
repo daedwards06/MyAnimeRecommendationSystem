@@ -106,6 +106,9 @@ This catalog documents all data assets used in the anime recommendation system, 
 4. `scripts/build_features.py` cleans interactions, builds multi-hot, TF-IDF, popularity/recency signals, cold-start flags, and user features → `data/processed/`. Embeddings generation is skipped gracefully when `sentence-transformers` is not installed.
 5. `scripts/build_synopsis_tfidf_artifact.py` and `scripts/build_synopsis_embeddings_artifact.py` produce versioned `.joblib` similarity artifacts in `models/`.
 6. `scripts/save_artifacts.py` retrains kNN + FunkSVD CF models → `models/`.
+   `--split train` instead fits on the train split only → `experiments/artifacts/`,
+   which is what offline evaluation scores (the `models/` artifacts have seen the
+   validation rows).
 7. **`scripts/refresh_catalog.py`** orchestrates steps 2–6 end-to-end. Convenience targets: `make refresh-all`, `make refresh-season YEAR=YYYY SEASON=xxx`.
 
 ## Quality & Validation Checks

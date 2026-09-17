@@ -22,6 +22,13 @@ EXPERIMENTS_DIR = Path("experiments")
 METRICS_DIR = EXPERIMENTS_DIR / "metrics"
 OPTUNA_DIR = EXPERIMENTS_DIR / "optuna_studies"
 
+# Offline evaluation fits its own CF artifacts on the train split only; the artifacts in
+# MODELS_DIR are fit on all interactions and would be scored against rows they trained on.
+# Created on demand, git-ignored, and never loaded by the app.
+EVAL_ARTIFACTS_DIR = EXPERIMENTS_DIR / "artifacts"
+MF_EVAL_ARTIFACT = "mf_sgd_trainsplit"
+KNN_EVAL_ARTIFACT = "item_knn_sklearn_trainsplit"
+
 # Ensure directories exist when imported in scripts
 for p in (MODELS_DIR, METRICS_DIR, OPTUNA_DIR):
     p.mkdir(parents=True, exist_ok=True)
