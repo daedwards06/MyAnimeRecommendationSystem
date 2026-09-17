@@ -119,7 +119,41 @@ The deployment process takes 2-5 minutes. You'll see:
 - File not found → check paths are relative, not absolute
 - Memory errors → models too large (1 GB RAM limit)
 
-### 5. Test the Deployed App
+### 5. Sharing Setting (public vs. private)
+
+The free tier allows **1 private app or unlimited public apps** (see "Cost & Limits" below), so a
+public demo costs nothing. A private app is visible only to the owner and invited viewers;
+everyone else ends on a Streamlit sign-in page.
+
+**Where it is:** [share.streamlit.io](https://share.streamlit.io) → the app's "..." menu →
+**Settings** → **Sharing**. Public shows as *"This app is public and searchable."*
+
+### 6. Verify From Outside
+
+Do not trust your own browser — you are signed in, so a private app renders normally for you.
+
+**A bare `curl` is not a valid check.** Every Streamlit Cloud app, public ones included, answers
+the first request with `303` to `https://share.streamlit.io/-/auth/app?redirect_uri=...`. That is
+the anonymous-session cookie handshake, not an auth wall. Checking only the first hop makes a
+healthy public app look private. Following redirects *without* storing cookies is equally
+misleading: the handshake never completes and curl gives up after 50 redirects.
+
+Follow the redirects **with a cookie jar** and look at where the chain ends:
+
+```powershell
+curl.exe -sL -c "$env:TEMP\st.txt" -b "$env:TEMP\st.txt" -o NUL -w "%{http_code} %{url_effective}`n" https://myanimerecommendationsystem-x6rqm6vqjmbr2ij8i8yk3b.streamlit.app/
+```
+
+- **Public (expected):** `200` and a final URL back on `...streamlit.app/` — three hops:
+  `/-/auth/app` → `/-/login?payload=...` → the app. A sleeping app also ends `200`, serving a
+  "wake up" page first.
+- **Private:** the chain ends on `share.streamlit.io` with a sign-in page instead of returning to
+  the app host — go back to step 5.
+
+A logged-out browser window (private/incognito) is the second check, and the one that also tells
+you whether the app is awake.
+
+### 7. Test the Deployed App
 
 Once live, test all critical paths:
 
@@ -131,7 +165,7 @@ Once live, test all critical paths:
 - ✅ Diversity panel displays correctly
 - ✅ No console errors
 
-### 6. Update README with Live URL
+### 8. Update README with Live URL
 
 After successful deployment, update your README.md:
 

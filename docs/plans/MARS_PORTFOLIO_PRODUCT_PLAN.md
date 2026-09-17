@@ -17,9 +17,9 @@ told.
 
 | Finding | Evidence |
 |---|---|
-| The public demo link never renders for an anonymous visitor | `curl` on the README badge URL returns `303` to a Streamlit sign-in page and loops; Community Cloud does this for a private app |
-| The README headline lift compares two different user cohorts | `+43% NDCG` is hybrid at 500 sampled users (0.0438) vs. popularity at 300 users (0.0307). In the matched 1,000-user cohort in `metrics_by_k.parquet`: popularity 0.0412, MF 0.0504, hybrid 0.0497 |
-| The ablation table is mislabeled | `generate_phase4_ablation.py` filters on model names `mf`/`hybrid` that do not exist in the parquet (`mf_sgd`/`hybrid_weighted`); the output shows ten rows all labeled `popularity` |
+| ~~The public demo link never renders for an anonymous visitor~~ **Not reproduced (2026-09-16)** | The `303` to `share.streamlit.io/-/auth/app` is the anonymous-session cookie handshake every Community Cloud app performs, not an auth wall. Followed with a cookie jar it completes in three hops and serves the app with `200`; the dashboard was already "public and searchable". The original finding inspected only the first hop |
+| The README headline lift is the baseline compared with itself | **Corrected 2026-09-16.** `+43% NDCG / +61% MAP` is popularity@500 (0.043849 / 0.029593) over popularity@300 (0.030722 / 0.018332) — the lift percentages match those rows exactly. The hybrid is absent from the ablation table entirely (see the next row), so **no hybrid lift has ever been published**; hybrid@500 is 0.044411 (+44.6%), a number that appears nowhere. In the 1,000-user cohort: popularity 0.0412, MF 0.0504, hybrid 0.0497 — but see the conflicting-rows note in Task 0.4 |
+| The ablation table is mislabeled | `generate_phase4_ablation.py` filters on model names `mf`/`hybrid` that do not exist in the parquet (`mf_sgd`/`hybrid_weighted`), so MF and hybrid are silently dropped and the output is ten rows all labeled `popularity` at three different cohort sizes. `compute_lifts` takes `iloc[0]` as the baseline (popularity@300) and the output drops `users_evaluated`, making the mismatch invisible. **This table is where the README's headline number comes from.** Regenerating it reproduces the committed CSV value-for-value |
 | MF alone beats the hybrid on accuracy | 1,000-user cohort: MF NDCG 0.0504 / coverage 0.071 vs. hybrid 0.0497 / 0.066. The honest story is "hybrid ≈ MF, both far above popularity on coverage", and it is not told |
 | Item-kNN scores near zero offline | NDCG@10 of 0.0017 at 1,000 users, 30× below MF; either a bug or a result that needs explaining before it carries 7% of the blend |
 | The evaluation report is labeled a draft | `reports/phase4_evaluation.md` opens with "Draft artifact – populate after running"; the model card says the ablation CSV is a draft with duplicate rows |
@@ -29,7 +29,7 @@ told.
 | "98% Match" implies calibration the score does not have | `format_user_friendly_score` maps rank 0 → 98% by construction; `score_semantics.py` itself says scores are uncalibrated |
 | Personalization is invisible to reviewers | It requires a MyAnimeList XML export, upload, parse, profile pick, mode switch. `data/samples/personas.json` exists and is unused by the UI |
 | Three product names | "MARS" (README), "Anime Recommender" (header), "Anime Explorer" (browser tab, Browse header) |
-| Repo weight and privacy | `data/raw/rating.csv` (98.8 MB, one row under GitHub's hard limit, Kaggle redistribution), two personal MAL export XMLs with the owner's username tracked, three byte-identical copies of the 189 MB kNN artifact in LFS, ~800 MB pack on clone |
+| Repo weight and privacy | `data/raw/rating.csv` (98.79 MiB committed, one row under GitHub's 100 MiB hard limit, Kaggle redistribution), two personal MAL export XMLs with the owner's username tracked, three byte-identical copies of the 189 MB kNN artifact in LFS (the MF copies are **not** identical — see Task 0.3), **1.1 GB** `.git` on clone |
 | Analysis is thin for a data-science portfolio | Two notebooks (8 and 17 code cells) against ~14K lines of app code; no error or segment analysis; no narrative write-up (`docs/index.md` is a placeholder) |
 
 **Decisions taken with the owner (2026-09-12 review):**
@@ -68,8 +68,11 @@ told.
 
 ## Task 0.1: Public Demo Link — **Owner action**
 
-**Why:** The README badge is the first click. Today it bounces to a sign-in page for anyone not
-logged into Streamlit. Nothing else in the plan matters to a visitor until this renders.
+**Why:** The README badge is the first click. The premise of this task — that it bounces to a
+sign-in page for anyone not logged into Streamlit — was **disproved on 2026-09-16**: the app was
+already public, and the `303` that prompted the finding is the cookie handshake every Community
+Cloud app performs. What survives is the documentation: a check that actually distinguishes
+public from private, so this is not re-diagnosed wrongly later.
 
 **Preflight Files:**
 - `README.md` (the "Open in Streamlit" badge URL at the top)
@@ -79,20 +82,24 @@ logged into Streamlit. Nothing else in the plan matters to a visitor until this 
 
 **Validation Commands:**
 ```powershell
-curl.exe -s -o NUL -w "%{http_code} %{redirect_url}`n" https://myanimerecommendationsystem-x6rqm6vqjmbr2ij8i8yk3b.streamlit.app/
-# Expect: 200 and an empty redirect (or a Streamlit "wake up" page), NOT 303 to share.streamlit.io/-/auth
+# Must follow redirects AND store cookies: the first hop is always a 303 to /-/auth/app, and
+# without a cookie jar the handshake never completes (curl stops after 50 redirects).
+curl.exe -sL -c "$env:TEMP\st.txt" -b "$env:TEMP\st.txt" -o NUL -w "%{http_code} %{url_effective}`n" https://myanimerecommendationsystem-x6rqm6vqjmbr2ij8i8yk3b.streamlit.app/
+# Expect: 200 and a final URL back on ...streamlit.app/ (public). A chain ending on
+# share.streamlit.io with a sign-in page means the app is private.
 ```
 
 **Checklist:**
-- [ ] **Owner:** in the Streamlit Community Cloud dashboard, open the app's Settings → Sharing
+- [x] **Owner:** in the Streamlit Community Cloud dashboard, open the app's Settings → Sharing
       and set it to public ("Anyone can view"); confirm the app is not in the "private app"
-      slot
-- [ ] `docs/DEPLOYMENT.md`: add a "Sharing setting" subsection (where it is, what the symptom
+      slot — *confirmed 2026-09-16: already set to "This app is public and searchable"; no
+      change was needed*
+- [x] `docs/DEPLOYMENT.md`: add a "Sharing setting" subsection (where it is, what the symptom
       of a private app looks like: 303 → `/-/auth/app` loop) and a "Verify from outside"
       subsection with the curl line above
-- [ ] README: keep the badge; add one line under it noting the app sleeps after inactivity and
+- [x] README: keep the badge; add one line under it noting the app sleeps after inactivity and
       takes ~10–20 s to wake (Community Cloud behavior)
-- [ ] Record a decision in `docs/decisions.md` (create it; dated log) on whether to add a
+- [x] Record a decision in `docs/decisions.md` (create it; dated log) on whether to add a
       Hugging Face Spaces mirror later (Phase 3)
 
 ---
@@ -144,10 +151,15 @@ ruff check src/ tests/
 ## Task 0.3: Prune Duplicate LFS Artifacts and Point Scripts at One Stem Set
 
 **Why:** `git lfs ls-files -s` shows the 189 MB kNN artifact three times with the **same LFS
-object id** (`v1.0`, `v2025.11.21`, `v2026.03.14`) and the MF artifact twice with the same id.
-Eval scripts hard-code `*_v1.0.joblib` while the app loads `*_v2025.11.21_202756`; so the
-README metrics and the app may not even use the same MF model. One stem per artifact family,
-referenced from one constant, ends both problems.
+object id** `14808c1048` (`v1.0`, `v2025.11.21`, `v2026.03.14`) — pure waste. The MF artifacts
+are a different problem: `v1.0` is `e31310c952` while `v2025.11.21` and `v2026.03.14` share
+`1358863976`. Eval scripts hard-code `*_v1.0.joblib` while the app loads `*_v2025.11.21_202756`,
+so the published metrics were **definitely** produced by a different MF model than the app
+serves (verified 2026-09-16 — not a "may"). One stem per artifact family, referenced from one
+constant, ends both problems.
+
+**This task blocks Task 0.4.** Re-running the evaluation before the stems are settled would
+republish metrics from the wrong MF model again.
 
 **Preflight Files:**
 - `src/app/constants.py` (`DEFAULT_MF_MODEL_STEM`, `DEFAULT_KNN_MODEL_STEM`, lines 57–58)
@@ -191,12 +203,22 @@ streamlit run app/main.py   # visual: app boots; "Scoring details" shows the ste
 
 ## Task 0.4: One Cohort, One Script — Rebuild the Evaluation Table
 
-**Why:** The README's `+43% NDCG / +61% MAP` compares a 500-user hybrid run with a 300-user
-popularity run. The ablation generator filters on model names that do not exist in the parquet
-and emits ten rows labeled `popularity`. The matched 1,000-user cohort says something different
-and more interesting: MF 0.0504, hybrid 0.0497, popularity 0.0412 on NDCG@10, with coverage
-0.071 / 0.066 / 0.006. This task makes one script produce one table from one run, and the
-README, model card, and evaluation report all quote it.
+**Why:** *(premise corrected 2026-09-16 — the original was wrong in a way that widens this
+task.)* The README's `+43% NDCG / +61% MAP` is not a hybrid run compared against an unmatched
+popularity run. The ablation generator's model filter drops `mf_sgd` and `hybrid_weighted`
+entirely, so **the table contains no hybrid row at all**: the headline is popularity@500
+(0.043849 / 0.029593) over popularity@300 (0.030722 / 0.018332) — the baseline against itself at
+a different sample size.
+
+The consequence for scope: this is not a re-framing job. No hybrid lift has ever been published,
+so every number in README § Results is regenerated from scratch rather than recompared.
+
+The 1,000-user cohort looks more interesting — MF 0.0504, hybrid 0.0497, popularity 0.0412 on
+NDCG@10, coverage 0.071 / 0.066 / 0.006 — but **treat the hybrid figure as provisional**:
+`hybrid_weighted@1000` has three conflicting rows in the parquet (0.041348 / 0.041198 /
+0.049725) and 0.0497 is one of them, chosen without a tiebreak. See the integrity check below.
+This task makes one script produce one table from one run, and the README, model card, and
+evaluation report all quote it.
 
 **Preflight Files:**
 - `data/processed/phase4/metrics_by_k.parquet` (columns `model, K, ndcg, map, coverage, gini,
@@ -230,6 +252,16 @@ ruff check src/ tests/
 - [ ] `aggregate_phase4_metrics.py`: read `generated_at` (or file mtime) and `users_evaluated`
       from each JSON; keep the **latest** run per `(model, K, users_evaluated)`; `--cohort`
       flag selects one `users_evaluated` for the output parquet
+- [ ] **Integrity check before any cohort is chosen.** Timestamp dedupe alone would resolve the
+      three conflicting `hybrid_weighted@1000` rows silently and hide a real bug: the middle row
+      (ndcg 0.041198, map 0.027851) is **bit-identical to `popularity@1000` on both metrics**,
+      i.e. either a popularity run written under a hybrid label or a silent fallback to
+      popularity. Make the aggregator fail (or loudly warn) when two different models share an
+      identical metric vector, and diagnose this instance before re-running
+- [ ] Make the ablation script runnable from the venv: it needs `PYTHONPATH=.` (add a
+      `sys.path` bootstrap or run it as `python -m`), and `df.to_markdown()` imports `tabulate`,
+      which is declared in no requirements file — the script currently writes the CSV and *then*
+      crashes on the Markdown, leaving the two artifacts out of sync
 - [ ] `generate_phase4_ablation.py`: use the real model names; add `users_evaluated` and
       `gini` columns; add a "vs. MF" lift column next to "vs. popularity"; sort rows by NDCG
 - [ ] `run_unified_eval.py`: pass `--sample-users` through consistently and write the seed and
@@ -373,8 +405,18 @@ streamlit run app/main.py   # visual: Search is the first sidebar control; Advan
 explanation. The data to write a sentence already exists in the contributions dict
 (`overlap_per_seed`, `seed_coverage`, `weighted_overlap`, `synopsis_*_sim`, `metadata_affinity`).
 
+**The line is also factually wrong, so this is a correctness fix and not only a presentation
+one** (found 2026-09-16). `_DISPLAY_LABELS` maps `knn → "Content"`, but the blend has exactly
+three signals — `mf` 0.931, `knn` 0.066, `pop` 0.003 (`DEFAULT_HYBRID_WEIGHTS`) — and **no
+content signal at all**. Item-kNN is collaborative filtering over the user-item matrix, so
+"Content 94.9%" is the kNN share under a false name. Moving that line into an expander without
+renaming it would preserve the error somewhere less visible.
+
 **Preflight Files:**
-- `src/app/explanations.py` (`format_explanation`, `format_seed_explanation`, `_DISPLAY_LABELS`)
+- `src/app/explanations.py` (`format_explanation`, `format_seed_explanation`, `_DISPLAY_LABELS`
+  — the `knn → "Content"` mislabel lives here, lines 26–30)
+- `src/models/constants.py` (`DEFAULT_HYBRID_WEIGHTS` — confirms the blend is mf/knn/pop with no
+  content term)
 - `src/app/scoring_pipeline.py` (`finalize_explanation_shares` line ~2001; the keys written into
   each rec's contributions dict in `run_seed_based_pipeline` — `weighted_overlap`,
   `metadata_affinity`, `synopsis_neural_sim`, `synopsis_tfidf_sim`, `theme_overlap`,
@@ -400,11 +442,17 @@ streamlit run app/main.py   # visual: card reads e.g. "Shares Sci-Fi and Suspens
       threshold → "very similar story"; MF share > 0.5 → "fans of <seed> also rate it highly";
       popularity band → "a well-known pick" / "a hidden gem"); deterministic; never mentions
       a component with zero share
+- [ ] Fix `_DISPLAY_LABELS` first: `knn` is labelled as the collaborative signal it is (e.g.
+      "Similar-item CF"), not "Content". Check whether "CF" for `mf` stays unambiguous once
+      both are CF — "Matrix factorization" / "Similar-item CF" / "Popularity" reads honestly
 - [ ] Card renders the sentence where the share line is now; the share line
       (`format_explanation`) moves into "More details" under a "Signal breakdown" caption
 - [ ] Multi-seed: "Matches 2 of 3 seeds" stays, appended to the sentence
-- [ ] Tests: one test per clause type, a zero-share test, a multi-seed test;
-      `test_truthful_shares` unchanged
+- [ ] Tests: one test per clause type, a zero-share test, a multi-seed test.
+      `test_truthful_shares` **does** change: `test_format_explanation_hides_unused_components`
+      asserts on the literal string `"Content"` and its comment reads "Content (knn)" — both
+      move to the new label. The behavioural contract (unused components stay hidden) is what
+      must survive, not the wording
 - [ ] Tests + ruff green
 
 ---
@@ -784,9 +832,11 @@ Phase 2  2.1 kNN diagnostic → 2.2 full ablation + hero chart → 2.3 learned r
 Phase 3  as decided
 ```
 
-Task 0.1 is the only owner-gated step and can happen today. Tasks 0.2–0.5 are independent of
-each other. Task 1.7 waits for the rest of Phase 1 and for Task 0.4. Task 2.2 depends on 0.3,
-0.4, and 2.1. Task 2.5 is last.
+Task 0.1 is closed (2026-09-16: the app was already public; the finding did not reproduce).
+Tasks 0.2 and 0.5 are independent of everything else, but **0.3 blocks 0.4** — re-running the
+evaluation before the artifact stems are settled would republish metrics from the wrong MF
+model, which is the defect 0.3 exists to fix. Task 1.7 waits for the rest of Phase 1 and for
+Task 0.4. Task 2.2 depends on 0.3, 0.4, and 2.1. Task 2.5 is last.
 
 ## Success Criteria
 
