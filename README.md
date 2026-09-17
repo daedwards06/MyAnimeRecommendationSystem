@@ -98,7 +98,19 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-The app loads with a default seed and shows recommendations immediately — no setup needed.
+The app loads with a default seed and shows recommendations immediately — no setup needed. It
+runs from the processed parquets committed to the repo; the raw Kaggle CSVs are not tracked.
+
+**Optional — fetch raw data for retraining:** only needed to rebuild features or retrain models
+(`scripts/build_features.py`, `scripts/refresh_catalog.py`), not to run the app.
+
+```bash
+pip install kaggle && export KAGGLE_USERNAME=... KAGGLE_KEY=...
+python scripts/download_data.py --dry-run   # show the plan
+python scripts/download_data.py             # download, extract, verify row counts
+```
+
+See [`data/README.md`](data/README.md) for the full data layout and which files are tracked.
 
 **Optional — Personalization:** Import your [MyAnimeList export](https://myanimelist.net/panel.php?go=export) via the sidebar to get CF-based recommendations from your own ratings. The app shows inline export instructions right next to the upload widget. See [`docs/user_guide_personalization.md`](docs/user_guide_personalization.md) for the full walkthrough.
 

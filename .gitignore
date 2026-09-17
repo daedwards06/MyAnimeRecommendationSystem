@@ -206,6 +206,13 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Raw Kaggle source data — large and redistributed; fetch with
+# `python scripts/download_data.py` (see data/README.md). The small id lists
+# and the compact Jikan cache below stay tracked.
+data/raw/*.csv
+data/raw/*.xml
+data/raw/animelist_*
+
 # User Profiles (personal watchlist data - keep private)
 data/user_profiles/*.json
 !data/user_profiles/example_profile.json

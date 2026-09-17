@@ -131,20 +131,20 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `.gitignore`: add `data/raw/*.csv`, `data/raw/*.xml`, `data/raw/animelist_*`; keep
+- [x] `.gitignore`: add `data/raw/*.csv`, `data/raw/*.xml`, `data/raw/animelist_*`; keep
       `jikan.tar.gz` and the small id lists tracked
-- [ ] `git rm --cached data/raw/rating.csv data/raw/anime.csv data/raw/animelist_*.xml`
+- [x] `git rm --cached data/raw/rating.csv data/raw/anime.csv data/raw/animelist_*.xml`
       (files stay on disk); commit message states the files remain in history
-- [ ] `scripts/download_data.py`: fetch the Kaggle dataset via the `kaggle` CLI (document
+- [x] `scripts/download_data.py`: fetch the Kaggle dataset via the `kaggle` CLI (document
       `KAGGLE_USERNAME` / `KAGGLE_KEY`), unzip into `data/raw/`, rename to the file names the
       pipeline expects, verify row counts against a small manifest in the script; `--dry-run`
       prints what it would do; exits non-zero with a clear message when the CLI is missing
-- [ ] `data/README.md`: layout, which files are tracked vs. fetched, and the one command to
+- [x] `data/README.md`: layout, which files are tracked vs. fetched, and the one command to
       fetch; `docs/DATA_SOURCES.md` links to it
-- [ ] README Quick Start: add "optional: fetch raw data for retraining" line; the app itself
+- [x] README Quick Start: add "optional: fetch raw data for retraining" line; the app itself
       still runs from committed parquets with no download
-- [ ] Tests: `download_data.py` manifest/rename logic as pure functions (no network)
-- [ ] Tests + ruff green
+- [x] Tests: `download_data.py` manifest/rename logic as pure functions (no network)
+- [x] Tests + ruff green
 
 ---
 
