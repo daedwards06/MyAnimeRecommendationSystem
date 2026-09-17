@@ -127,7 +127,7 @@ from src.eval.metrics_extra import item_coverage, gini_index
 from src.eval.splits import build_validation, sample_user_ids
 
 from src.models.baselines import popularity_scores
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, DEFAULT_HYBRID_WEIGHTS
+from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, MF_MODEL_STEM
 from src.models.data_loader import load_interactions
 from src.models.hybrid import weighted_blend
 from src.models.knn_sklearn import ItemKNNRecommender
@@ -182,8 +182,8 @@ def _run_headline_metrics(*, k: int, sample_users: int, w_mf: float, w_knn: floa
     users = sample_user_ids(val_df["user_id"].astype(int).unique().tolist(), sample_users)
 
     # Load or fit models (offline-eval harness; not app inference)
-    knn_path = MODELS_DIR / "item_knn_sklearn_v1.0.joblib"
-    mf_path = MODELS_DIR / "mf_sgd_v1.0.joblib"
+    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
+    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
 
     if knn_path.exists():
         knn_model: ItemKNNRecommender = load(knn_path)

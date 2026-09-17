@@ -15,6 +15,8 @@ from joblib import load
 
 from src.models.constants import (
     DATA_PROCESSED_DIR,
+    KNN_MODEL_STEM,
+    MF_MODEL_STEM,
     MODELS_DIR,
     METRICS_DIR,
     TOP_K_DEFAULT,
@@ -69,8 +71,8 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
 
     # Load or fit models
-    knn_path = MODELS_DIR / "item_knn_sklearn_v1.0.joblib"
-    mf_path = MODELS_DIR / "mf_sgd_v1.0.joblib"
+    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
+    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
     if knn_path.exists():
         knn_model: ItemKNNRecommender = load(knn_path)
     else:

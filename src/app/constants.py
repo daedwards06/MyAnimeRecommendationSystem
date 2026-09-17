@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 
+from src.models.constants import KNN_MODEL_STEM, MF_MODEL_STEM
+
 RANDOM_SEED: int = 42
 
 # Default UI parameters
@@ -52,10 +54,11 @@ MIN_METADATA_COLUMNS = [
 METADATA_PARQUET = "anime_metadata.parquet"
 PERSONAS_JSON = "data/samples/personas.json"
 
-# Default artifact stems (used when multiple candidates exist and env vars are not set).
-# Override at runtime with APP_MF_MODEL_STEM / APP_KNN_MODEL_STEM.
-DEFAULT_MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
-DEFAULT_KNN_MODEL_STEM = "item_knn_sklearn_v2025.11.21_202756"
+# Default artifact stems, re-exported from src.models.constants so the app and the offline
+# eval scripts load the same artifacts. Override at runtime with APP_MF_MODEL_STEM /
+# APP_KNN_MODEL_STEM.
+DEFAULT_MF_MODEL_STEM = MF_MODEL_STEM
+DEFAULT_KNN_MODEL_STEM = KNN_MODEL_STEM
 
 
 def _env_bool(name: str, default: bool) -> bool:

@@ -14,8 +14,8 @@ Models included:
 Prerequisites:
   data/processed/interactions.parquet
   data/processed/item_features_tfidf.parquet
-  mf_sgd_v1.0.joblib (optional; will train if missing)
-  item_knn_sklearn_v1.0.joblib (optional)
+  models/<MF_MODEL_STEM>.joblib (optional; will train if missing)
+  models/<KNN_MODEL_STEM>.joblib (optional)
 """
 from __future__ import annotations
 import argparse
@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, DEFAULT_SAMPLE_USERS, TOP_K_DEFAULT, DEFAULT_HYBRID_WEIGHTS
+from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, DEFAULT_SAMPLE_USERS, TOP_K_DEFAULT, DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, MF_MODEL_STEM
 from src.eval.splits import build_validation, sample_user_ids
 from src.models.baselines import popularity_scores
 from src.models.mf_sgd import FunkSVDRecommender
@@ -80,8 +80,8 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float):
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
 
     # Load / fit models
-    mf_path = MODELS_DIR / "mf_sgd_v1.0.joblib"
-    knn_path = MODELS_DIR / "item_knn_sklearn_v1.0.joblib"
+    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
+    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
     if mf_path.exists():
         mf_model: FunkSVDRecommender = load(mf_path)
     else:

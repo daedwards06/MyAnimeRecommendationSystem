@@ -11,6 +11,11 @@ DEFAULT_HYBRID_WEIGHTS = {
     "pop": 0.0029736871569621902,
 }
 
+# Single surviving artifact stem per model family (Task 0.3). Scripts and the app must
+# reference these instead of literals so offline evaluation scores the model the app serves.
+MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
+KNN_MODEL_STEM = "item_knn_sklearn_v2025.11.21_202756"
+
 DATA_PROCESSED_DIR = Path("data/processed")
 MODELS_DIR = Path("models")
 EXPERIMENTS_DIR = Path("experiments")

@@ -27,10 +27,12 @@ Ensure the following files/folders are in your repository:
 │       ├── anime_metadata.parquet  (~6 MB)
 │       ├── interactions.parquet    (~17 MB)
 │       └── [other data files]
-├── models/
-│   ├── mf_sgd_v*.joblib            (~23 MB)
-│   ├── item_knn_sklearn_v*.joblib  (~181 MB)
-│   └── [other model files]
+├── models/                      # one artifact per family, all Git LFS
+│   ├── mf_sgd_v2025.11.21_202756.joblib               (~23 MB)
+│   ├── item_knn_sklearn_v2025.11.21_202756.joblib     (~181 MB)
+│   ├── synopsis_tfidf_v2026.03.14_001647.joblib       (~5 MB)
+│   ├── synopsis_embeddings_v2026.03.14_001718.joblib  (~12 MB)
+│   └── synopsis_neural_embeddings_v2026.01.31_235728.joblib (~17 MB)
 ├── src/
 │   └── app/
 │       ├── artifacts_loader.py
@@ -49,9 +51,29 @@ Ensure the following files/folders are in your repository:
 ## File Size Summary
 
 Based on current artifacts:
-- **Models folder:** ~440 MB
-- **Data folder:** ~88 MB  
-- **Total:** ~528 MB ✓ (under 1 GB limit)
+- **Models folder:** ~250 MB (5 LFS artifacts; was ~650 MB before the duplicate stems were
+  pruned in Task 0.3)
+- **Data folder:** ~88 MB
+- **Total:** ~338 MB ✓ (under 1 GB limit)
+
+### One stem per model family
+
+`models/` holds exactly one artifact per family, and `MF_MODEL_STEM` / `KNN_MODEL_STEM` in
+`src/models/constants.py` name the MF and kNN ones (re-exported by `src/app/constants.py` as
+`DEFAULT_MF_MODEL_STEM` / `DEFAULT_KNN_MODEL_STEM`). Offline evaluation scripts and the app read
+those constants, so the metrics describe the model that is served.
+
+Adding a second artifact for a family without updating the constant makes `_select_model_stem`
+ambiguous: MF selection then fails the app at startup, and the optional kNN and synopsis families
+are dropped silently. Replace the artifact and update the constant in the same change, or set
+`APP_MF_MODEL_STEM` / `APP_KNN_MODEL_STEM` / `APP_SYNOPSIS_TFIDF_STEM` /
+`APP_SYNOPSIS_EMBEDDINGS_STEM` / `APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM` to disambiguate.
+
+Verify with:
+
+```powershell
+git lfs ls-files -s   # expect 5 entries, one per family
+```
 
 ## Step-by-Step Deployment
 
@@ -209,7 +231,7 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 
 ### 2. Model Loading Time
 - **Symptom:** App shows "Please wait..." for 30-60 seconds on first load
-- **Cause:** Loading ~440 MB of models from disk
+- **Cause:** Loading ~250 MB of models from disk
 - **Solution:** Normal behavior. Models are cached after first load.
 
 ### 3. Memory Limits
@@ -245,7 +267,7 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 
 ### 6. GitHub File Size Limits
 - **Limit:** 100 MB per file
-- **Current largest:** `item_knn_sklearn_v*.joblib` (~181 MB)
+- **Current largest:** `item_knn_sklearn_v2025.11.21_202756.joblib` (~181 MB)
 - **Solution:** Use Git LFS:
   ```powershell
   git lfs install
@@ -316,7 +338,7 @@ Streamlit Community Cloud free tier includes:
 - ✅ Community support
 
 **Current MARS usage:**
-- Storage: ~528 MB ✓
+- Storage: ~338 MB ✓
 - RAM: ~600-800 MB ✓
 - Public repository ✓
 

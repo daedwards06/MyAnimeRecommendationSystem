@@ -7,6 +7,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import joblib
+
+from src.models.constants import MF_MODEL_STEM, MODELS_DIR
 import pandas as pd
 import numpy as np
 from src.data.user_profiles import load_profile
@@ -30,7 +32,7 @@ print(f"  - Avg rating: {profile['stats']['avg_rating']:.2f}/10")
 
 # Load MF model
 print("\n2. Loading MF model...")
-model_path = Path("models/mf_sgd_v2025.11.21_202756.joblib")
+model_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
 mf_model = joblib.load(model_path)
 print(f"✓ Loaded MF model")
 print(f"  - User factors: {mf_model.P.shape}")

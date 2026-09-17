@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 import pandas as pd
 from joblib import load
 
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS
+from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, KNN_MODEL_STEM, MF_MODEL_STEM
 from src.eval.splits import build_validation, sample_user_ids
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.models.knn_sklearn import ItemKNNRecommender
@@ -58,8 +58,8 @@ def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS):
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
 
     # Load or fit models (prefer existing artifacts)
-    knn_path = MODELS_DIR / "item_knn_sklearn_v1.0.joblib"
-    mf_path = MODELS_DIR / "mf_sgd_v1.0.joblib"
+    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
+    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
     if not knn_path.exists():
         from src.models.knn_sklearn import ItemKNNRecommender
         knn_model = ItemKNNRecommender().fit(train_df)

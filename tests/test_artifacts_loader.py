@@ -502,3 +502,41 @@ def test_determinism_is_set():
     val2 = np.random.randint(0, 1000)
 
     assert val1 == val2, "Determinism not working as expected"
+
+
+def test_stem_constants_resolve_to_real_artifacts():
+    """The declared stems must name files that exist when models/ is populated.
+
+    Skips where the artifacts are absent (CI, fresh clone without LFS pull).
+    """
+    from src.app.constants import DEFAULT_KNN_MODEL_STEM, DEFAULT_MF_MODEL_STEM
+    from src.models.constants import KNN_MODEL_STEM, MF_MODEL_STEM, MODELS_DIR
+
+    assert DEFAULT_MF_MODEL_STEM == MF_MODEL_STEM
+    assert DEFAULT_KNN_MODEL_STEM == KNN_MODEL_STEM
+
+    if not any(MODELS_DIR.glob("*.joblib")):
+        pytest.skip("No model artifacts present (LFS not pulled)")
+
+    for stem in (MF_MODEL_STEM, KNN_MODEL_STEM):
+        assert (MODELS_DIR / f"{stem}.joblib").exists(), f"Missing artifact for stem: {stem}"
+
+
+def test_one_artifact_per_model_family():
+    """One stem per family, so selection resolves without APP_*_STEM env vars."""
+    from src.models.constants import MODELS_DIR
+
+    artifacts = sorted(p.stem for p in MODELS_DIR.glob("*.joblib"))
+    if not artifacts:
+        pytest.skip("No model artifacts present (LFS not pulled)")
+
+    families = (
+        "mf_sgd",
+        "item_knn_sklearn",
+        "synopsis_tfidf",
+        "synopsis_embeddings",
+        "synopsis_neural_embeddings",
+    )
+    for family in families:
+        matches = [a for a in artifacts if a.startswith(family)]
+        assert len(matches) <= 1, f"Multiple {family} artifacts: {matches}"

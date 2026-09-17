@@ -8,7 +8,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import joblib
 
-model_path = Path("models/mf_sgd_v2025.11.21_202756.joblib")
+from src.models.constants import MF_MODEL_STEM, MODELS_DIR
+
+model_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
 model = joblib.load(model_path)
 
 print("=" * 60)

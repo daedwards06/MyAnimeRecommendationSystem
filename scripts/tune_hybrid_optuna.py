@@ -10,7 +10,7 @@ import optuna
 import pandas as pd
 import numpy as np
 
-from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, OPTUNA_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS
+from src.models.constants import DATA_PROCESSED_DIR, MODELS_DIR, OPTUNA_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS, KNN_MODEL_STEM, MF_MODEL_STEM
 from src.eval.splits import build_validation, sample_user_ids
 from joblib import load
 from src.models.knn_sklearn import ItemKNNRecommender
@@ -25,8 +25,8 @@ def _prepare_cache(k: int, sample_users: int):
     train_df, val_df = build_validation(interactions)
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
 
-    knn_path = MODELS_DIR / "item_knn_sklearn_v1.0.joblib"
-    mf_path = MODELS_DIR / "mf_sgd_v1.0.joblib"
+    knn_path = MODELS_DIR / f"{KNN_MODEL_STEM}.joblib"
+    mf_path = MODELS_DIR / f"{MF_MODEL_STEM}.joblib"
     knn_model: ItemKNNRecommender = load(knn_path) if knn_path.exists() else ItemKNNRecommender().fit(train_df)
     mf_model: FunkSVDRecommender = load(mf_path) if mf_path.exists() else FunkSVDRecommender().fit(train_df)
 
