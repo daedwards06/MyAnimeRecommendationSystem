@@ -9,7 +9,7 @@ the whole catalog in a few seconds.
 ![CI](https://github.com/daedwards06/MyAnimeRecommendationSystem/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem/graph/badge.svg)](https://codecov.io/gh/daedwards06/MyAnimeRecommendationSystem)
 
-> When the live demo is awake, the first recommendations appear in about 11 seconds. It sleeps after a period of inactivity, and waking it takes longer.
+> The live demo is kept awake by a scheduled visit, and the first recommendations appear in about 11 seconds. If you ever find it asleep, click the wake-up button; it reloads its models before showing results, so that first load takes longer.
 
 ![MARS demo: pick a seed title, read why a card was recommended, switch to a demo profile](app/assets/demo.gif)
 

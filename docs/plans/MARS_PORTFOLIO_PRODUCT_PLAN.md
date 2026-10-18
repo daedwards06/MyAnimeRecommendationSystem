@@ -997,25 +997,34 @@ ruff check src/ tests/ app/
 ```
 
 **Checklist:**
-- [ ] `scripts/check_live_app.py`: Playwright, fresh browser context, opens the deployed URL,
+- [x] `scripts/check_live_app.py`: Playwright, fresh browser context, opens the deployed URL,
       clicks the wake button if the sleep page shows, waits for the first card (the "N
       recommendations" header plus a poster image inside the app iframe). Prints time to first
       card and whether the app was asleep; exits non-zero and saves a screenshot on timeout.
-      Playwright is installed by the workflow only, not added to `requirements.txt`
-- [ ] Before trusting a reading, the detector is checked against the live page both ways (it
+      Playwright is installed by the workflow only, not added to `requirements.txt` — *live
+      runs 10.1 / 10.5 / 12.6 s, exit 0; the wake button text ("get this app back up") is not
+      yet confirmed on a real sleep page, only on a local stand-in*
+- [x] Before trusting a reading, the detector is checked against the live page both ways (it
       fires on a rendered page and times out on a page without cards). Task 1.8 lost its only
-      cold reading to a detector looking for a button the cards no longer have
-- [ ] `.github/workflows/keep-awake.yml`: `schedule` every 6 hours, `workflow_dispatch`, and a
+      cold reading to a detector looking for a button the cards no longer have — *local pages:
+      header only and poster only time out (exit 1, screenshot), both fire (4.2 s); live fires.
+      The check caught a real bug: local Streamlit 1.38 has no `stMain` test id, so the
+      detector now scopes to "outside `stSidebar`" instead*
+- [x] `.github/workflows/keep-awake.yml`: `schedule` every 6 hours, `workflow_dispatch`, and a
       run after pushes to `main` that first waits for the redeploy; no checkout of LFS objects.
       The time to first card and `was_asleep` go to the job summary; the screenshot is uploaded
-      as an artifact on failure
-- [ ] `docs/DEPLOYMENT.md`: a "Keeping the demo awake" section (what the job does, the
+      as an artifact on failure — *cron `17 */6 * * *`; push runs `sleep 300` first; sparse
+      checkout of the script only. YAML parsed locally; not yet run on GitHub (owner item below)*
+- [x] `docs/DEPLOYMENT.md`: a "Keeping the demo awake" section (what the job does, the
       60-day scheduled-workflow disable and how to re-enable, how to read a failure); any
-      `was_asleep` run's time goes into § Performance as a cold-start reading
-- [ ] README note under the badge: says the demo is kept awake and what to expect if it is
-      ever found asleep, using a measured figure only
+      `was_asleep` run's time goes into § Performance as a cold-start reading — *no run has
+      found the app asleep yet, so the Cold row is still empty; § Performance says where a
+      reading goes*
+- [x] README note under the badge: says the demo is kept awake and what to expect if it is
+      ever found asleep, using a measured figure only — *~11 s warm (measured); the wake is
+      described as "takes longer" with no number, since none is measured*
 - [ ] Owner action: run the workflow once by hand and confirm it is green
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

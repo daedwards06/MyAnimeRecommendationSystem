@@ -1,0 +1,57 @@
+name: Keep demo awake
+
+# Opens the deployed app in a headless browser and waits for the first recommendation card, so
+# Streamlit Community Cloud counts a visit and does not put the app to sleep. A plain HTTP
+# request does not count (a sleeping app still answers 200). Fails when no card appears, so a
+# broken demo emails the owner. See docs/DEPLOYMENT.md ("Keeping the demo awake").
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  # A push to main redeploys and reboots the app; visiting after the redeploy means the first
+  # real visitor does not pay the model load.
+  push:
+    branches: [main]
+
+concurrency:
+  group: keep-awake
+  cancel-in-progress: true
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Only the script is needed; no LFS objects (lfs defaults to false).
+      - name: Checkout script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/check_live_app.py
+          sparse-checkout-cone-mode: false
+
+      - name: Wait for the redeploy
+        if: github.event_name == 'push'
+        run: sleep 300
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright==1.64.0
+          python -m playwright install --with-deps chromium
+
+      - name: Visit the app
+        run: python scripts/check_live_app.py --timeout 420 --screenshot live-app-failure.png
+
+      - name: Upload screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-app-failure
+          path: live-app-failure.png
+          if-no-files-found: ignore

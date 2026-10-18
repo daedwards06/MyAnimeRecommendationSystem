@@ -292,7 +292,8 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 - **Symptom:** A visitor lands on a "This app has gone to sleep" page
 - **Cause:** Streamlit Cloud spins down idle apps
 - **Solution:** Normal for free tier. Waking reboots the container, which then pays the model
-  load above. Timings are under [Performance](#performance).
+  load above. Timings are under [Performance](#performance). A scheduled job keeps the demo
+  from sleeping; see [Keeping the demo awake](#keeping-the-demo-awake).
 
 ### 6. Path Issues
 - **Symptom:** FileNotFoundError for data/models
@@ -395,7 +396,12 @@ after it has slept, click the wake button, and stop the clock at the first poste
 median and range to the table above and to the README note under the badge.
 Decided 2026-10-18 without the cold runs: rather than measure the wake, keep the app from
 sleeping with a scheduled headless-browser visit (`docs/decisions.md`; plan Task 1.9). That
-job records a cold reading whenever it finds the app asleep.
+job records a cold reading whenever it finds the app asleep (see
+[Keeping the demo awake](#keeping-the-demo-awake)); add any such reading to the Cold row above.
+
+The same detector, run locally with `scripts/check_live_app.py` on the awake app, read 10.1,
+10.5 and 12.6 s (Playwright's Chromium and Edge, 2026-10-18), in line with the warm row. A
+fourth run, the first after installing the browser, read 20.8 s and is not counted.
 
 Locally (Windows, Python 3.12, same machine as the deployed-app timings), `streamlit run` takes
 28.5 s to the first card on a fresh server and 8.7 s on the next session. The difference is the
@@ -431,6 +437,58 @@ largest difference in any `phase4_ablation.csv` column was 1.8e-13. The Python v
 move the published numbers. `requirements.txt` uses `>=` floors, not pins, so the library
 versions Cloud resolves can drift from the ones the evaluation used; this check does not cover
 that.
+
+## Keeping the demo awake
+
+Community Cloud puts an app to sleep after a period with no traffic, and waking it reboots the
+container and reloads every model before the first card. `.github/workflows/keep-awake.yml`
+visits the app so that a reviewer does not have to wait for that (decision: `docs/decisions.md`,
+2026-10-18).
+
+**What the job does.** It runs `scripts/check_live_app.py`, which opens the app in headless
+Chromium with a fresh browser context, clicks the wake button if the sleep page shows, and waits
+for the first card: the "N recommendations" header plus a loaded poster image. A plain `curl`
+does not count as a visit (a sleeping app still answers `200`; see
+[Verify From Outside](#6-verify-from-outside)). The job runs:
+
+- every 6 hours (`17 */6 * * *`, UTC);
+- on demand: Actions → **Keep demo awake** → **Run workflow**;
+- after every push to `main`, which redeploys and reboots the app. It waits 5 minutes for the
+  redeploy first, so the job, not the next visitor, pays the model load.
+
+It checks out only the script (no LFS objects, so no LFS bandwidth) and installs Playwright
+itself. Playwright is not in `requirements.txt`. The time to first card and `was_asleep` go to
+the run's job summary.
+
+**Run it locally.**
+
+```powershell
+pip install playwright; python -m playwright install chromium
+python scripts/check_live_app.py                    # or --channel msedge to use installed Edge
+```
+
+It prints `time_to_first_card_s` and `was_asleep`, and exits 1 after `--timeout` seconds
+(default 300; the workflow uses 420) with a screenshot at `--screenshot`.
+
+**Reading a failure.** A red run means no card appeared within the timeout. Download the
+`live-app-failure` artifact from the run and look at the screenshot:
+
+- *Sleep page still showing:* the wake button's text no longer matches `WAKE_BUTTON_RE` in the
+  script (it looks for "get this app back up"; that text has not been checked against a real
+  sleep page yet). Update the pattern.
+- *App error or "in the oven":* the app itself is broken or still redeploying. Check the Cloud
+  dashboard logs; re-run the job once it is up.
+- *App rendered, cards visible:* the detector is stale (the header text or the
+  `stImageContainer` test id changed). Fix the script, and check it both ways before trusting a
+  reading: it must fire on the rendered page and time out on a page without cards.
+
+**Cold-start readings.** A run with `was_asleep: yes` found the app asleep. Its time to first
+card is a cold-start reading for the table under [Performance](#performance). If those runs
+become common, the app is sleeping between visits and the schedule should be tightened.
+
+**The 60-day disable.** GitHub disables scheduled workflows in a public repository after 60 days
+with no commits, and emails the owner first. Re-enable it from Actions → **Keep demo awake** →
+**Enable workflow**, or push any commit. Until then the app goes back to sleeping.
 
 ## Cost & Limits (Free Tier)
 
