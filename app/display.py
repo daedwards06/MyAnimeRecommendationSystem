@@ -1,7 +1,8 @@
 """Display rendering for the MARS Streamlit app.
 
 Handles CSS injection, header rendering, result card orchestration,
-diversity mix bar, empty states, and the footer (diversity panel + help).
+diversity mix bar, empty states, and the footer (diversity panel, help,
+scoring details).
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from src.app.badges import badge_payload
 from src.app.components.cards import render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
-from src.app.components.instructions import render_onboarding
+from src.app.components.instructions import render_intro_line
 from src.app.score_semantics import has_match_score
 
 if TYPE_CHECKING:
@@ -187,8 +188,22 @@ def inject_css(theme: dict) -> None:
 # ── Header ───────────────────────────────────────────────────────────────────
 
 
+HEADER_TITLE = "MARS"
+
+_MODE_SUBTITLES: dict[str, str] = {
+    "Seed-based": "Find anime like the ones you love",
+    "Personalized": "Ranked from your ratings",
+    "Browse": "Browse the catalog",
+}
+
+
+def header_text(ui_mode: str) -> tuple[str, str]:
+    """(title, subtitle) for the page header; the title is the same in every mode."""
+    return HEADER_TITLE, _MODE_SUBTITLES.get(ui_mode, _MODE_SUBTITLES["Seed-based"])
+
+
 def render_header(ui_mode: str, theme: dict | None = None) -> None:
-    """Render the mode-dependent page header.
+    """Render the page header: MARS plus a one-line subtitle for the current mode.
 
     Args:
         ui_mode: Current UI mode (Browse, Personalized, or Seed-based)
@@ -198,29 +213,13 @@ def render_header(ui_mode: str, theme: dict | None = None) -> None:
         from src.app.theme import get_theme
         theme = get_theme()
 
-    text_muted = theme["colors"]["text_muted"]
-
-    if ui_mode == "Browse":
-        st.markdown(
-            "<h1 style='margin-bottom:0; font-weight:800;'>Anime Explorer</h1>"
-            f"<p style='color:{text_muted}; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
-            "Browse the catalog by genre, type, and year</p>",
-            unsafe_allow_html=True,
-        )
-    elif ui_mode == "Personalized":
-        st.markdown(
-            "<h1 style='margin-bottom:0; font-weight:800;'>Your Recommendations</h1>"
-            f"<p style='color:{text_muted}; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
-            "Ranked from your rated history</p>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<h1 style='margin-bottom:0; font-weight:800;'>Anime Recommender</h1>"
-            f"<p style='color:{text_muted}; font-size:1.05rem; margin-top:0; margin-bottom:1rem;'>"
-            "Discover anime similar to titles you love</p>",
-            unsafe_allow_html=True,
-        )
+    title, subtitle = header_text(ui_mode)
+    st.markdown(
+        f"<h1 style='margin-bottom:0; font-weight:800;'>{title}</h1>"
+        f"<p style='color:{theme['colors']['text_muted']}; font-size:1.05rem; "
+        f"margin-top:0; margin-bottom:1rem;'>{subtitle}</p>",
+        unsafe_allow_html=True,
+    )
 
 
 def render_import_light_warning() -> None:
@@ -241,7 +240,7 @@ def artifact_notice(load_report: dict | None) -> str | None:
     names = ", ".join(FAMILY_LABELS.get(f, f) for f in missing)
     return (
         f"Some model artifacts did not load ({names}); recommendations run without them. "
-        "Details under Scoring details."
+        "Details under Scoring details at the bottom of the page."
     )
 
 
@@ -252,9 +251,14 @@ def render_artifact_notice(load_report: dict | None) -> None:
         st.warning(notice)
 
 
-def render_onboarding_section(ui_mode: str) -> None:
-    """Render onboarding instructions for the current mode."""
-    render_onboarding(ui_mode=ui_mode)
+def render_intro_section(
+    ui_mode: str,
+    seed_titles: list[str],
+    *,
+    default_seed_title: str | None = None,
+) -> None:
+    """Render the dismissible one-line intro under the header."""
+    render_intro_line(ui_mode, seed_titles, default_seed_title=default_seed_title)
 
 
 # ── Results rendering ────────────────────────────────────────────────────────
@@ -269,9 +273,8 @@ def render_results(
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
     theme: dict | None = None,
-    load_report: dict | None = None,
 ) -> None:
-    """Render recommendation results: scoring details, count, mix bar, cards.
+    """Render recommendation results: count, mix bar, cards.
 
     Args:
         theme: Optional theme dictionary for color tokens
@@ -281,20 +284,6 @@ def render_results(
         theme = get_theme()
 
     colors = theme["colors"]
-    # Scoring path expander
-    with st.expander("Scoring details", expanded=False):
-        st.caption(f"Active scoring path: {pipeline.active_scoring_path}")
-        blocked_reason = st.session_state.get("personalization_blocked_reason")
-        if (
-            st.session_state.get("personalization_enabled", False)
-            and not pipeline.personalization_applied
-            and blocked_reason
-        ):
-            st.caption(f"Personalization note: {blocked_reason}")
-        if load_report is not None:
-            for family in missing_expected_families(load_report):
-                reason = (load_report.get(family) or {}).get("reason") or "not in the load report"
-                st.caption(f"Not loaded: {FAMILY_LABELS.get(family, family)} — {reason}")
 
     # Result count
     total_anime = len(metadata)
@@ -615,7 +604,7 @@ def _render_cold_start_state(metadata: pd.DataFrame, title_to_id: dict[str, int]
     st.caption("Or search for any title in the sidebar.")
 
 
-# ── Footer (diversity panel + help) ──────────────────────────────────────────
+# ── Footer (diversity panel, help, scoring details) ──────────────────────────
 
 
 def render_footer(
@@ -623,10 +612,49 @@ def render_footer(
     metadata: pd.DataFrame,
     browse_mode: bool,
     ui_mode: str,
+    *,
+    pipeline: PipelineRunResult | None = None,
+    load_report: dict | None = None,
+    pipeline_ms: float | None = None,
 ) -> None:
-    """Render the diversity panel and help/FAQ section."""
+    """Render the diversity panel, then Help/FAQ and Scoring details side by side."""
     _render_diversity_panel_fragment(recs, metadata, is_browse=browse_mode)
-    render_help_panel(ui_mode=ui_mode)
+    help_col, details_col = st.columns(2)
+    with help_col:
+        render_help_panel(
+            ui_mode=ui_mode, expanded=bool(st.session_state.get("help_expanded", False))
+        )
+    with details_col:
+        _render_scoring_details(pipeline, load_report, pipeline_ms)
+
+
+def _render_scoring_details(
+    pipeline: PipelineRunResult | None,
+    load_report: dict | None,
+    pipeline_ms: float | None,
+) -> None:
+    """Reviewer panel: active scoring path, artifact stems, last pipeline time."""
+    with st.expander("Scoring details", expanded=False):
+        if pipeline is not None:
+            st.caption(f"Active scoring path: {pipeline.active_scoring_path}")
+            blocked_reason = st.session_state.get("personalization_blocked_reason")
+            if (
+                st.session_state.get("personalization_enabled", False)
+                and not pipeline.personalization_applied
+                and blocked_reason
+            ):
+                st.caption(f"Personalization note: {blocked_reason}")
+        if pipeline_ms is not None:
+            st.caption(f"Last pipeline: {pipeline_ms:.0f} ms")
+        if load_report is not None:
+            for family, entry in load_report.items():
+                entry = entry or {}
+                label = FAMILY_LABELS.get(family, family)
+                if entry.get("loaded"):
+                    st.caption(f"{label}: `{entry.get('stem')}`")
+            for family in missing_expected_families(load_report):
+                reason = (load_report.get(family) or {}).get("reason") or "not in the load report"
+                st.caption(f"Not loaded: {FAMILY_LABELS.get(family, family)} — {reason}")
 
 
 @st.fragment

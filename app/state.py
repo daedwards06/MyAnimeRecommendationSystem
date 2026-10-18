@@ -13,6 +13,8 @@ import streamlit as st
 
 from src.app.constants import DEFAULT_TOP_N
 
+DEFAULT_SEED_TITLE = "Fullmetal Alchemist: Brotherhood"
+
 # ── Query-param helpers ──────────────────────────────────────────────────────
 
 
@@ -68,6 +70,8 @@ def init_session_state() -> None:
         "selected_seed_titles": [],
         "_first_load_done": False,
         "_default_seed_active": False,
+        "intro_dismissed": False,
+        "help_expanded": False,
     }.items():
         if key not in st.session_state:
             st.session_state[key] = default
@@ -84,7 +88,7 @@ def setup_first_run(metadata, *, import_light: bool = False) -> None:
         and str(st.session_state.get("ui_mode", "Seed-based")) == "Seed-based"
         and not import_light
     ):
-        _default_title = "Fullmetal Alchemist: Brotherhood"
+        _default_title = DEFAULT_SEED_TITLE
         _fmab_rows = metadata[metadata["title_display"] == _default_title]
         if not _fmab_rows.empty:
             _fmab_id = int(_fmab_rows.iloc[0]["anime_id"])

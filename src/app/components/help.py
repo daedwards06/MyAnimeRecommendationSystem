@@ -3,6 +3,14 @@ from __future__ import annotations
 
 import streamlit as st
 
+FAQ_MD_USER = """
+**What am I looking at?** Anime picked to match the titles you chose (Seed-based), your ratings (Personalized), or your genre filters (Browse). Higher on the list means a closer match.
+
+**How do I get better picks?** Add 1–5 titles you love in the sidebar; more titles broaden the mix. For picks from your whole watch history, load a rated profile or import your MyAnimeList list and switch to Personalized.
+
+**What does the match score mean?** It ranks titles within the current list only. It is not a rating out of 10 or a probability.
+"""
+
 FAQ_MD_RANKED = """
 **Match score (relative):** a unitless, uncalibrated ranking signal (higher = better match). Compare within the current run (not a probability or /10 rating).
 
@@ -19,7 +27,7 @@ FAQ_MD_RANKED = """
 
 **Cold-start badge:** means the title is not in the MF model’s training set; some scoring/explanations may be limited.
 
-**Performance:** see the sidebar panel for the most recent ranking timing.
+**Performance:** see the sidebar panel or Scoring details for the most recent ranking timing.
 """
 
 FAQ_MD_BROWSE = """
@@ -32,8 +40,11 @@ FAQ_MD_BROWSE = """
 **Performance:** timing is shown for ranked modes.
 """
 
-def render_help_panel(*, ui_mode: str | None = None):
-    with st.expander("Help / FAQ"):
+
+def render_help_panel(*, ui_mode: str | None = None, expanded: bool = False):
+    with st.expander("Help / FAQ", expanded=expanded):
+        st.markdown(FAQ_MD_USER)
+        st.markdown("#### For reviewers")
         if str(ui_mode or "").strip() == "Browse":
             st.markdown(FAQ_MD_BROWSE)
         else:

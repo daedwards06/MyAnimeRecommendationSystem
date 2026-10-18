@@ -33,7 +33,7 @@ from app.display import (
     render_footer,
     render_header,
     render_import_light_warning,
-    render_onboarding_section,
+    render_intro_section,
     render_results,
 )
 from app.pipeline_runner import (
@@ -43,7 +43,12 @@ from app.pipeline_runner import (
     run_recommendations,
 )
 from app.sidebar import render_sidebar
-from app.state import init_mode_state, init_session_state, setup_first_run
+from app.state import (
+    DEFAULT_SEED_TITLE,
+    init_mode_state,
+    init_session_state,
+    setup_first_run,
+)
 from src.app.artifacts_loader import build_artifacts
 from src.app.constants import PERSONAS_JSON
 from src.app.theme import get_theme
@@ -105,7 +110,7 @@ metadata: pd.DataFrame = bundle["metadata"]
 personas = load_personas(PERSONAS_JSON)
 
 # ── Page configuration ───────────────────────────────────────────────────────
-st.set_page_config(page_title="Anime Explorer", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="MARS", layout="wide", page_icon="🎬")
 theme = get_theme()
 
 # ── State initialisation ─────────────────────────────────────────────────────
@@ -116,9 +121,10 @@ init_session_state()
 inject_css(theme)
 _ui_mode_for_header = str(st.session_state.get("ui_mode", "Seed-based"))
 render_header(_ui_mode_for_header, theme)
+# Filled after the sidebar runs, so it reflects this run's seeds.
+intro_slot = st.empty()
 render_import_light_warning()
 render_artifact_notice(bundle.get("load_report"))
-render_onboarding_section(_ui_mode_for_header)
 
 # ── First-run experience: auto-populate default seed ─────────────────────────
 setup_first_run(metadata, import_light=IMPORT_LIGHT)
@@ -130,6 +136,15 @@ sidebar_state = render_sidebar(
     personas,
     clear_cache_fn=getattr(init_bundle, "clear", None),
 )
+
+with intro_slot.container():
+    render_intro_section(
+        sidebar_state.ui_mode,
+        list(sidebar_state.selected_seed_titles or []),
+        default_seed_title=(
+            DEFAULT_SEED_TITLE if st.session_state.get("_default_seed_active", False) else None
+        ),
+    )
 
 # ── Build recommender engine ─────────────────────────────────────────────────
 engine: RecommenderEngine
@@ -173,17 +188,6 @@ elif (
     )
 
 else:
-    # Show banner if default seed is active
-    if (
-        st.session_state.get("_default_seed_active", False)
-        and sidebar_state.selected_seed_ids
-        and sidebar_state.selected_seed_titles
-    ):
-        st.info(
-            f"Showing recommendations based on **{sidebar_state.selected_seed_titles[0]}** "
-            "— change the seed in the sidebar to explore."
-        )
-
     if sidebar_state.selected_seed_ids and sidebar_state.selected_seed_titles:
         if len(sidebar_state.selected_seed_titles) == 1:
             st.subheader(f"Similar to {sidebar_state.selected_seed_titles[0]}")
@@ -212,7 +216,6 @@ if pipeline_result.recs:
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
         theme=theme,
-        load_report=bundle.get("load_report"),
     )
 elif sidebar_state.browse_mode and sidebar_state.genre_filter:
     # Browse returned zero results
@@ -236,11 +239,14 @@ elif not sidebar_state.browse_mode and engine.recommender is None:
 elif not sidebar_state.browse_mode:
     render_empty_state(sidebar_state, pipeline_result, metadata)
 
-# ── Footer (diversity panel + help) ──────────────────────────────────────────
+# ── Footer (diversity panel, help, scoring details) ──────────────────────────
 st.markdown("---")
 render_footer(
     pipeline_result.recs,
     metadata,
     sidebar_state.browse_mode,
     str(st.session_state.get("ui_mode", "Seed-based")),
+    pipeline=pipeline_result,
+    load_report=bundle.get("load_report"),
+    pipeline_ms=pipeline_elapsed,
 )

@@ -620,17 +620,20 @@ streamlit run app/main.py   # visual: tab title and H1 both say MARS; first card
 ```
 
 **Checklist:**
-- [ ] Page title and header: **MARS** with a one-line subtitle per mode ("Find anime like the
+- [x] Page title and header: **MARS** with a one-line subtitle per mode ("Find anime like the
       ones you love" / "Ranked from your ratings" / "Browse the catalog"); README H1 unchanged
-- [ ] First-run banner and onboarding expander merge into one dismissible line under the
+- [x] First-run banner and onboarding expander merge into one dismissible line under the
       header: "Showing picks for **Fullmetal Alchemist: Brotherhood** — pick your own titles in
-      the sidebar" with a "How it works" link that opens the Help expander
-- [ ] "Scoring details" moves into the footer next to Help (it is a reviewer panel, not a
+      the sidebar" with a "How it works" link that opens the Help expander — *a button, since
+      Streamlit 1.38 has no link-style button; after the default seed changes, the line becomes
+      a short per-mode hint*
+- [x] "Scoring details" moves into the footer next to Help (it is a reviewer panel, not a
       user panel); shows active scoring path, artifact stems, and last pipeline time
-- [ ] Help/FAQ rewritten for users first (three short Q&As), with a "For reviewers" subsection
+- [x] Help/FAQ rewritten for users first (three short Q&As), with a "For reviewers" subsection
       that keeps the current technical text
-- [ ] Tests: header/subtitle helper is a pure function with a test per mode
-- [ ] Tests + ruff green
+- [x] Tests: header/subtitle helper is a pure function with a test per mode — *plus intro-line
+      tests, `tests/test_header_intro.py`*
+- [x] Tests + ruff green
 
 ---
 

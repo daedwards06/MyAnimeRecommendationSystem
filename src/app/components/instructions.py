@@ -1,42 +1,63 @@
-"""Onboarding / usage instructions component for the Streamlit app.
+"""One-line intro under the header: what is showing and where to change it.
 
-Provides a compact, dismissible panel so first-time users understand the UX.
+Dismissible; its "How it works" button opens the Help panel in the footer.
 """
 from __future__ import annotations
 
 import streamlit as st
 
-_MODE_STEPS: dict[str, list[str]] = {
-    "Browse": [
-        "Select **Browse** mode, then pick one or more genres to explore.",
-        "Refine with type, year, or sort controls in the sidebar.",
-    ],
-    "Personalized": [
-        "Load a **rated profile** (sidebar) with at least one rating.",
-        "Results are re-ranked using your taste profile automatically.",
-    ],
-    "Seed-based": [
-        "You'll see results for **Fullmetal Alchemist: Brotherhood** by default.",
-        "Swap seeds anytime — pick 1–5 titles in the sidebar or click a sample button.",
-        "Tweak hybrid weights and filters to steer discovery.",
-    ],
+_MODE_HINTS: dict[str, str] = {
+    "Browse": "Pick one or more genres in the sidebar to browse the catalog",
+    "Personalized": "Load a rated profile in the sidebar to rank titles from your ratings",
+    "Seed-based": "Pick 1–5 titles you love in the sidebar to find similar anime",
 }
 
 
-def render_onboarding(*, ui_mode: str = "Seed-based"):
-    key = "__ONBOARD_DISMISSED__"
-    if st.session_state.get(key, False):
+def intro_line(
+    ui_mode: str,
+    seed_titles: list[str],
+    *,
+    default_seed_title: str | None = None,
+) -> str:
+    """Markdown for the intro line; names the default seed while it is the only seed."""
+    if (
+        ui_mode == "Seed-based"
+        and default_seed_title is not None
+        and seed_titles == [default_seed_title]
+    ):
+        return (
+            f"Showing picks for **{default_seed_title}** — pick your own titles in the sidebar"
+        )
+    return _MODE_HINTS.get(ui_mode, _MODE_HINTS["Seed-based"])
+
+
+def render_intro_line(
+    ui_mode: str,
+    seed_titles: list[str],
+    *,
+    default_seed_title: str | None = None,
+) -> None:
+    if st.session_state.get("intro_dismissed", False):
         return
 
-    steps = _MODE_STEPS.get(ui_mode, _MODE_STEPS["Seed-based"])
-
-    with st.expander("Quick start — click to dismiss", expanded=True):
-        for i, step in enumerate(steps, 1):
-            st.markdown(f"**{i}.** {step}")
-        st.caption(
-            "**Modes:** Seed-based (similar titles) · Personalized (rated history) · Browse (catalog filters)"
+    text_col, help_col, close_col = st.columns([8, 1.6, 0.6], vertical_alignment="center")
+    with text_col:
+        st.markdown(intro_line(ui_mode, seed_titles, default_seed_title=default_seed_title))
+    with help_col:
+        st.button(
+            "How it works",
+            key="intro_how_it_works",
+            on_click=_set_state,
+            args=("help_expanded",),
         )
-        if st.button("Got it", key="dismiss_onboarding"):
-            st.session_state[key] = True
+    with close_col:
+        st.button(
+            "✕", key="intro_dismiss", help="Dismiss", on_click=_set_state, args=("intro_dismissed",)
+        )
 
-__all__ = ["render_onboarding"]
+
+def _set_state(key: str) -> None:
+    st.session_state[key] = True
+
+
+__all__ = ["intro_line", "render_intro_line"]

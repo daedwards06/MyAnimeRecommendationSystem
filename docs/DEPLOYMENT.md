@@ -66,7 +66,7 @@ those constants, so the metrics describe the model that is served.
 Adding a second artifact for a family without updating the constant makes `_select_model_stem`
 ambiguous: MF selection then fails the app at startup, and the kNN and synopsis families are
 dropped. A dropped family is logged at warning level, recorded in `bundle["load_report"]`, and
-shown as a notice under the app header (reason under Scoring details); the app keeps running. Replace the artifact and update the constant in the same change, or set
+shown as a notice under the app header (reason under Scoring details, in the footer); the app keeps running. Replace the artifact and update the constant in the same change, or set
 `APP_MF_MODEL_STEM` / `APP_KNN_MODEL_STEM` / `APP_SYNOPSIS_TFIDF_STEM` /
 `APP_SYNOPSIS_EMBEDDINGS_STEM` / `APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM` to disambiguate.
 
