@@ -35,13 +35,22 @@ def test_neural_artifact_stores_library_versions_as_plain_str():
 def test_neural_artifact_loads_without_torch(monkeypatch):
     """The deployed app has no torch; the neural artifact must unpickle without it.
 
-    Skips where the artifacts are absent (CI, fresh clone without LFS pull).
+    Skips where the artifacts are absent or are LFS pointer files (CI checks out without
+    LFS objects, so the files exist but hold a short text pointer).
     """
     import sys
 
     from src.models.constants import MODELS_DIR
 
-    paths = sorted(MODELS_DIR.glob("synopsis_neural_embeddings*.joblib"))
+    def _is_lfs_pointer(path) -> bool:
+        with path.open("rb") as fh:
+            return fh.read(64).startswith(b"version https://git-lfs")
+
+    paths = [
+        p
+        for p in sorted(MODELS_DIR.glob("synopsis_neural_embeddings*.joblib"))
+        if not _is_lfs_pointer(p)
+    ]
     if not paths:
         pytest.skip("No neural embeddings artifact present (LFS not pulled)")
 
