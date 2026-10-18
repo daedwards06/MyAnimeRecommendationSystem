@@ -474,16 +474,21 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `tests/test_published_numbers.py`: parse the README Results table (model label → NDCG,
+- [x] `tests/test_published_numbers.py`: parse the README Results table (model label → NDCG,
       MAP, coverage, Gini, lift) and assert each value equals the CSV value rounded the way the
       README shows it; same for the model card's table
-- [ ] A small explicit label map (README display name → ablation model id) in the test, and
+- [x] A small explicit label map (README display name → ablation model id) in the test, and
       the test fails on any README row the map doesn't cover. A renamed row can't silently
       drop out of the check
-- [ ] Prose numbers in the Results paragraph (e.g. "10.9× popularity's coverage", "within
-      0.6%") are recomputed from the CSV and checked too; keep the list short and explicit
-- [ ] Mutation check from the Validation Commands done and reverted
-- [ ] Tests + ruff green
+- [x] Prose numbers in the Results paragraph (e.g. "10.9× popularity's coverage", "within
+      0.6%") are recomputed from the CSV and checked too; keep the list short and explicit —
+      *those two examples are no longer in the text; checked instead: the README's three paired
+      diffs + CIs and "0.0324 → 0.0658", and the model card's "11.9× popularity". First run
+      caught a real error: README said CI [+0.018, +0.045], CSV gives +0.017 (fixed). The
+      blend weight percentages (93/7, 95/5) are not in the CSV and are not checked*
+- [x] Mutation check from the Validation Commands done and reverted — *Item-kNN NDCG
+      0.0628 → 0.0629 failed `test_readme_table_matches_ablation`*
+- [x] Tests + ruff green
 
 ---
 

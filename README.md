@@ -50,7 +50,7 @@ intervals on the NDCG difference, because every model is scored on the same user
 
 - **Collaborative filtering with item-kNN works; MF on its own does not beat popularity.** The
   re-tuned blend, item-kNN alone and RRF all beat popularity (re-tuned blend +0.031,
-  CI [+0.018, +0.045]) and MF. MF and popularity are statistically tied
+  CI [+0.017, +0.045]) and MF. MF and popularity are statistically tied
   (−0.002, CI [−0.014, +0.010]), as are MF and the blend with the current config weights.
 - **Re-tuning roughly doubled the blend's NDCG** (0.0324 → 0.0658). The config weights
   (93% MF / 7% kNN) came from a sweep run while kNN could not score, on users that overlapped the ones the
