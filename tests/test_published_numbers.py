@@ -134,10 +134,23 @@ def test_readme_prose_numbers_match_ablation(readme_results, ablation):
         _paired_claim(ablation, "hybrid_weighted_tuned", "popularity"),
         _paired_claim(ablation, "mf_sgd", "popularity"),
         _paired_claim(ablation, "hybrid_weighted_tuned", "item_knn_sklearn"),
-        f"({_f4(ablation.loc['hybrid_weighted', 'ndcg@10'])} → {_f4(ablation.loc['hybrid_weighted_tuned', 'ndcg@10'])})",
     ]
     missing = [c for c in claims if c not in prose]
     assert not missing, f"README Results prose does not state: {missing}"
+
+
+def test_readme_lessons_numbers_match_ablation(ablation):
+    prose = _normalize(_section(README, "## What was hard / what I learned"))
+    cov = ablation["coverage@10"]
+    claims = [
+        f"({_f4(ablation.loc['hybrid_weighted', 'ndcg@10'])} → {_f4(ablation.loc['hybrid_weighted_tuned', 'ndcg@10'])})",
+        f"cover {_f4(cov['popularity'])} of the catalog",
+        f"cover {_f4(cov['content_tfidf'])}",
+        f"({_f4(cov['item_knn_sklearn'])} vs. {_f4(cov['hybrid_weighted_tuned'])})",
+    ]
+    missing = [c for c in claims if c not in prose]
+    assert not missing, f"README lessons prose does not state: {missing}"
+    assert ablation.loc["content_tfidf", "ndcg@10"] < ablation.loc["popularity", "ndcg@10"]
 
 
 def test_model_card_prose_numbers_match_ablation(card_metrics, ablation):

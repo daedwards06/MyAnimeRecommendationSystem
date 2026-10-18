@@ -891,18 +891,27 @@ ruff check src/ tests/ app/
 ```
 
 **Checklist:**
-- [ ] New order: 2-sentence pitch → demo badge + GIF (10–15 s: pick a seed, read a card's
+- [x] New order: 2-sentence pitch → demo badge + GIF (10–15 s: pick a seed, read a card's
       explanation, switch to a demo profile) → Results (one table + one sentence, from Task 0.4)
       → How it works (existing Mermaid diagram, trimmed) → What was hard / what I learned
       (5 bullets: the evaluation bug that hid kNN and the re-tune it forced, MF vs. popularity
       (Task 2.1), coverage vs. accuracy, synthetic timestamps, hand-tuned gates) → Quick Start → Links (docs index, model card, write-up)
-- [ ] Catalog refresh, project structure, and tech stack move to `docs/` pages linked from
-      the index
-- [ ] Record the GIF with the final UI; keep a still PNG as fallback; both under
-      `app/assets/`; each under 5 MB
-- [ ] Every number in the README is copied from `reports/phase4_ablation.md` (the Task 0.7
+      — *write-up link deferred: `docs/WRITEUP.md` does not exist until Task 2.5. The MF bullet
+      states the tie and that the diagnosis is next; Task 2.1 replaces it with the result. The
+      cold-start note under the badge is unchanged until Task 1.8 measures it.*
+- [x] Catalog refresh, project structure, and tech stack move to `docs/` pages linked from
+      the index — *`docs/data_catalog.md` § Updating the Catalog; new `docs/project_structure.md`*
+- [x] Record the GIF with the final UI; keep a still PNG as fallback; both under
+      `app/assets/`; each under 5 MB — *`demo.gif` 0.89 MB / 14.85 s, `demo_screenshot.png`
+      0.21 MB; recorded locally with Playwright + Edge. Recording surfaced the For me card
+      explanation printing `**Match score: 1.083**` as literal markdown; fixed in
+      `src/app/components/explanations.py` (raw score removed, as Task 1.5 intended) with
+      `tests/test_personalized_explanation.py`*
+- [x] Every number in the README is copied from `reports/phase4_ablation.md` (the Task 0.7
       test enforces this; extend its prose-number list for any new number the rewrite adds)
-- [ ] Tests + ruff green
+      — *new `test_readme_lessons_numbers_match_ablation` covers the re-tune and coverage
+      figures in the lessons section; mutation-checked*
+- [x] Tests + ruff green
 
 ---
 

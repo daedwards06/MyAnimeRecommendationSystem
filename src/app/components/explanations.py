@@ -10,8 +10,6 @@ import logging
 import numpy as np
 import pandas as pd
 
-from src.app.score_semantics import SCORE_LABEL_SHORT, format_match_score
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,13 +62,9 @@ def generate_explanation(
         # Sort by average rating
         matching_genres.sort(key=lambda x: x[1], reverse=True)
 
-        # Build explanation
+        # The card renders this as HTML and shows the match tier and raw score itself.
         parts = []
 
-        # Part 1: Match score (relative, uncalibrated)
-        parts.append(f"📈 **{SCORE_LABEL_SHORT}: {format_match_score(match_score)}**")
-
-        # Part 2: Genre match (if any)
         if matching_genres:
             top_genres = matching_genres[:top_n_genres]
             genre_texts = []
@@ -83,7 +77,6 @@ def generate_explanation(
                 genre_list = ", ".join(genre_texts[:-1]) + f" & {genre_texts[-1]}"
                 parts.append(f"You rate {genre_list}")
 
-        # Part 3: Similar to highly-rated anime (if available)
         similar_anime = _find_similar_rated_anime(
             anime_id,
             anime_genres,
@@ -99,12 +92,10 @@ def generate_explanation(
             else:
                 parts.append(f"Similar to: {similar_anime[0]}, {similar_anime[1]}")
 
-        # Combine parts
-        if len(parts) == 1:
-            # Only have match score, add generic message
-            return f"{parts[0]} • Based on your taste profile"
+        if not parts:
+            return "Based on your taste profile"
 
-        return " • ".join(parts)
+        return " · ".join(parts)
 
     except Exception as e:
         logger.warning(f"Failed to generate explanation for anime {anime_id}: {e}")

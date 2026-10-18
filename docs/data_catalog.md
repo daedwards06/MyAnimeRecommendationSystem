@@ -111,6 +111,27 @@ This catalog documents all data assets used in the anime recommendation system, 
    validation rows).
 7. **`scripts/refresh_catalog.py`** orchestrates steps 2–6 end-to-end. Convenience targets: `make refresh-all`, `make refresh-season YEAR=YYYY SEASON=xxx`.
 
+## Updating the Catalog
+
+The catalog ships with 13,000+ titles. To add newly aired anime (e.g., a new season's premieres):
+
+```bash
+# Full refresh — discover new IDs from Jikan, fetch metadata, rebuild all artifacts:
+python scripts/refresh_catalog.py
+
+# Or target a specific season:
+python scripts/refresh_catalog.py --season 2026 winter
+
+# Makefile shortcuts:
+make refresh-all
+make refresh-season YEAR=2026 SEASON=winter
+```
+
+The refresh pipeline runs 7 steps automatically: discover → fetch metadata → build features →
+synopsis TF-IDF → synopsis embeddings → retrain CF models → enrich images. Use `--skip-models`,
+`--skip-synopsis`, or `--skip-images` to skip expensive steps. The steps are described under
+[Transformation Lineage](#transformation-lineage).
+
 ## Quality & Validation Checks
 | Check | Asset | Method | Threshold/Rule |
 |-------|-------|--------|----------------|

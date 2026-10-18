@@ -17,6 +17,7 @@ Start with the [README](../README.md) for the pitch and quick start, then the
 | Page | What it covers |
 |------|----------------|
 | [Scoring pipeline](scoring_pipeline_integration_guide.md) | Candidate generation → shortlist → hybrid reranking → post-processing |
+| [Project structure](project_structure.md) | Directory layout and tech stack |
 | [Features](features.md) | Content, metadata, and CF features |
 | [Decision log](decisions.md) | Why things are the way they are |
 | [UI design](ui_design.md) | Layout, design tokens, imagery, UX backlog |
@@ -27,7 +28,7 @@ Start with the [README](../README.md) for the pitch and quick start, then the
 | Page | What it covers |
 |------|----------------|
 | [Data sources](DATA_SOURCES.md) | Kaggle and Jikan sources, attribution, licensing |
-| [Data catalog](data_catalog.md) | Every dataset, its lineage, and the catalog refresh |
+| [Data catalog](data_catalog.md) | Every dataset, its lineage, and [updating the catalog](data_catalog.md#updating-the-catalog) |
 
 ## Using and running it
 
