@@ -324,7 +324,9 @@ def build_artifact_from_embeddings(
         schema=SYNOPSIS_NEURAL_EMBEDDINGS_SCHEMA,
         created_utc=str(created),
         model_name=str(model_name),
-        model_library_versions=dict(model_library_versions or {}),
+        # Plain str: torch.__version__ is a TorchVersion, and pickling it makes the artifact
+        # unloadable where torch is not installed (the deployed app).
+        model_library_versions={str(k): str(v) for k, v in (model_library_versions or {}).items()},
         text_field="synopsis",
         text_preprocessing=dict(text_preprocessing or {}),
         dim=int(dim),
