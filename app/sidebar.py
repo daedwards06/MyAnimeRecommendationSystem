@@ -235,7 +235,28 @@ def _render_profile_section(metadata) -> None:
     if st.session_state["active_profile"]:
         _render_profile_stats(metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary)
     else:
+        if st.session_state.get("ui_mode") == "Personalized":
+            _render_demo_profile_buttons(available_profiles, load_profile)
         _render_profile_import_cta(metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary)
+
+
+def _render_demo_profile_buttons(available_profiles: list[str], load_profile) -> None:
+    demos = [p for p in (load_profile(u) for u in available_profiles if u.startswith("demo_")) if p and p.get("demo")]
+    if not demos:
+        return
+    st.markdown("**Try a demo profile**")
+    st.caption("Fictional rating histories, so you can see For me without a MAL export.")
+    for demo in demos:
+        if st.button(
+            demo.get("label", demo["username"]),
+            key=f"demo_profile_{demo['username']}",
+            help=demo.get("preference_summary") or None,
+            use_container_width=True,
+        ):
+            st.session_state["active_profile"] = demo
+            st.session_state["personalization_enabled"] = True
+            st.session_state["_personalization_autoset"] = True
+            st.rerun()
 
 
 def _render_profile_stats(metadata, save_profile, load_profile, parse_mal_export, get_mal_export_summary) -> None:
@@ -243,7 +264,11 @@ def _render_profile_stats(metadata, save_profile, load_profile, parse_mal_export
     watched_count = len(profile.get("watched_ids", []))
     avg_rating = profile.get("stats", {}).get("avg_rating", 0)
 
-    st.success(f"**{profile['username']}** · {watched_count} watched")
+    if profile.get("demo"):
+        st.success(f"**{profile.get('label', profile['username'])}** · {watched_count} watched")
+        st.caption(f"Demo profile (read-only). {profile.get('preference_summary', '')}".strip())
+    else:
+        st.success(f"**{profile['username']}** · {watched_count} watched")
 
     ratings_count = len(profile.get("ratings", {}))
     if ratings_count > 0:

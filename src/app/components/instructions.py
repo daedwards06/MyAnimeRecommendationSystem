@@ -8,7 +8,7 @@ import streamlit as st
 
 _MODE_HINTS: dict[str, str] = {
     "Browse": "Pick one or more genres in the sidebar to browse the catalog",
-    "Personalized": "Load a rated profile in the sidebar to rank titles from your ratings",
+    "Personalized": "Load a rated profile, or try a demo profile, in the sidebar to rank titles from ratings",
     "Seed-based": "Pick 1–5 titles you love in the sidebar to find similar anime",
 }
 

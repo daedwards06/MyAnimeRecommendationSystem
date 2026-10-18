@@ -852,19 +852,19 @@ streamlit run app/main.py   # visual: "For me" mode shows two "Try a demo profil
 ```
 
 **Checklist:**
-- [ ] `scripts/build_demo_profiles.py`: for each persona, pick 25–35 titles deterministically
+- [x] `scripts/build_demo_profiles.py`: for each persona, pick 25–35 titles deterministically
       (seed 42) from the persona's `liked_example_ids` plus the most popular in-training titles
       in its `favorite_genres`, assign ratings 7–10 with a fixed pattern, write
       `demo_<slug>_profile.json` in the profile schema with `demo: true`
-- [ ] `.gitignore`: `!data/user_profiles/demo_*_profile.json`
-- [ ] Sidebar: in "For me" mode with no active profile, show the demo buttons above the import
+- [x] `.gitignore`: `!data/user_profiles/demo_*_profile.json`
+- [x] Sidebar: in "For me" mode with no active profile, show the demo buttons above the import
       widget; clicking loads the profile, enables personalization, reruns; a "Demo profile"
       caption stays visible while active
-- [ ] Rating buttons on cards are disabled for demo profiles (they are read-only fixtures)
-- [ ] `docs/user_guide_personalization.md`: "Try it without an export" section first
-- [ ] Tests: generated profiles validate; every rated id is in the MF index (skips if models
+- [x] Rating buttons on cards are disabled for demo profiles (they are read-only fixtures)
+- [x] `docs/user_guide_personalization.md`: "Try it without an export" section first
+- [x] Tests: generated profiles validate; every rated id is in the MF index (skips if models
       absent); demo flag prevents save
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

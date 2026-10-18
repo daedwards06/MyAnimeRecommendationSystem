@@ -37,6 +37,10 @@ def save_profile(username: str, profile_data: dict) -> Path:
     Returns:
         Path to the saved profile file
     """
+    profile_path = PROFILES_DIR / f"{username}_profile.json"
+    if profile_data.get('demo') or is_demo_profile_file(profile_path):
+        raise ValueError(f"'{username}' is a read-only demo profile; import under another name.")
+
     ensure_profiles_dir()
 
     # Build full profile with metadata
@@ -50,9 +54,6 @@ def save_profile(username: str, profile_data: dict) -> Path:
         'stats': profile_data.get('stats', {})
     }
 
-    # Save to file
-    profile_path = PROFILES_DIR / f"{username}_profile.json"
-
     try:
         with open(profile_path, 'w', encoding='utf-8') as f:
             json.dump(full_profile, f, indent=2, ensure_ascii=False)
@@ -63,6 +64,15 @@ def save_profile(username: str, profile_data: dict) -> Path:
     except Exception as e:
         logger.error(f"Failed to save profile for {username}: {e}")
         raise
+
+
+def is_demo_profile_file(profile_path: Path) -> bool:
+    if not profile_path.exists():
+        return False
+    try:
+        return bool(json.loads(profile_path.read_text(encoding='utf-8')).get('demo'))
+    except (OSError, ValueError):
+        return False
 
 
 def load_profile(username: str) -> dict | None:

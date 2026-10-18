@@ -216,6 +216,7 @@ data/raw/animelist_*
 # User Profiles (personal watchlist data - keep private)
 data/user_profiles/*.json
 !data/user_profiles/example_profile.json
+!data/user_profiles/demo_*_profile.json
 
 # Windows shortcuts
 *.lnk

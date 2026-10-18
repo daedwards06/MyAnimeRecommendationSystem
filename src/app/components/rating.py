@@ -89,21 +89,31 @@ def render_quick_rating_buttons(anime_id: int, title: str, current_rating: int |
     if current_rating:
         st.caption(f"Your rating: {current_rating}/10")
 
+    is_demo = bool(profile.get("demo"))
+    if is_demo:
+        st.caption("Demo profiles are read-only; import your own list to rate.")
+
     # Quick rating buttons
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("👍 8", key=f"quick_good_{anime_id}", help="Good (8/10)", use_container_width=True):
+        if st.button(
+            "👍 8", key=f"quick_good_{anime_id}", help="Good (8/10)", use_container_width=True, disabled=is_demo
+        ):
             _save_rating(anime_id, 8, title)
             st.rerun()
 
     with col2:
-        if st.button("❤️ 10", key=f"quick_love_{anime_id}", help="Love it! (10/10)", use_container_width=True):
+        if st.button(
+            "❤️ 10", key=f"quick_love_{anime_id}", help="Love it! (10/10)", use_container_width=True, disabled=is_demo
+        ):
             _save_rating(anime_id, 10, title)
             st.rerun()
 
     with col3:
-        if st.button("👎 4", key=f"quick_meh_{anime_id}", help="Meh (4/10)", use_container_width=True):
+        if st.button(
+            "👎 4", key=f"quick_meh_{anime_id}", help="Meh (4/10)", use_container_width=True, disabled=is_demo
+        ):
             _save_rating(anime_id, 4, title)
             st.rerun()
 
@@ -123,6 +133,10 @@ def _save_rating(anime_id: int, rating: int, title: str) -> None:
     profile = st.session_state.get("active_profile")
     if not profile:
         st.error("No active profile")
+        return
+
+    if profile.get("demo"):
+        st.error("Demo profiles are read-only")
         return
 
     username = profile.get("username")

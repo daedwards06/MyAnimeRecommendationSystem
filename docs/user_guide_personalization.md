@@ -1,5 +1,22 @@
 # User Guide: Personalized Recommendations
 
+## Try It Without an Export
+
+You don't need a MyAnimeList account to see personalization:
+
+1. In the sidebar, choose **For me** under *What do you want?*
+2. Under **Try a demo profile**, click **Action Adventurer** or **Drama Slice-Fan**
+3. Results rerank immediately from that profile's 30 ratings; tick **🎨 View Taste Profile** to
+   see what it learned
+
+The demo profiles are fictional, read-only fixtures (rating buttons on cards are disabled while
+one is active). Each one is the persona's liked examples from `data/samples/personas.json` plus
+popular titles in its favourite genres, all drawn from the collaborative-filtering training set
+so every rating counts. Rebuild them with `python scripts/build_demo_profiles.py`. Choose
+**(none)** in the profile dropdown to switch back.
+
+---
+
 ## Overview
 
 The MARS (My Anime Recommendation System) now includes **personalized collaborative filtering** to generate recommendations tailored to your unique taste profile. Instead of relying solely on seed-based similarity, the system learns from your rating history to predict which anime you'll enjoy most.
