@@ -262,36 +262,36 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `aggregate_phase4_metrics.py`: read `generated_at` (or file mtime) and `users_evaluated`
+- [x] `aggregate_phase4_metrics.py`: read `generated_at` (or file mtime) and `users_evaluated`
       from each JSON; keep the **latest** run per `(model, K, users_evaluated)`; `--cohort`
       flag selects one `users_evaluated` for the output parquet
-- [ ] **Integrity check before any cohort is chosen.** Timestamp dedupe alone would resolve the
+- [x] **Integrity check before any cohort is chosen.** Timestamp dedupe alone would resolve the
       three conflicting `hybrid_weighted@1000` rows silently and hide a real bug: the middle row
       (ndcg 0.041198, map 0.027851) is **bit-identical to `popularity@1000` on both metrics**,
       i.e. either a popularity run written under a hybrid label or a silent fallback to
       popularity. Make the aggregator fail (or loudly warn) when two different models share an
       identical metric vector, and diagnose this instance before re-running
-- [ ] Make the ablation script runnable from the venv: it needs `PYTHONPATH=.` (add a
+- [x] Make the ablation script runnable from the venv: it needs `PYTHONPATH=.` (add a
       `sys.path` bootstrap or run it as `python -m`), and `df.to_markdown()` imports `tabulate`,
       which is declared in no requirements file — the script currently writes the CSV and *then*
       crashes on the Markdown, leaving the two artifacts out of sync
-- [ ] `generate_phase4_ablation.py`: use the real model names; add `users_evaluated` and
+- [x] `generate_phase4_ablation.py`: use the real model names; add `users_evaluated` and
       `gini` columns; add a "vs. MF" lift column next to "vs. popularity"; sort rows by NDCG
-- [ ] `run_unified_eval.py`: pass `--sample-users` through consistently and write the seed and
+- [x] `run_unified_eval.py`: pass `--sample-users` through consistently and write the seed and
       artifact stems (Task 0.3 constants) into every JSON
 - [ ] Re-run at 1,000 users, seed 42, against the app's stems; commit the regenerated
       `phase4_ablation.{csv,md}` and `metrics_by_k.parquet`
-- [ ] README § Results: one table (model, NDCG@10, MAP@10, Coverage@10, Gini@10, lift vs.
+- [x] README § Results: one table (model, NDCG@10, MAP@10, Coverage@10, Gini@10, lift vs.
       popularity), one sentence that says hybrid ≈ MF on accuracy with ~11× the coverage of
       popularity; **move** the synthetic temporal-split table out of the README into
       `reports/phase4_evaluation.md` §6 with its caveat
-- [ ] `docs/MODEL_CARD.md` § Metrics: same table, drop the "treat as draft" note and the
+- [x] `docs/MODEL_CARD.md` § Metrics: same table, drop the "treat as draft" note and the
       duplicate-rows note
-- [ ] `reports/phase4_evaluation.md`: remove the draft banner; §4 embeds the table; §8 tells
+- [x] `reports/phase4_evaluation.md`: remove the draft banner; §4 embeds the table; §8 tells
       the MF-vs-hybrid story explicitly
-- [ ] Tests: `compute_lifts` with a two-baseline-row frame raises or dedupes (not `iloc[0]`);
+- [x] Tests: `compute_lifts` with a two-baseline-row frame raises or dedupes (not `iloc[0]`);
       aggregate dedupe keeps latest
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

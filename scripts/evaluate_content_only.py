@@ -14,6 +14,7 @@ import numpy as np
 from sklearn.preprocessing import normalize
 
 from src.models.constants import DATA_PROCESSED_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS
+from src.eval.eval_artifacts import run_metadata
 from src.eval.splits import build_validation, sample_user_ids
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
@@ -97,6 +98,10 @@ def main(k: int, sample_users: int):
     metrics_emb = _eval("content_embeddings", recs_emb)
     metrics_emb["item_coverage@k"] = item_coverage(recs_emb, total_items)
     metrics_emb["gini_index@k"] = gini_index(recs_emb)
+
+    meta = run_metadata(k=k, sample_users=sample_users)
+    metrics_tfidf.update(meta)
+    metrics_emb.update(meta)
 
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")

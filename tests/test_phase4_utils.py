@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.eval.phase4_utils import compute_lifts, json_safe
 
@@ -17,6 +18,16 @@ def test_compute_lifts_zero_baseline():
     assert pop_row["ndcg_lift_vs_popularity_pct"] is None
     assert mf_row["ndcg_lift_vs_popularity_pct"] is None  # baseline ndcg was zero => None
     assert mf_row["map_lift_vs_popularity_pct"] == ((0.03 - 0.02) / 0.02) * 100
+
+
+def test_compute_lifts_rejects_duplicate_baseline_rows():
+    df = pd.DataFrame([
+        {"model": "popularity", "ndcg": 0.030722, "map": 0.018332},
+        {"model": "popularity", "ndcg": 0.043849, "map": 0.029593},
+        {"model": "mf_sgd", "ndcg": 0.050358, "map": 0.039001},
+    ])
+    with pytest.raises(ValueError, match="2 rows"):
+        compute_lifts(df, baseline_model="popularity", metrics=["ndcg", "map"])
 
 
 def test_json_safe_numpy_scalars():

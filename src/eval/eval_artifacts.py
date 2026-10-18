@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,9 @@ from joblib import dump, load
 from src.models.constants import (
     EVAL_ARTIFACTS_DIR,
     KNN_EVAL_ARTIFACT,
+    KNN_MODEL_STEM,
     MF_EVAL_ARTIFACT,
+    MF_MODEL_STEM,
     RANDOM_SEED,
 )
 from src.models.knn_sklearn import ItemKNNRecommender
@@ -129,3 +132,19 @@ def load_eval_models(
             _save(mf_model, mf_path, fingerprint)
 
     return knn_model, mf_model
+
+
+def run_metadata(*, k: int, sample_users: int, generated_at: str | None = None) -> dict[str, Any]:
+    """Provenance stamped into every metrics JSON so a row can be traced to its run.
+
+    `artifacts` names the train-split models evaluation actually scores; `served_stems`
+    names the full-fit artifacts the app serves, which are deliberately not the same.
+    """
+    return {
+        "seed": RANDOM_SEED,
+        "k": k,
+        "sample_users": sample_users,
+        "generated_at": generated_at or datetime.now(UTC).isoformat(timespec="seconds"),
+        "artifacts": {"mf": MF_EVAL_ARTIFACT, "knn": KNN_EVAL_ARTIFACT},
+        "served_stems": {"mf": MF_MODEL_STEM, "knn": KNN_MODEL_STEM},
+    }

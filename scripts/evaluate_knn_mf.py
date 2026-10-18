@@ -23,7 +23,7 @@ import pandas as pd
 
 from src.models.constants import DATA_PROCESSED_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS
 from src.eval.splits import build_validation, sample_user_ids
-from src.eval.eval_artifacts import load_eval_models
+from src.eval.eval_artifacts import load_eval_models, run_metadata
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
 
@@ -79,6 +79,10 @@ def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS):
     metrics_mf = evaluate("mf_sgd", mf_recs, val_hist, k)
     metrics_mf["item_coverage@k"] = item_coverage(mf_recs, total_items)
     metrics_mf["gini_index@k"] = gini_index(mf_recs)
+
+    meta = run_metadata(k=k, sample_users=sample_users)
+    metrics_knn.update(meta)
+    metrics_mf.update(meta)
 
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")

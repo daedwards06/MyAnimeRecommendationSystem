@@ -5,6 +5,49 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-09-16 — The evaluation table is one cohort from one run; metric collisions fail the build
+
+**Status:** Adopted
+
+**Context.** The published ablation (`reports/phase4_ablation.{csv,md}`) was ten rows all labeled
+`popularity`, spanning three different cohort sizes, and the README's headline `+43% NDCG / +61%
+MAP` was popularity@500 measured against popularity@300 — the baseline against itself. Three
+faults compounded: `aggregate_phase4_metrics.py` only read a `metrics_by_k` array that no file in
+`experiments/metrics/` has ever contained, so it could not run at all and the committed parquet
+came from some other route with no dedupe; `generate_phase4_ablation.py` filtered on the model
+names `mf` and `hybrid`, which do not exist (`mf_sgd` and `hybrid_weighted` do), dropping every
+CF row; and `compute_lifts` took `iloc[0]` as the baseline, silently picking one of the duplicate
+`popularity` rows.
+
+The parquet also held three conflicting `hybrid_weighted@1000` rows, one of them bit-identical to
+`popularity@1000` on NDCG and MAP. **That is not a mislabeled run or a silent fallback.** The
+three rows are three different weight vectors written under one model label:
+`{mf 0.309, knn 0.022, pop 0.6}`, `{mf 0.0004, knn 0.039, pop 0.4}`, and the shipped
+`DEFAULT_HYBRID_WEIGHTS`. In the second, the MF weight is effectively zero and popularity
+dominates, so the blend degenerates to a popularity ranking — the top-10s coincide and the
+metrics match, with Gini differing only in the fifth decimal. The defect is that the parquet
+recorded no run configuration, so three experiments were indistinguishable after the fact.
+
+**Decision.** Every published number comes from one cohort of one run. `aggregate_phase4_metrics.py`
+reads the flat schema the eval scripts actually emit, keeps the latest run per
+`(model, K, users_evaluated)`, carries `seed`, `generated_at` and `source` into the parquet, and
+takes `--cohort` to select a single `users_evaluated`. `generate_phase4_ablation.py` refuses a
+frame spanning more than one cohort, and `compute_lifts` raises rather than choosing among
+duplicate baseline rows. Two differently-labeled models sharing an identical `(ndcg, map)` pair
+in one cohort fails the aggregator, overridable with `--allow-metric-collisions` once understood.
+
+**Why.** Each guard is placed where the specific published error would have been caught. A
+degenerate blend that scores exactly like popularity is worth stopping on even when explainable:
+it means a weight vector is doing nothing, which is a result, not a rounding artifact.
+
+**What would change this.** A deliberate multi-cohort study (a sample-size sensitivity curve, for
+example) would need the ablation's single-cohort rule relaxed to an explicit "compare within
+cohort" grouping rather than an error. Recording the weight vector as a parquet column would let
+several hybrid configurations coexist under one label, which is the cleaner fix if hybrid weight
+variants ever need to appear in the same table.
+
+---
+
 ## 2026-09-16 — One CF trainer; offline evaluation gets its own train-split artifacts
 
 **Status:** Adopted

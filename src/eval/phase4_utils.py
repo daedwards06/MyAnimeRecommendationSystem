@@ -17,6 +17,13 @@ def compute_lifts(df: pd.DataFrame, baseline_model: str, metrics: Iterable[str])
     base_row = df[df["model"] == baseline_model]
     if base_row.empty:
         raise ValueError(f"Baseline model '{baseline_model}' not found in DataFrame")
+    if len(base_row) > 1:
+        # Silently taking the first row is how a baseline was once compared against itself at a
+        # different cohort size and published as a hybrid lift.
+        raise ValueError(
+            f"Baseline model '{baseline_model}' has {len(base_row)} rows; deduplicate to one "
+            "row before computing lifts."
+        )
     base = base_row.iloc[0]
     out_rows = []
     for _, row in df.iterrows():

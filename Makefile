@@ -57,7 +57,11 @@ fmt-check:
 	ruff format --check src/ tests/
 
 # Regenerate Phase 4 evaluation artifacts (metrics curves, ablation, explanations, diversity/novelty)
+# EVAL_COHORT must match the --sample-users of the run_unified_eval.py run that produced the metrics JSON.
+EVAL_COHORT ?= 1000
+
 phase4-artifacts:
+	. .venv/Scripts/activate && python scripts/aggregate_phase4_metrics.py --cohort $(EVAL_COHORT)
 	. .venv/Scripts/activate && python scripts/plot_phase4_metrics.py --metrics-path data/processed/phase4/metrics_by_k.parquet || echo "(Skip if metrics_by_k not yet built)"
 	. .venv/Scripts/activate && python scripts/generate_phase4_ablation.py
 	. .venv/Scripts/activate && python scripts/explain_hybrid_examples.py --k 10 --sample-users 500 --max-users 3

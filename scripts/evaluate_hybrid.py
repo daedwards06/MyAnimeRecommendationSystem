@@ -19,7 +19,7 @@ from src.models.constants import (
     DEFAULT_HYBRID_WEIGHTS,
 )
 from src.eval.splits import build_validation, sample_user_ids
-from src.eval.eval_artifacts import load_eval_models
+from src.eval.eval_artifacts import load_eval_models, run_metadata
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.models.hybrid import weighted_blend, reciprocal_rank_fusion
 from src.models.baselines import popularity_scores
@@ -156,6 +156,10 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
     metrics_rrf = _evaluate("hybrid_rrf", recs_rrf, val_hist, k)
     metrics_rrf["item_coverage@k"] = item_coverage(recs_rrf, total_items)
     metrics_rrf["gini_index@k"] = gini_index(recs_rrf)
+
+    meta = run_metadata(k=k, sample_users=sample_users)
+    for m in (metrics_knn, metrics_mf, metrics_pop, metrics_blend, metrics_rrf):
+        m.update(meta)
 
     # Write artifacts
     METRICS_DIR.mkdir(parents=True, exist_ok=True)

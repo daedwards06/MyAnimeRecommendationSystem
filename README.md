@@ -25,34 +25,40 @@ A **hybrid recommendation engine** that combines collaborative filtering, conten
 
 ## Results
 
-All evaluations rank over the **full 13K-item catalog** (no pre-filtered shortlist), seeded (`seed=42`) for reproducibility. See [`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) and the [model card](docs/MODEL_CARD.md#metrics) for protocol details, cold-start analysis, and caveats.
+All evaluations rank over the **full 13K-item catalog** (no pre-filtered shortlist), from a single
+run: 1,000 sampled users, `seed=42`, K=10. Collaborative-filtering models are fit on the **train
+split only** — the artifacts the app serves are fit on every interaction, including the held-out
+rows, so scoring them offline measures leakage rather than quality. See
+[`reports/phase4_evaluation.md`](reports/phase4_evaluation.md) and the
+[model card](docs/MODEL_CARD.md#metrics) for protocol, caveats, and the full narrative.
 
-### Ablation — lift over baseline (K=10)
+### Ablation (K=10, 1,000 users, seed 42)
 
-The headline result: the hybrid model delivers a **+43% NDCG** and **+61% MAP** lift over a popularity-only baseline.
+| Model | NDCG@10 | MAP@10 | Coverage@10 | Gini@10 | NDCG vs. popularity |
+|:---|---:|---:|---:|---:|---:|
+| **Item-kNN** | **0.0628** | **0.0513** | 0.1160 | 0.7280 | **+81%** |
+| Hybrid (RRF rank fusion) | 0.0586 | 0.0456 | 0.0784 | 0.8253 | +69% |
+| Popularity baseline | 0.0347 | 0.0255 | 0.0056 | 0.7175 | (baseline) |
+| MF (FunkSVD) | 0.0326 | 0.0266 | 0.0668 | 0.7875 | −6% |
+| Hybrid (weighted, shipped) | 0.0324 | 0.0249 | 0.0615 | 0.7993 | −7% |
+| Content-only (TF-IDF) | 0.0211 | 0.0166 | 0.1711 | 0.6334 | −39% |
+| Content-only (embeddings) | 0.0101 | 0.0069 | 0.0588 | 0.8620 | −71% |
 
-| Variant | NDCG@10 | MAP@10 | vs. Popularity |
-|---------|---------|--------|----------------|
-| **Hybrid (MF + kNN + content)** | **0.044** | **0.030** | **+43% NDCG · +61% MAP** |
-| Popularity baseline | 0.031 | 0.018 | (baseline) |
-| Content-only (TF-IDF) | 0.025 | 0.021 | — |
+The shipped weighted hybrid is 93% MF, and it performs like MF: the two are within 0.6% of each
+other on NDCG, both sit near the popularity baseline on accuracy, and the hybrid's real gain is
+**10.9× popularity's catalog coverage**. Item-kNN alone beats both by a wide margin — its weight in
+the blend is 6.6%, set by a sweep run under an earlier evaluation that structurally prevented kNN
+from scoring at all. Re-tuning the blend against the corrected protocol is the top open item, and
+is tracked rather than quietly applied; the table above is what the code does today, not what it
+could do.
 
-### Temporal split (heuristic robustness check)
+Reproduce with:
 
-| Metric | @5 | @10 | @20 |
-|--------|-----|------|------|
-| NDCG | 0.440 | 0.438 | 0.445 |
-| MAP | 0.153 | 0.090 | 0.074 |
-
-> **Caveat:** this split approximates chronological order from *synthetic* timestamps (no real interaction dates in the snapshot), so these values may be inflated by ordering artifacts. Treat them as a heuristic robustness check, not a headline accuracy claim — the ablation lift above is the more defensible comparison.
-
-### Beyond-accuracy (@10)
-
-| Coverage | Gini |
-|----------|------|
-| 0.18% | 0.50 |
-
-Low top-10 coverage reflects real popularity concentration — a known limitation tracked in the model card.
+```bash
+python scripts/run_unified_eval.py --k 10 --sample-users 1000
+python scripts/aggregate_phase4_metrics.py --cohort 1000
+python scripts/generate_phase4_ablation.py
+```
 
 ## Architecture
 
