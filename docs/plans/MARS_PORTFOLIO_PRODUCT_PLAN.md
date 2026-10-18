@@ -1023,7 +1023,8 @@ ruff check src/ tests/ app/
 - [x] README note under the badge: says the demo is kept awake and what to expect if it is
       ever found asleep, using a measured figure only — *~11 s warm (measured); the wake is
       described as "takes longer" with no number, since none is measured*
-- [ ] Owner action: run the workflow once by hand and confirm it is green
+- [x] Owner action: run the workflow once by hand and confirm it is green — *green on
+      2026-10-18: first card 9.8 s, `was_asleep` no*
 - [x] Tests + ruff green
 
 ---

@@ -401,7 +401,8 @@ job records a cold reading whenever it finds the app asleep (see
 
 The same detector, run locally with `scripts/check_live_app.py` on the awake app, read 10.1,
 10.5 and 12.6 s (Playwright's Chromium and Edge, 2026-10-18), in line with the warm row. A
-fourth run, the first after installing the browser, read 20.8 s and is not counted.
+fourth run, the first after installing the browser, read 20.8 s and is not counted. The first
+manual run of the workflow on GitHub's runner read 9.8 s (app awake).
 
 Locally (Windows, Python 3.12, same machine as the deployed-app timings), `streamlit run` takes
 28.5 s to the first card on a fresh server and 8.7 s on the next session. The difference is the
