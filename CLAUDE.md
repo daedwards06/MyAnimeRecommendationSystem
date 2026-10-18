@@ -70,10 +70,10 @@ this protocol exactly:
   (git-ignored); `scripts/aggregate_phase4_metrics.py` builds
   `data/processed/phase4/metrics_by_k.parquet`; `scripts/generate_phase4_ablation.py` writes
   `reports/phase4_ablation.{csv,md}`.
-- **Tests:** 246 tests in `tests/`, run with `APP_IMPORT_LIGHT=1` so the app entrypoint imports
+- **Tests:** ~290 tests in `tests/`, run with `APP_IMPORT_LIGHT=1` so the app entrypoint imports
   without loading model artifacts. Must stay green after every task.
-- **Lint:** `ruff check src/ tests/` (the CI scope) must stay at 0 errors. `app/` has 1 error
-  and `scripts/` has ~394; widening the scope is a plan task, not a side effect.
+- **Lint:** `ruff check src/ tests/ app/` (the CI scope) must stay at 0 errors. `scripts/` has ~394
+  errors; widening the scope is a plan task, not a side effect.
 - **Deployed app:** Streamlit Community Cloud, link in the README badge. Model artifacts are
   Git LFS (`models/*.joblib`); processed parquets are committed under `data/processed/`.
 
@@ -102,7 +102,7 @@ this protocol exactly:
 $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 
 # Lint (CI scope)
-ruff check src/ tests/
+ruff check src/ tests/ app/
 
 # Run the app
 streamlit run app/main.py
@@ -112,7 +112,7 @@ Equivalent from the Bash tool (no activation needed):
 
 ```bash
 APP_IMPORT_LIGHT=1 .venv/Scripts/python.exe -m pytest -q -x
-ruff check src/ tests/
+ruff check src/ tests/ app/
 ```
 
 ## Conventions

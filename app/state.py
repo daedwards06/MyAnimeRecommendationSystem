@@ -13,7 +13,6 @@ import streamlit as st
 
 from src.app.constants import DEFAULT_TOP_N
 
-
 # ── Query-param helpers ──────────────────────────────────────────────────────
 
 

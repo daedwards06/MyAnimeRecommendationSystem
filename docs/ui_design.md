@@ -118,5 +118,28 @@ Store persona, weight mode, top-N, collapsed state of drawer under `st.session_s
 - Coverage & genre exposure accessible via one click (drawer) with keyboard focus.
 - Zero contrast ratio violations (AA) in color audit.
 
+## Backlog
+Open ideas carried over from an early UX review (the archived `UX_Suggestions.md`). Already
+shipped from that list: genre/type/year filters, sort options, reset filters, MAL score /
+episodes / studios on cards, grid view, clickable genre chips, "more like this", multi-seed
+blending, and quick ratings.
+
+- **Empty state:** when filters leave no results, suggest which filter to relax instead of only
+  warning.
+- **Session history:** previously viewed recommendations in the sidebar.
+- **Share / export:** copy the list, or a URL with the seeds and filters as query params (see
+  Session Persistence).
+- **Comparison mode:** pick 2–3 titles and compare them side by side.
+- **Watch-time estimate:** episodes × typical episode length, shown on the card.
+- **MAL link** on each card.
+- **Latency indicator:** the pipeline is instrumented but the timing is not shown.
+- **Onboarding:** something on screen on first load (a trending row or a pre-run example seed),
+  plus an optional short walkthrough.
+- **Accessibility:** keyboard navigation through cards, ARIA labels on badges/icons, a
+  high-contrast option.
+
+Not carried over: a "match percentage". Scores are relative and uncalibrated
+(`src/app/score_semantics.py`), so a percentage would overstate them.
+
 ---
 Last Updated: 2025-11-22

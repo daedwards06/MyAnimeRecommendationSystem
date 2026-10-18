@@ -28,7 +28,7 @@ ci:
 	. .venv/Scripts/activate && APP_IMPORT_LIGHT=1 pytest -x -q --tb=short
 
 app:
-	. .venv/Scripts/activate && streamlit run app/app.py
+	. .venv/Scripts/activate && streamlit run app/main.py
 
 fetch-jikan:
 	. .venv/Scripts/activate && python scripts/fetch_jikan.py --ids 1 20 1735 --snapshot-suffix $$(date +%Y%m)
@@ -48,13 +48,13 @@ refresh-season:
 	. .venv/Scripts/activate && python scripts/refresh_catalog.py --season $(YEAR) $(SEASON)
 
 lint:
-	ruff check src/ tests/
+	ruff check src/ tests/ app/
 
 fmt:
-	ruff format src/ tests/
+	ruff format src/ tests/ app/
 
 fmt-check:
-	ruff format --check src/ tests/
+	ruff format --check src/ tests/ app/
 
 # Regenerate Phase 4 evaluation artifacts (metrics curves, ablation, explanations, diversity/novelty)
 # EVAL_COHORT must match the --sample-users of the run_unified_eval.py run that produced the metrics JSON.

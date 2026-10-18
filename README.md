@@ -6,7 +6,7 @@
 
 > The live demo sleeps after a period of inactivity; the first load wakes it and takes ~10–20 seconds.
 
-A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and 246 automated tests.
+A **hybrid recommendation engine** that combines collaborative filtering, content-based similarity, and neural embeddings to recommend anime from a catalog of 13,000+ titles. Built with a three-stage scoring pipeline (candidate generation → shortlist → reranking), a Streamlit UI with explainable results, and ~290 automated tests.
 
 <!-- To update: run the app (streamlit run app/main.py), search for a popular title, take a screenshot, save to app/assets/demo_screenshot.png -->
 ![MARS Demo](app/assets/demo_screenshot.png)
@@ -161,7 +161,7 @@ The refresh pipeline runs 7 steps automatically: discover → fetch metadata →
 │   ├── discover_new_ids.py      # Find new MAL IDs missing from catalog
 │   ├── build_features.py        # Feature engineering orchestrator
 │   └── save_artifacts.py        # Retrain CF models (--split full serves, --split train evaluates)
-├── tests/                       # 246 tests across 23 files
+├── tests/                       # ~290 tests
 ├── reports/                     # Evaluation reports, ablation studies
 ├── models/                      # Trained model artifacts (.joblib, gitignored)
 └── data/                        # Processed parquets + samples tracked; image & Jikan caches gitignored

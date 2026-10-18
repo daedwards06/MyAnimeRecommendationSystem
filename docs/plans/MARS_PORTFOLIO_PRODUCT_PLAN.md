@@ -339,10 +339,10 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 ```
 
 **Checklist:**
-- [ ] `Makefile`: `app:` runs `app/main.py`; `lint:` and `fmt-check:` include `app/`
-- [ ] Fix the one ruff error in `app/`; add `app/` to the CI lint line; leave `scripts/` out
+- [x] `Makefile`: `app:` runs `app/main.py`; `lint:` and `fmt-check:` include `app/`
+- [x] Fix the one ruff error in `app/`; add `app/` to the CI lint line; leave `scripts/` out
       (394 errors, its own item in Phase 3)
-- [ ] Move `scripts/test_*.py` to `scripts/archive/` (git-ignored) or delete; any that contain
+- [x] Move `scripts/test_*.py` to `scripts/archive/` (git-ignored) or delete; any that contain
       real assertions become tests under `tests/`. Five of the seven read personal or
       now-untracked data - `test_explanations.py`, `test_mal_parser.py`,
       `test_personalized_integration.py`, `test_profile_loading.py`, `test_user_embedding.py`
@@ -350,14 +350,14 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
       exists in a fresh clone since Task 0.2. Anything promoted to `tests/` must build a
       synthetic fixture instead of reading the owner's export. (`test_mal_parser.py` has no
       assertions at all - it prints a parse of a hardcoded personal XML; archive it.)
-- [ ] `git rm -r --cached app/assets/archive`; fold the still-useful ideas from
+- [x] `git rm -r --cached app/assets/archive`; fold the still-useful ideas from
       `UX_Suggestions.md` into `docs/ui_design.md` § Backlog before removing it
-- [ ] `docs/index.md`: replace the placeholder with a one-screen table of contents linking
+- [x] `docs/index.md`: replace the placeholder with a one-screen table of contents linking
       every doc and report (it becomes the write-up landing page in Task 2.5)
-- [ ] Stale test counts: README (pitch paragraph and project tree) and `CLAUDE.md` say 246
+- [x] Stale test counts: README (pitch paragraph and project tree) and `CLAUDE.md` say 246
       tests; use the count from this task's own green run. Prefer wording that does not go stale
       (e.g. "~290 tests") over an exact number
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

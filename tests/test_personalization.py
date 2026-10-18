@@ -139,6 +139,29 @@ class TestPersonalizedRankingIntegration:
         assert recs_a[0]["anime_id"] == 0
         assert recs_b[0]["anime_id"] == 1
 
+    def test_exclusions_respected_and_n_filled(self, mock_mf_model, sample_ratings):
+        rng = np.random.default_rng(0)
+        components = HybridComponents(
+            mf=None,
+            knn=None,
+            pop=rng.random(100).astype(np.float32),
+            item_ids=np.arange(100),
+        )
+        recommender = HybridRecommender(components)
+        embedding = generate_user_embedding(sample_ratings, mock_mf_model, method="weighted_average", normalize=True)
+        excluded = [0, 1, 2, 3, 4]
+
+        recs = recommender.get_personalized_recommendations(
+            user_embedding=embedding,
+            mf_model=mock_mf_model,
+            n=10,
+            weights={"mf": 0.7, "pop": 0.3},
+            exclude_item_ids=excluded,
+        )
+
+        assert len(recs) == 10
+        assert not set(excluded) & {rec["anime_id"] for rec in recs}
+
     def test_missing_items_handled(self, mock_mf_model):
         """Test that items not in model are gracefully skipped."""
         ratings_with_missing = {0: 10, 1: 9, 999: 8}  # 999 not in model
