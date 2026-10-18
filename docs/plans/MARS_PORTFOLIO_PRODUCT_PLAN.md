@@ -660,17 +660,17 @@ streamlit run app/main.py   # visual: Search is the first sidebar control; Advan
 ```
 
 **Checklist:**
-- [ ] New order: **Find** (mode as three plain labels "Similar to a title / For me / Browse",
+- [x] New order: **Find** (mode as three plain labels "Similar to a title / For me / Browse",
       then the title multiselect) → **Refine** (genre, type, year, top-N, sort) → **Personalize**
       (expander: profile + import + strength; auto-expanded only in "For me" mode) → **Advanced**
       (expander: hybrid weights, MMR toggle + strength, seed goal, reload artifacts, performance)
-- [ ] Mode radio keeps the internal values `Seed-based | Personalized | Browse` so
+- [x] Mode radio keeps the internal values `Seed-based | Personalized | Browse` so
       `pipeline_runner`, state, and tests are untouched; only labels change
-- [ ] `SidebarResult` fields and session-state keys unchanged; query params still round-trip
-- [ ] Sample-seed buttons (currently under the seed indicator) move directly under the
+- [x] `SidebarResult` fields and session-state keys unchanged; query params still round-trip
+- [x] Sample-seed buttons (currently under the seed indicator) move directly under the
       multiselect as "Try: Steins;Gate · Your Name · Cowboy Bebop"
-- [ ] Tests: label ↔ internal mode mapping; existing `test_app_helpers` unchanged
-- [ ] Tests + ruff green
+- [x] Tests: label ↔ internal mode mapping; existing `test_app_helpers` unchanged
+- [x] Tests + ruff green
 
 ---
 
