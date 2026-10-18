@@ -88,6 +88,7 @@ def main(k: int, sample_users: int):
             "users_evaluated": len(recs),
             "ndcg@k_mean": float(sum(ndcgs) / max(1, len(ndcgs))),
             "map@k_mean": float(sum(maps) / max(1, len(maps))),
+            "per_user": {"user_id": [int(u) for u in recs], "ndcg": ndcgs, "map": maps},
         }
 
     total_items = int(interactions["anime_id"].nunique())
@@ -109,9 +110,9 @@ def main(k: int, sample_users: int):
     (METRICS_DIR / f"content_embeddings_{ts}.json").write_text(json.dumps(metrics_emb, indent=2))
 
     out_csv = METRICS_DIR / "summary.csv"
-    pd.DataFrame([metrics_tfidf, metrics_emb]).to_csv(out_csv, mode="a", header=not out_csv.exists(), index=False)
+    pd.DataFrame([metrics_tfidf, metrics_emb]).drop(columns="per_user").to_csv(out_csv, mode="a", header=not out_csv.exists(), index=False)
 
-    print(json.dumps({"tfidf": metrics_tfidf, "embeddings": metrics_emb}, indent=2))
+    print(json.dumps({m["model"]: {k: v for k, v in m.items() if k != "per_user"} for m in (metrics_tfidf, metrics_emb)}, indent=2))
 
 
 if __name__ == "__main__":

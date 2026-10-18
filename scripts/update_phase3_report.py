@@ -12,7 +12,8 @@ from src.models.constants import METRICS_DIR
 
 
 def _latest_json(prefix: str) -> Path | None:
-    files = sorted(METRICS_DIR.glob(f"{prefix}_*.json"))
+    # The digit anchors the timestamp suffix, so "hybrid_weighted" does not also match "hybrid_weighted_tuned".
+    files = sorted(METRICS_DIR.glob(f"{prefix}_[0-9]*.json"))
     return files[-1] if files else None
 
 

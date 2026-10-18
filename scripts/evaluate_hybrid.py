@@ -14,16 +14,31 @@ import numpy as np
 from src.models.constants import (
     DATA_PROCESSED_DIR,
     METRICS_DIR,
+    OPTUNA_DIR,
     TOP_K_DEFAULT,
     DEFAULT_SAMPLE_USERS,
     DEFAULT_HYBRID_WEIGHTS,
 )
-from src.eval.splits import build_validation, sample_user_ids
+from src.eval.splits import build_validation, reporting_and_tuning_users
 from src.eval.eval_artifacts import load_eval_models, run_metadata
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.models.hybrid import weighted_blend, reciprocal_rank_fusion
 from src.models.baselines import popularity_scores
 from src.eval.metrics_extra import item_coverage, gini_index
+
+
+# The blend served before Task 0.6, tuned while item-kNN could not score. Kept as an ablation
+# row so the effect of the re-tune stays visible.
+LEGACY_HYBRID_WEIGHTS = {"mf": 0.9307796791956574, "knn": 0.06624663364738044, "pop": 0.0029736871569621902}
+
+
+def _tuned_weights(path: Path) -> dict[str, float] | None:
+    """Normalized weights from the latest Optuna sweep, or None if no sweep has run."""
+    try:
+        w = json.loads(path.read_text(encoding="utf-8"))["weights_normalized"]
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+    return {"mf": float(w["w_mf"]), "knn": float(w["w_knn"]), "pop": float(w["w_pop"])}
 
 
 def _build_validation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -56,13 +71,14 @@ def _evaluate(model_name: str, recommendations: dict[int, list[int]], relevant: 
         "users_evaluated": len(recommendations),
         "ndcg@k_mean": float(sum(ndcgs) / max(1, len(ndcgs))),
         "map@k_mean": float(sum(maps) / max(1, len(maps))),
+        "per_user": {"user_id": [int(u) for u in recommendations], "ndcg": ndcgs, "map": maps},
     }
 
 
 def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, save_examples: int = 2):
     interactions = pd.read_parquet(DATA_PROCESSED_DIR / "interactions.parquet")
     train_df, val_df = _build_validation(interactions)
-    users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
+    users, _ = reporting_and_tuning_users(val_df["user_id"].unique().tolist(), sample_users, 0)
 
     # Train-split artifacts: the served models in models/ trained on the val rows.
     knn_model, mf_model = load_eval_models(train_df)
@@ -77,7 +93,13 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
     recs_knn: dict[int, list[int]] = {}
     recs_mf: dict[int, list[int]] = {}
     recs_pop: dict[int, list[int]] = {}
-    recs_blend: dict[int, list[int]] = {}
+    blend_variants = {"hybrid_weighted": {"mf": w_mf, "knn": w_knn, "pop": w_pop}}
+    if blend_variants["hybrid_weighted"] != LEGACY_HYBRID_WEIGHTS:
+        blend_variants["hybrid_weighted_legacy"] = LEGACY_HYBRID_WEIGHTS
+    tuned = _tuned_weights(OPTUNA_DIR / "hybrid_weights_best.json")
+    if tuned is not None and tuned not in blend_variants.values():
+        blend_variants["hybrid_weighted_tuned"] = tuned
+    recs_blend: dict[str, dict[int, list[int]]] = {name: {} for name in blend_variants}
     recs_rrf: dict[int, list[int]] = {}
 
     examples: dict[str, dict] = {}
@@ -113,8 +135,8 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
             "knn": knn_scores,
             "pop": pop_scores,
         }
-        weights = {"mf": w_mf, "knn": w_knn, "pop": w_pop}
-        recs_blend[u] = weighted_blend(sources, weights, top_k=k)
+        for name, weights in blend_variants.items():
+            recs_blend[name][u] = weighted_blend(sources, weights, top_k=k)
 
         # RRF (rank fusion)
         rankings = {
@@ -130,7 +152,7 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
                 "knn": recs_knn[u][:5],
                 "mf": recs_mf[u][:5],
                 "pop": recs_pop[u][:5],
-                "blend": recs_blend[u][:5],
+                "blend": recs_blend["hybrid_weighted"][u][:5],
                 "rrf": recs_rrf[u][:5],
             }
 
@@ -148,17 +170,20 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
     metrics_pop["item_coverage@k"] = item_coverage(recs_pop, total_items)
     metrics_pop["gini_index@k"] = gini_index(recs_pop)
 
-    metrics_blend = _evaluate("hybrid_weighted", recs_blend, val_hist, k)
-    metrics_blend["item_coverage@k"] = item_coverage(recs_blend, total_items)
-    metrics_blend["gini_index@k"] = gini_index(recs_blend)
-    # Attach weights metadata for traceability
-    metrics_blend["weights"] = {"mf": w_mf, "knn": w_knn, "pop": w_pop}
+    metrics_blends = []
+    for name, weights in blend_variants.items():
+        m = _evaluate(name, recs_blend[name], val_hist, k)
+        m["item_coverage@k"] = item_coverage(recs_blend[name], total_items)
+        m["gini_index@k"] = gini_index(recs_blend[name])
+        m["weights"] = weights
+        metrics_blends.append(m)
     metrics_rrf = _evaluate("hybrid_rrf", recs_rrf, val_hist, k)
     metrics_rrf["item_coverage@k"] = item_coverage(recs_rrf, total_items)
     metrics_rrf["gini_index@k"] = gini_index(recs_rrf)
 
     meta = run_metadata(k=k, sample_users=sample_users)
-    for m in (metrics_knn, metrics_mf, metrics_pop, metrics_blend, metrics_rrf):
+    all_metrics = [metrics_knn, metrics_mf, metrics_pop, *metrics_blends, metrics_rrf]
+    for m in all_metrics:
         m.update(meta)
 
     # Write artifacts
@@ -170,23 +195,21 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
     _write(metrics_knn, "item_knn_sklearn")
     _write(metrics_mf, "mf_sgd")
     _write(metrics_pop, "popularity_baseline")
-    _write(metrics_blend, "hybrid_weighted")
+    for m in metrics_blends:
+        _write(m, m["model"])
     _write(metrics_rrf, "hybrid_rrf")
     _write(examples, "hybrid_examples")
 
     # Append combined CSV rows
     out_csv = METRICS_DIR / "summary.csv"
-    pd.DataFrame([metrics_knn, metrics_mf, metrics_pop, metrics_blend, metrics_rrf]).to_csv(
+    pd.DataFrame(all_metrics).drop(columns="per_user").to_csv(
         out_csv, mode="a", header=not out_csv.exists(), index=False
     )
 
-    print(json.dumps({
-        "knn": metrics_knn,
-        "mf": metrics_mf,
-        "pop": metrics_pop,
-        "blend": metrics_blend,
-        "rrf": metrics_rrf
-    }, indent=2, default=_json_default))
+    print(json.dumps(
+        {m["model"]: {key: v for key, v in m.items() if key != "per_user"} for m in all_metrics},
+        indent=2, default=_json_default,
+    ))
 
 
 if __name__ == "__main__":

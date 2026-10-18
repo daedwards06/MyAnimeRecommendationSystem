@@ -1,13 +1,29 @@
 {
-  "best_value": 0.06286918385303653,
+  "best_value": 0.08669060285586577,
   "best_params": {
-    "w_mf": 0.7662911593892667,
-    "w_knn": 0.05453944777474683,
-    "w_pop": 0.00244817353676941
+    "w_mf": 0.03763061607385706,
+    "w_knn": 0.7542376818867658,
+    "w_pop": 0.0002435130783121527
   },
   "weights_normalized": {
-    "w_mf": 0.9307796791956574,
-    "w_knn": 0.06624663364738044,
-    "w_pop": 0.0029736871569621902
-  }
+    "w_mf": 0.047506697349330884,
+    "w_knn": 0.9521858800432561,
+    "w_pop": 0.0003074226074129113
+  },
+  "tuning_metrics": {
+    "ndcg": 0.08669060285586577,
+    "coverage": 0.11035714285714286,
+    "gini": 0.7595438511326861
+  },
+  "objective": {
+    "diversity_metric": "none",
+    "lambda_diversity": 0.0,
+    "pop_cap": null
+  },
+  "n_trials": 100,
+  "k": 10,
+  "tuning_users": 1000,
+  "reporting_cohort_users": 1000,
+  "tuning_reporting_overlap": 0,
+  "seed": 42
 }

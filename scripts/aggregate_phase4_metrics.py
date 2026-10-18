@@ -20,7 +20,11 @@ The directory accumulates every run ever made, so rows are deduplicated: the lat
 single `users_evaluated`, because mixing cohorts in one table produces comparisons between runs
 that sampled different users.
 
-Outputs: `data/processed/phase4/metrics_by_k.parquet`
+Runs that carry a `per_user` block ({"user_id": [...], "ndcg": [...], "map": [...]}) also feed a
+long table, one row per (model, user), which the ablation resamples for its bootstrap intervals.
+
+Outputs: `data/processed/phase4/metrics_by_k.parquet`,
+`data/processed/phase4/per_user_metrics.parquet`
 
 Usage:
     python scripts/aggregate_phase4_metrics.py --cohort 1000
@@ -45,6 +49,7 @@ OUTPUT_COLUMNS = [
     "model", "K", "ndcg", "map", "coverage", "gini",
     "users_evaluated", "seed", "generated_at", "source",
 ]
+PER_USER_COLUMNS = ["model", "K", "users_evaluated", "user_id", "ndcg", "map"]
 _FILENAME_TS = re.compile(r"_(\d{14})$")
 
 
@@ -89,6 +94,7 @@ def extract_rows(obj: Dict[str, Any], path: Path) -> List[Dict[str, Any]]:
         "seed": obj.get("seed"),
         "generated_at": generated_at,
         "source": path.name,
+        "per_user": obj.get("per_user"),
     }
 
     per_k = obj.get("metrics_by_k")
@@ -113,6 +119,26 @@ def dedupe_latest(df: pd.DataFrame) -> pd.DataFrame:
     """Keep the most recent run per (model, K, users_evaluated)."""
     ordered = df.sort_values("generated_at")
     return ordered.drop_duplicates(subset=["model", "K", "users_evaluated"], keep="last")
+
+
+def explode_per_user(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per (model, user) from the runs that recorded per-user vectors."""
+    frames = []
+    for row in df.itertuples(index=False):
+        block = getattr(row, "per_user", None)
+        if not isinstance(block, dict) or not block.get("user_id"):
+            continue
+        frames.append(pd.DataFrame({
+            "model": row.model,
+            "K": row.K,
+            "users_evaluated": row.users_evaluated,
+            "user_id": block["user_id"],
+            "ndcg": block["ndcg"],
+            "map": block["map"],
+        }))
+    if not frames:
+        return pd.DataFrame(columns=PER_USER_COLUMNS)
+    return pd.concat(frames, ignore_index=True)[PER_USER_COLUMNS]
 
 
 def find_metric_collisions(df: pd.DataFrame) -> List[tuple[str, str, int, int]]:
@@ -185,11 +211,20 @@ def main(args: argparse.Namespace) -> None:
     cohorts = sorted(out["users_evaluated"].dropna().unique().tolist())
     print(f"Wrote aggregated metrics parquet: {out_path} (rows={len(out)}, cohorts={cohorts})")
 
+    per_user = explode_per_user(df)
+    per_user_path = Path(args.per_user_output)
+    per_user.to_parquet(per_user_path, index=False)
+    missing = sorted(set(df["model"]) - set(per_user["model"]))
+    print(f"Wrote per-user metrics parquet: {per_user_path} (rows={len(per_user)})")
+    if missing:
+        print(f"WARN: no per-user vectors for {missing}; their intervals cannot be computed. Re-run their eval.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--metrics-dir", default="experiments/metrics", help="Directory containing model metric JSON files.")
     parser.add_argument("--output", default="data/processed/phase4/metrics_by_k.parquet", help="Output parquet path.")
+    parser.add_argument("--per-user-output", default="data/processed/phase4/per_user_metrics.parquet", help="Per-user metrics parquet path.")
     parser.add_argument("--cohort", type=int, default=None, help="Keep only rows with this users_evaluated value.")
     parser.add_argument("--allow-metric-collisions", action="store_true", help="Warn instead of failing when two models share a metric vector.")
     main(parser.parse_args())

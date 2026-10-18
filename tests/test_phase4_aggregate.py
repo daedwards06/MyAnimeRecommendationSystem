@@ -152,3 +152,71 @@ def test_markdown_table_has_one_row_per_model():
     body = [line for line in markdown.splitlines()[2:] if line.strip()]
     assert len(body) == 3
     assert [line.split("|")[1].strip() for line in body] == ["mf_sgd", "hybrid_weighted", "popularity"]
+
+
+def test_per_user_vectors_survive_aggregation(tmp_path: Path):
+    _write_metrics(
+        tmp_path, "mf_sgd_20260101000000", model="mf_sgd", users_evaluated=2, ndcg=0.25, map=0.25,
+        per_user={"user_id": [1, 2], "ndcg": [0.5, 0.0], "map": [0.5, 0.0]},
+    )
+    _write_metrics(tmp_path, "popularity_20260101000000", model="popularity", users_evaluated=2, ndcg=0.1, map=0.1)
+    per_user = aggregate_phase4_metrics.explode_per_user(aggregate_phase4_metrics.aggregate(tmp_path))
+    assert list(per_user.columns) == aggregate_phase4_metrics.PER_USER_COLUMNS
+    assert set(per_user["model"]) == {"mf_sgd"}
+    assert per_user["ndcg"].tolist() == [0.5, 0.0]
+
+
+def _per_user_frame(frame: pd.DataFrame, n_users: int = 4) -> pd.DataFrame:
+    """Per-user vectors whose means reproduce each model's reported ndcg and map."""
+    rows = []
+    for r in frame.itertuples(index=False):
+        for u in range(n_users):
+            spread = (u - (n_users - 1) / 2) * 0.001
+            rows.append({"model": r.model, "K": 10, "users_evaluated": n_users, "user_id": u,
+                         "ndcg": r.ndcg + spread, "map": r.map + spread})
+    return pd.DataFrame(rows)
+
+
+def test_ablation_intervals_bracket_point_estimates_and_pair_against_references():
+    frame = _ablation_frame()
+    ablation = generate_phase4_ablation.add_intervals(
+        generate_phase4_ablation.build_ablation(frame), _per_user_frame(frame)
+    )
+    for _, row in ablation.iterrows():
+        assert row["ndcg@10_ci_low"] <= row["ndcg@10"] <= row["ndcg@10_ci_high"]
+        assert row["map@10_ci_low"] <= row["map@10"] <= row["map@10_ci_high"]
+    hybrid = ablation[ablation["model"] == "hybrid_weighted"].iloc[0]
+    assert hybrid["ndcg_diff_vs_mf_sgd"] == pytest.approx(0.048 - 0.05)
+    pop = ablation[ablation["model"] == "popularity"].iloc[0]
+    assert pop["ndcg_diff_vs_popularity_ci_low"] == pop["ndcg_diff_vs_popularity_ci_high"] == 0.0
+    view = generate_phase4_ablation.display_table(ablation)
+    assert "ndcg@10 95% CI" in view.columns
+    assert "ndcg_diff_vs_mf_sgd 95% CI" in view.columns
+
+
+def test_ablation_intervals_refuse_a_model_without_per_user_vectors():
+    frame = _ablation_frame()
+    per_user = _per_user_frame(frame)
+    with pytest.raises(ValueError, match="No per-user vectors"):
+        generate_phase4_ablation.add_intervals(
+            generate_phase4_ablation.build_ablation(frame), per_user[per_user["model"] != "mf_sgd"]
+        )
+
+
+def test_ablation_intervals_refuse_vectors_that_do_not_reproduce_the_table():
+    frame = _ablation_frame()
+    per_user = _per_user_frame(frame)
+    per_user.loc[per_user["model"] == "mf_sgd", "ndcg"] += 0.01
+    with pytest.raises(ValueError, match="does not reproduce"):
+        generate_phase4_ablation.add_intervals(generate_phase4_ablation.build_ablation(frame), per_user)
+
+
+def test_ablation_pairs_against_item_knn_when_present():
+    knn = {"model": "item_knn_sklearn", "K": 10, "users_evaluated": 1000, "ndcg": 0.06, "map": 0.05, "coverage": 0.12, "gini": 0.73}
+    frame = pd.concat([_ablation_frame(), pd.DataFrame([knn])], ignore_index=True)
+    ablation = generate_phase4_ablation.add_intervals(
+        generate_phase4_ablation.build_ablation(frame), _per_user_frame(frame)
+    )
+    hybrid = ablation[ablation["model"] == "hybrid_weighted"].iloc[0]
+    assert hybrid["ndcg_diff_vs_item_knn_sklearn"] == pytest.approx(0.048 - 0.06)
+    assert hybrid["ndcg_lift_vs_item_knn_sklearn_pct"] == pytest.approx((0.048 - 0.06) / 0.06 * 100)

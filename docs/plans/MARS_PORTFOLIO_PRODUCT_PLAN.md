@@ -3,8 +3,9 @@
 > Generated: 2026-09-12 | Scope decided with the project owner over a product + portfolio review
 > Revised: 2026-10-17 after Task 0.4's corrected evaluation reordered the models (Task 0.6 added,
 > Task 2.1 retargeted from kNN to MF, Tasks 1.3 / 2.2 / 2.3 / 2.5 and the success criteria updated);
-> then Tasks 0.7, 0.8, 1.8 and a Cut Line added
-> Executor: Claude via Claude Code (protocol in `CLAUDE.md`) | Est. effort: 4 phases, 21 tasks + a deferred list
+> then Tasks 0.7, 0.8, 1.8 and a Cut Line added; then Task 0.9 added after Task 0.6 found the app
+> never serves kNN
+> Executor: Claude via Claude Code (protocol in `CLAUDE.md`) | Est. effort: 4 phases, 22 tasks + a deferred list
 > Owner: data scientist; this is the single portfolio project, so every task is judged by
 > "what does a hiring manager see in the first five minutes?"
 
@@ -25,7 +26,7 @@ told.
 | The ablation table is mislabeled | `generate_phase4_ablation.py` filters on model names `mf`/`hybrid` that do not exist in the parquet (`mf_sgd`/`hybrid_weighted`), so MF and hybrid are silently dropped and the output is ten rows all labeled `popularity` at three different cohort sizes. `compute_lifts` takes `iloc[0]` as the baseline (popularity@300) and the output drops `users_evaluated`, making the mismatch invisible. **This table is where the README's headline number comes from.** Regenerating it reproduces the committed CSV value-for-value |
 | ~~MF alone beats the hybrid on accuracy~~ **Superseded by Task 0.4 (2026-09-17)** | Original: MF NDCG 0.0504 vs. hybrid 0.0497. On the corrected protocol hybrid ≈ MF still holds (0.0324 vs. 0.0326), but **both sit below popularity** (0.0347) and MF fell 35% from the figure quoted here — see Task 2.1 |
 | ~~Item-kNN scores near zero offline~~ **Resolved by Task 0.4 — it was the evaluation** | Original: NDCG@10 0.0017. `recommend(exclude_seen=True)` masked items using the model's own matrix, so a full-fit artifact removed the held-out item before scoring. On train-split artifacts item-kNN is the **best** model: 0.0628, +81% vs. popularity |
-| The shipped blend is mistuned *(added 2026-10-17)* | `BALANCED_WEIGHTS` (mf 0.931 / knn 0.066 / pop 0.003) came from an Optuna sweep run while kNN could not score, so it weights the weakest CF model highest. RRF over the same three sources reaches 0.0586 vs. the shipped blend's 0.0324. `reports/phase4_evaluation.md` §8 names re-tuning the top open item; Task 0.6 does it |
+| The shipped blend is mistuned *(added 2026-10-17; re-tuned offline by Task 0.6, served by Task 0.9)* | `BALANCED_WEIGHTS` (mf 0.931 / knn 0.066 / pop 0.003) came from an Optuna sweep run while kNN could not score, so it weights the weakest CF model highest. RRF over the same three sources reaches 0.0586 vs. the shipped blend's 0.0324. `reports/phase4_evaluation.md` §8 names re-tuning the top open item; Task 0.6 does it |
 | The evaluation report is labeled a draft | `reports/phase4_evaluation.md` opens with "Draft artifact – populate after running"; the model card says the ablation CSV is a draft with duplicate rows |
 | The primary action is fourth in the sidebar | Order is Mode → Profile → Personalization → Search → Filters; the README screenshot shows the sidebar already scrolled |
 | Cards show debug output as the explanation | `CF 0.0% \| Content 94.9% \| Popularity 5.1%` renders on every card; to a user "CF 0.0%" reads as "the model did nothing" |
@@ -412,30 +413,39 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] Tuning users come from the validation users **minus** the reporting cohort (one helper in
+- [x] Tuning users come from the validation users **minus** the reporting cohort (one helper in
       `src/eval/splits.py`, used by both scripts). Record the tuning-set size and seed in the
       Optuna output JSON
-- [ ] Per-user metric vectors are kept, and the ablation reports a 95% bootstrap CI on NDCG@10
+- [x] Per-user metric vectors are kept, and the ablation reports a 95% bootstrap CI on NDCG@10
       and MAP@10 (users resampled, 1,000 resamples, fixed seed), plus a paired bootstrap CI on
       the NDCG difference vs. popularity and vs. MF. Paired, because every model is scored on
       the same users
-- [ ] Re-tune the weighted blend; evaluate on the reporting cohort: old weights, re-tuned
+- [x] Re-tune the weighted blend; evaluate on the reporting cohort: old weights, re-tuned
       weights, RRF, kNN alone
-- [ ] Decide what the app serves, using the paired intervals: re-tuned weights, RRF, or kNN
+- [x] Decide what the app serves, using the paired intervals: re-tuned weights, RRF, or kNN
       alone. Record it in `docs/decisions.md` with the numbers. If the winner is RRF and serving
       it would change the pipeline contract, stop: ship the best *weighted* blend now and record
-      RRF as a follow-up
-- [ ] Update `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (and `DIVERSITY_EMPHASIZED_WEIGHTS`
+      RRF as a follow-up — *done 2026-10-17: the served weights stay. The app has no kNN
+      component (`knn=None`), so neither the re-tuned blend (mf 0.048 / knn 0.952) nor kNN alone
+      can be served by changing constants. The stop rule applied to the weighted blend itself;
+      the follow-up is Task 0.9*
+- [x] ~~Update `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (and `DIVERSITY_EMPHASIZED_WEIGHTS`
       if a diversity-aware re-tune changes it); confirm the README Key Features and the
-      architecture diagram's "93% MF + 7% kNN" are updated to match
-- [ ] Regenerate the ablation, then update README § Results, model card § Metrics and
+      architecture diagram's "93% MF + 7% kNN" are updated to match~~ — *superseded 2026-10-17
+      by the decision above (owner-approved): the app has no kNN component, so the weights can't
+      be served by changing constants. Carried by Task 0.9. README Key Features and the diagram
+      were corrected here to describe what the app does serve: MF plus a popularity prior*
+- [x] Regenerate the ablation, then update README § Results, model card § Metrics and
       `reports/phase4_evaluation.md` §8 (the "re-tune is the top open item" text becomes the
       result). No claim of "≈" or "beats" whose paired CI says otherwise
-- [ ] Visual check: the app boots in all three modes with the new weights; Steins;Gate seed
-      still gives sensible results (seed mode reranks with these CF scores too)
-- [ ] Tests: tuning and reporting user sets are disjoint; bootstrap CI is deterministic with a
-      seed and brackets the point estimate; existing weight-selection tests updated on purpose
-- [ ] Tests + ruff green
+- [x] ~~Visual check: the app boots in all three modes with the new weights; Steins;Gate seed
+      still gives sensible results (seed mode reranks with these CF scores too)~~ — *superseded
+      2026-10-17 (owner-approved): no served weights or app code changed in this task, so the
+      check was not run. Carried by Task 0.9*
+- [x] Tests: tuning and reporting user sets are disjoint; bootstrap CI is deterministic with a
+      seed and brackets the point estimate; existing weight-selection tests updated on purpose —
+      *weight-selection tests unchanged because the weights are unchanged*
+- [x] Tests + ruff green
 
 ---
 
@@ -526,6 +536,45 @@ ruff check src/ tests/
       whether to enable it
 - [ ] Tests: the load report marks a family missing when its artifact is absent (temp-dir
       fixtures, like `tests/test_artifacts_loader.py`); the expected-family notice fires
+- [ ] Tests + ruff green
+
+---
+
+## Task 0.9: Serve Item-kNN in the App
+
+*(Added 2026-10-17, from Task 0.6.)*
+
+**Why:** Task 0.6 found that the app has never served kNN. `app/pipeline_runner.py` builds
+`HybridComponents(mf=..., knn=None, ...)` and reads the kNN artifact only for its popularity
+vector, so the served CF signal is `w_mf·MF + w_pop·pop`. Offline, item-kNN alone (0.0628) and
+the re-tuned kNN-led blend (0.0658) are tied with each other (paired CI [−0.0033, +0.0097]),
+and both beat MF and popularity. MF and popularity are tied with each other. The app serves the
+weaker side of that table. Changing the weights alone cannot fix it (see `docs/decisions.md`,
+2026-10-17), so this task wires kNN in and then serves it.
+
+**Preflight Files:**
+- `app/pipeline_runner.py` (`HybridComponents` construction line ~203; mean-user MF scores)
+- `src/app/recommender.py` (`HybridRecommender._blend`, `get_personalized_recommendations`, which
+  has no kNN term)
+- `src/app/scoring_pipeline.py` (blended scores ~1166–1201; hard-coded `0.93 * mf_base + 0.07 *
+  knn_base` in `hybrid_cf_score` ~1247; `STAGE2_HYBRID_CF_WEIGHT` use ~1416)
+- `src/models/knn_sklearn.py` (`score_all`, `_user_profile`: needs a profile built from seeds or
+  profile ratings, not a training-user id)
+- `src/app/constants.py` (`BALANCED_WEIGHTS`, `DIVERSITY_EMPHASIZED_WEIGHTS`, Stage-2 coefficients)
+- `docs/decisions.md` 2026-10-17, `reports/phase4_ablation.md`
+
+**Checklist:**
+- [ ] kNN scores in the app from a profile vector: seeds in seed mode, profile ratings when
+      personalized; `components.knn` populated (or an equivalent per-request vector)
+- [ ] Serve item-kNN alone or the re-tuned blend; they are tied offline, so prefer the simpler
+      one unless the visual check says otherwise. Record the choice in `docs/decisions.md`
+- [ ] Replace the hard-coded 0.93 / 0.07 in `hybrid_cf_score` with the served weights; re-check
+      the Stage-2 coefficients against the new CF magnitude
+- [ ] Update `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (and the diversity preset); README
+      Key Features and architecture diagram describe what is served
+- [ ] Visual check: all three modes boot; Steins;Gate seed still gives sensible results
+- [ ] Tests: kNN component present in seed and personalized paths; weight-selection tests
+      updated on purpose
 - [ ] Tests + ruff green
 
 ---
@@ -621,6 +670,13 @@ without renaming it would preserve the error somewhere less visible.
 **Runs after Task 0.6** *(added 2026-10-17)*. The sentence clauses are chosen by which signal
 dominates, and Task 0.6 decides that. Under the old weights an "MF share > 0.5" rule would fire
 on almost every card.
+
+**Premise partly corrected by Task 0.6 (2026-10-17).** The app never loads a kNN component
+(`HybridComponents(..., knn=None)`). In seed mode the card's `knn` raw share is assembled in
+`scoring_pipeline.py` (~1457) from genre overlap, seed coverage, Stage-1 score and synopsis
+adjustments, which *are* content signals. So "Content" is closer to the truth than the paragraph
+above says. The real defect is that the key is named `knn`. Re-read the share assembly before
+relabelling, and run this after Task 0.9, which changes what the CF share contains.
 
 **Preflight Files:**
 - `src/app/explanations.py` (`format_explanation`, `format_seed_explanation`, `_DISPLAY_LABELS`
@@ -1151,7 +1207,7 @@ send" before it is finished. Tasks in order of how much a reviewer would notice 
 
 | Tier | Tasks | Ships as |
 |---|---|---|
-| **Must** — portfolio-ready | 0.5, 0.6, 0.7, 0.8, 1.1, 1.3, 1.6, 1.8, 1.7, **2.5 short form** | The first five minutes are clean, the headline result is correct with intervals and enforced by a test, the demo shows personalization in one click, and a ~600-word write-up exists |
+| **Must** — portfolio-ready | 0.5, 0.6, 0.7, 0.8, 0.9, 1.1, 1.3, 1.6, 1.8, 1.7, **2.5 short form** | The first five minutes are clean, the headline result is correct with intervals and enforced by a test, the demo shows personalization in one click, and a ~600-word write-up exists |
 | **Strong** — do next | 2.1, 2.2, 1.2, 1.4, 1.5 | Each one is a visible improvement, but missing it won't put a reviewer off |
 | **Nice to have** | 2.3, 2.4, Phase 3 | Interview depth more than first-impression value |
 
@@ -1163,7 +1219,8 @@ Task 0.1 is closed (2026-09-16: the app was already public; the finding did not 
 Tasks 0.2 and 0.5 are independent of everything else, but **0.3 blocks 0.4** — re-running the
 evaluation before the artifact stems are settled would republish metrics from the wrong MF
 model, which is the defect 0.3 exists to fix. Task 1.7 waits for the rest of Phase 1 and for
-Task 0.4. Task 2.2 depends on 0.3, 0.4, 0.6, and 2.1. Task 2.5 is last.
+Task 0.4. Task 1.3 waits for 0.9, which changes what the CF share contains. Task 2.2 depends
+on 0.3, 0.4, 0.6, 0.9, and 2.1. Task 2.5 is last.
 
 ## Success Criteria
 

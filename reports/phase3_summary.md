@@ -217,3 +217,25 @@ Generated: 2026-09-17 04:32 UTC
 User 14593: top=[199, 1, 4224, 245, 23273]
 
 (See experiments/metrics/hybrid_explanations.json for full breakdown.)
+
+
+## Auto-generated metrics (latest)
+
+Generated: 2026-10-18 02:27 UTC
+
+| Model | NDCG@10 | MAP@10 | Users | Coverage | Gini |
+|---|---|---|---|---|---|
+| Popularity Baseline | 0.03466 | 0.02546 | 1000 | 0.006 | 0.717 |
+| MF (FunkSVD, SGD) | 0.03259 | 0.02663 | 1000 | 0.067 | 0.788 |
+| Item kNN (profile) | 0.06277 | 0.05130 | 1000 | 0.116 | 0.728 |
+| Hybrid Weighted | 0.03240 | 0.02487 | 1000 | 0.062 | 0.799 |
+| Hybrid RRF | 0.05860 | 0.04555 | 1000 | 0.078 | 0.825 |
+| Content TF-IDF | 0.02112 | 0.01663 | 1000 | 0.171 | 0.633 |
+| Content Embeddings | 0.01014 | 0.00690 | 1000 | 0.059 | 0.862 |
+
+
+### Cold-Start (new items only)
+
+| Model | NDCG@10 | MAP@10 | Users | Coverage | Gini |
+|---|---|---|---|---|---|
+| Cold-Start Content TF-IDF | 0.00000 | 0.00000 | 1000 | 0.000 | 0.000 |

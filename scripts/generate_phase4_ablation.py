@@ -2,8 +2,12 @@
 """Generate the Phase 4 ablation table at K=10 from one cohort.
 
 Reads the parquet written by `aggregate_phase4_metrics.py` and writes CSV + Markdown with
-raw metrics and relative lifts against both the popularity baseline and MF, which is the
-strongest single model and therefore the comparison the hybrid has to answer.
+raw metrics and relative lifts against the popularity baseline, MF, and item-kNN.
+
+With the per-user parquet alongside, each model also gets a 95% bootstrap CI on NDCG@10 and
+MAP@10, and a *paired* bootstrap CI on its NDCG@10 difference from each reference model
+(users resampled jointly, since every model is scored on the same cohort). A comparison whose
+paired interval spans zero is a tie, whatever its point estimate says.
 """
 from __future__ import annotations
 import sys
@@ -15,22 +19,34 @@ if str(ROOT) not in sys.path:
 
 import argparse
 import pandas as pd
+from src.eval.bootstrap import bootstrap_mean_ci, paired_bootstrap_diff_ci
 from src.eval.phase4_utils import compute_lifts
 
 TARGET_K = 10
 BASELINE_MODEL = "popularity"
 REFERENCE_MODEL = "mf_sgd"
+# The strongest single model; any blend has to beat it to be worth serving. Optional so a
+# partial table still builds.
+STRONGEST_SINGLE_MODEL = "item_knn_sklearn"
 MODELS = [
     "popularity",
     "item_knn_sklearn",
     "mf_sgd",
     "hybrid_weighted",
+    "hybrid_weighted_legacy",
+    "hybrid_weighted_tuned",
     "hybrid_rrf",
     "content_tfidf",
     "content_embeddings",
 ]
 METRICS = ["ndcg", "map", "coverage", "gini"]
 LIFT_METRICS = ["ndcg", "map"]
+CI_METRICS = ["ndcg", "map"]
+
+
+def references(models) -> list[str]:
+    present = set(models)
+    return [BASELINE_MODEL, REFERENCE_MODEL] + [m for m in (STRONGEST_SINGLE_MODEL,) if m in present]
 
 
 def to_markdown_table(df: pd.DataFrame) -> str:
@@ -60,11 +76,9 @@ def build_ablation(metrics: pd.DataFrame) -> pd.DataFrame:
             "are not comparable. Re-run aggregate_phase4_metrics.py with --cohort."
         )
 
-    lifts_vs_pop = compute_lifts(subset, baseline_model=BASELINE_MODEL, metrics=LIFT_METRICS)
-    lifts_vs_mf = compute_lifts(subset, baseline_model=REFERENCE_MODEL, metrics=LIFT_METRICS)
-
     ablation = subset[["model", "users_evaluated", *METRICS]].copy()
-    for frame in (lifts_vs_pop, lifts_vs_mf):
+    for ref in references(subset["model"]):
+        frame = compute_lifts(subset, baseline_model=ref, metrics=LIFT_METRICS)
         lift_cols = [c for c in frame.columns if c.endswith("_pct")]
         ablation = ablation.merge(frame[["model", *lift_cols]], on="model", how="left")
 
@@ -72,10 +86,68 @@ def build_ablation(metrics: pd.DataFrame) -> pd.DataFrame:
     return ablation.sort_values(f"ndcg@{TARGET_K}", ascending=False).reset_index(drop=True)
 
 
+def add_intervals(ablation: pd.DataFrame, per_user: pd.DataFrame) -> pd.DataFrame:
+    """Attach bootstrap CIs computed from per-user vectors aligned on user_id."""
+    per_user = per_user[(per_user["K"] == TARGET_K) & (per_user["model"].isin(ablation["model"]))]
+    wide = {m: per_user.pivot_table(index="user_id", columns="model", values=m) for m in CI_METRICS}
+    missing = sorted(set(ablation["model"]) - set(wide["ndcg"].columns))
+    if missing:
+        raise ValueError(f"No per-user vectors for {missing}; re-run their evaluation before building intervals.")
+    if wide["ndcg"].isna().any().any():
+        raise ValueError("Models were scored on different users; paired intervals need one cohort.")
+
+    out = ablation.copy()
+    for m in CI_METRICS:
+        col = f"{m}@{TARGET_K}"
+        lows, highs = [], []
+        for model, point in zip(out["model"], out[col]):
+            mean, low, high = bootstrap_mean_ci(wide[m][model].to_numpy())
+            if abs(mean - point) > 1e-9:
+                raise ValueError(f"{model}: per-user mean {mean} does not reproduce the reported {col} {point}")
+            lows.append(low)
+            highs.append(high)
+        out[f"{col}_ci_low"] = lows
+        out[f"{col}_ci_high"] = highs
+
+    for ref in references(out["model"]):
+        diffs, lows, highs = [], [], []
+        for model in out["model"]:
+            diff, low, high = paired_bootstrap_diff_ci(wide["ndcg"][model].to_numpy(), wide["ndcg"][ref].to_numpy())
+            diffs.append(diff)
+            lows.append(low)
+            highs.append(high)
+        out[f"ndcg_diff_vs_{ref}"] = diffs
+        out[f"ndcg_diff_vs_{ref}_ci_low"] = lows
+        out[f"ndcg_diff_vs_{ref}_ci_high"] = highs
+    return out
+
+
+def display_table(ablation: pd.DataFrame) -> pd.DataFrame:
+    """The Markdown view: intervals folded into `[low, high]` cells; the CSV keeps every column."""
+    def interval(low: float, high: float, signed: bool = False) -> str:
+        fmt = "{:+.4f}" if signed else "{:.4f}"
+        return f"[{fmt.format(low)}, {fmt.format(high)}]"
+
+    view = pd.DataFrame({"model": ablation["model"], "users_evaluated": ablation["users_evaluated"]})
+    for m in METRICS:
+        col = f"{m}@{TARGET_K}"
+        view[col] = ablation[col]
+        if f"{col}_ci_low" in ablation.columns:
+            view[f"{col} 95% CI"] = [interval(lo, hi) for lo, hi in zip(ablation[f"{col}_ci_low"], ablation[f"{col}_ci_high"])]
+    for ref in references(ablation["model"]):
+        view[f"ndcg_lift_vs_{ref}_pct"] = ablation[f"ndcg_lift_vs_{ref}_pct"]
+        if f"ndcg_diff_vs_{ref}_ci_low" in ablation.columns:
+            view[f"ndcg_diff_vs_{ref} 95% CI"] = [
+                interval(lo, hi, signed=True)
+                for lo, hi in zip(ablation[f"ndcg_diff_vs_{ref}_ci_low"], ablation[f"ndcg_diff_vs_{ref}_ci_high"])
+            ]
+    return view
+
+
 def main(args: argparse.Namespace) -> None:
     metrics = pd.read_parquet(args.metrics_path)
-    ablation = build_ablation(metrics)
-    markdown = to_markdown_table(ablation)
+    ablation = add_intervals(build_ablation(metrics), pd.read_parquet(args.per_user_path))
+    markdown = to_markdown_table(display_table(ablation))
 
     out_csv = Path(args.output_csv)
     out_md = Path(args.output_md)
@@ -87,7 +159,11 @@ def main(args: argparse.Namespace) -> None:
     with out_md.open("w", encoding="utf-8") as f:
         f.write(f"# Phase 4 Ablation (K={TARGET_K})\n\n")
         f.write(f"One cohort: {cohort} sampled users, seed 42, ranking over the full catalog.\n")
-        f.write("Lifts are relative percentages against the popularity baseline and against MF.\n\n")
+        f.write("Lifts are relative percentages against popularity, MF and item-kNN (the strongest single model).\n")
+        f.write("Intervals are 95% percentile bootstrap (users resampled, 1,000 resamples, seed 42); the\n")
+        f.write("`ndcg_diff` intervals are paired (same users resampled for both models), so an interval\n")
+        f.write("that spans zero means the two models are not distinguishable on this cohort.\n")
+        f.write("MAP lifts and every interval bound are in the CSV.\n\n")
         f.write(markdown)
         f.write("\n")
 
@@ -99,6 +175,7 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--metrics-path", default="data/processed/phase4/metrics_by_k.parquet", help="Input metrics parquet path.")
+    parser.add_argument("--per-user-path", default="data/processed/phase4/per_user_metrics.parquet", help="Per-user metrics parquet path.")
     parser.add_argument("--output-csv", default="reports/phase4_ablation.csv", help="CSV output file.")
     parser.add_argument("--output-md", default="reports/phase4_ablation.md", help="Markdown output file.")
     main(parser.parse_args())

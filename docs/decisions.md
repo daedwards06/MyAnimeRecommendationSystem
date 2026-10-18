@@ -5,6 +5,60 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-17 — Blend re-tuned offline on disjoint users; the app keeps its weights until it can serve kNN
+
+**Status:** Decided (serving change deferred to a follow-up task)
+
+**Context.** `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (mf 0.931 / knn 0.066 / pop 0.003)
+came from an Optuna sweep run while item-kNN could not score, and that sweep drew its users with
+the same seed from the same population as the 1,000-user reporting cohort. Task 0.6 re-ran the
+sweep on 1,000 validation users drawn from **outside** the reporting cohort
+(`reporting_and_tuning_users` in `src/eval/splits.py`; overlap 0, recorded in
+`experiments/optuna_studies/hybrid_weights_best.json`), 100 TPE trials, seed 42. The weights are
+searched log-uniformly because the three sources are summed raw and their scales differ by orders
+of magnitude (kNN similarity about ±0.5, MF predicted rating 2–10, popularity 0–80).
+
+**Result** (reporting cohort, NDCG@10, 95% paired bootstrap CIs, 1,000 resamples):
+
+| Comparison | Difference | 95% CI |
+|:---|---:|:---|
+| Re-tuned blend (mf 0.048 / knn 0.952 / pop 0.0003) − popularity | +0.0312 | [+0.0175, +0.0454] |
+| Re-tuned blend − MF | +0.0332 | [+0.0222, +0.0448] |
+| Re-tuned blend − item-kNN alone | +0.0031 | [−0.0033, +0.0097] |
+| RRF − item-kNN alone | −0.0042 | [−0.0141, +0.0056] |
+| Shipped blend − MF | −0.0002 | [−0.0053, +0.0041] |
+| MF − popularity | −0.0021 | [−0.0139, +0.0102] |
+
+The re-tuned blend scores 0.0658 [0.0535, 0.0795], against 0.0324 for the shipped weights. It is
+effectively item-kNN with a small MF tiebreak, and it is **not distinguishable from item-kNN
+alone** (0.0628) or from RRF (0.0586). All three clearly beat popularity, MF and the shipped
+blend. Separately, "MF is below popularity", as stated after Task 0.4, is not supported: the
+interval spans zero.
+
+**Decision.** The served weights stay as they are. The re-tuned weights are recorded as the offline
+result (`hybrid_weighted_tuned` in the ablation) and not written to `src/app/constants.py` or
+`src/models/constants.py`.
+
+**Why.** The app cannot serve this blend by changing constants. `app/pipeline_runner.py` builds
+`HybridComponents(mf=..., knn=None, ...)`; the kNN artifact is read only for its item-popularity
+vector. The app's CF signal is therefore `w_mf·MF + w_pop·pop`, and the "kNN" share on cards is
+made up of content signals (genre overlap, seed coverage, synopsis similarity). Setting
+`w_mf = 0.048` would shrink the MF term about 20× beneath Stage-2 coefficients hand-tuned around
+its current magnitude, while adding no kNN. The app would get a different and unmeasured ranking,
+not the one measured offline. This is the stop condition the plan sets for RRF ("if serving it
+would change the pipeline contract, ship the best weighted blend and record the rest as a
+follow-up"). Here the condition applies to the weighted blend itself, because its winning
+ingredient is not wired in.
+
+**What would change this.** A follow-up task wires per-user item-kNN scores into the app
+(from the seeds in seed mode, from profile ratings when personalized), populates
+`components.knn`, and re-checks the Stage-2 coefficients. Then the re-tuned weights, or kNN alone,
+can be served. Because the two are tied, the simpler kNN-alone option is a legitimate choice.
+README, model card and `reports/phase4_evaluation.md` §8 say plainly that the app does not yet
+serve the best offline ranker.
+
+---
+
 ## 2026-09-16 — The evaluation table is one cohort from one run; metric collisions fail the build
 
 **Status:** Adopted

@@ -36,3 +36,21 @@ def sample_user_ids(user_ids: list[int], max_users: int, seed: int | None = None
         return list(user_ids)
     rng = random.Random(seed)
     return rng.sample(list(user_ids), max_users)
+
+
+def reporting_and_tuning_users(
+    user_ids: list[int],
+    n_report: int,
+    n_tune: int,
+    seed: int | None = None,
+) -> tuple[list[int], list[int]]:
+    """Return (reporting cohort, tuning users), disjoint by construction.
+
+    The reporting cohort is exactly `sample_user_ids(user_ids, n_report, seed)`, the cohort every
+    evaluation script scores, so weights tuned on the second list are never tuned on the users
+    the published numbers come from.
+    """
+    report = sample_user_ids(user_ids, n_report, seed)
+    held_out = set(report)
+    pool = [u for u in user_ids if u not in held_out]
+    return report, sample_user_ids(pool, n_tune, seed)

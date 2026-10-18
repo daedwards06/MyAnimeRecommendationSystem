@@ -46,6 +46,7 @@ def evaluate(model_name: str, recommendations: dict[int, list[int]], relevant: d
         "users_evaluated": len(recommendations),
         "ndcg@k_mean": float(sum(ndcgs) / max(1, len(ndcgs))),
         "map@k_mean": float(sum(maps) / max(1, len(maps))),
+        "per_user": {"user_id": [int(u) for u in recommendations], "ndcg": ndcgs, "map": maps},
     }
 
 
@@ -91,9 +92,9 @@ def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS):
 
     # Append combined CSV rows (use top-level pandas import)
     out_csv = METRICS_DIR / "summary.csv"
-    pd.DataFrame([metrics_knn, metrics_mf]).to_csv(out_csv, mode="a", header=not out_csv.exists(), index=False)
+    pd.DataFrame([metrics_knn, metrics_mf]).drop(columns="per_user").to_csv(out_csv, mode="a", header=not out_csv.exists(), index=False)
 
-    print(json.dumps({"knn": metrics_knn, "mf": metrics_mf}, indent=2), flush=True)
+    print(json.dumps({m["model"]: {k: v for k, v in m.items() if k != "per_user"} for m in (metrics_knn, metrics_mf)}, indent=2), flush=True)
 
 
 if __name__ == "__main__":

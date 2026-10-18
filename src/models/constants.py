@@ -3,6 +3,8 @@ from pathlib import Path
 RANDOM_SEED: int = 42
 TOP_K_DEFAULT: int = 10
 DEFAULT_SAMPLE_USERS: int = 300
+# The cohort the ablation and README report on; blend tuning draws its users from outside it.
+REPORTING_COHORT_USERS: int = 1000
 
 # Default weighted hybrid blend (balanced: accuracy + coverage; normalized Optuna diversity-aware weights)
 DEFAULT_HYBRID_WEIGHTS = {
