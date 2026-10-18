@@ -1074,25 +1074,37 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] **Carry-over regression test (from the kNN finding):** a kNN model fit on data that
+- [x] **Carry-over regression test (from the kNN finding):** a kNN model fit on data that
       contains a user's held-out item, evaluated with that user's *train* history, must not mask
       the held-out item. Whichever exclusion source the eval path uses, the test fails if it
-      goes back to the model's own matrix
-- [ ] Separate the 0.0504 → 0.0326 drop into a protocol part and a snapshot part. Run old protocol
+      goes back to the model's own matrix — *the eval path used the model's own matrix, so it
+      now goes through `knn_eval_scores` (train history). Mutation-checked: reverting the helper
+      fails the test. Writing it found a second leak: `getcol().nonzero()` drops 0 ratings, so
+      0-rated train items stayed eligible (139/10,000 slots; kNN 0.0628 → 0.0632). A third fault
+      turned up in the MF scoring: unknown users got an index-order popularity fallback (MF
+      0.0326 → 0.0282). Both fixed and tested; ablation, README, model card and report regenerated*
+- [x] Separate the 0.0504 → 0.0326 drop into a protocol part and a snapshot part. Run old protocol
       on new data, and new protocol on new data. Run on old data too if that snapshot can be
-      rebuilt; if not, say so
-- [ ] Relevance definition: re-score all models with the holdout restricted to liked items
-      (rating ≥ 8) as a sensitivity check. Report whether the model ordering changes
-- [ ] Objective: add an implicit-feedback MF variant (BPR or ALS; prefer a small numpy
+      rebuilt; if not, say so — *the old snapshot rebuilt from git has identical rows in identical
+      order (snapshot part = 0). A third factor surfaced (the June holdout-sampler change); crossed
+      with the protocol it is a tie, and the protocol (leak) is −0.019 to −0.023. The old setup
+      reproduces 0.0504 and popularity's 0.0412 exactly*
+- [x] Relevance definition: re-score all models with the holdout restricted to liked items
+      (rating ≥ 8) as a sensitivity check. Report whether the model ordering changes — *also
+      split out the 0-coded "watched, unrated" holdouts (16% of the cohort). Ordering changes
+      only for popularity vs. the old config blend; the top four are unchanged*
+- [x] Objective: add an implicit-feedback MF variant (BPR or ALS; prefer a small numpy
       implementation or the `implicit` package in `requirements-dev.txt`, not the app's
-      requirements) and evaluate it on the same cohort with the Task 0.6 intervals
-- [ ] `scripts/diagnose_mf.py` writes `reports/mf_diagnostic.md`: table, conclusion, and what
+      requirements) and evaluate it on the same cohort with the Task 0.6 intervals — *numpy ALS in
+      `src/models/als_implicit.py`, α tuned on disjoint users: 0.1890 [0.1687, 0.2086]. Also ran
+      FunkSVD without the 0 rows (worse) and with a popularity prior (better, but mostly popularity)*
+- [x] `scripts/diagnose_mf.py` writes `reports/mf_diagnostic.md`: table, conclusion, and what
       it means for the served personalized mode
-- [ ] If implicit MF clearly beats FunkSVD (paired CI excludes 0): record it in
+- [x] If implicit MF clearly beats FunkSVD (paired CI excludes 0): record it in
       `docs/decisions.md` as a candidate for serving. Swapping the served MF is a separate task
       (it touches `user_embedding.py` and the personalized gate). Not done here
-- [ ] Model card § Limitations and README "What I learned" cite the result
-- [ ] Tests + ruff green
+- [x] Model card § Limitations and README "What I learned" cite the result
+- [x] Tests + ruff green
 
 ---
 

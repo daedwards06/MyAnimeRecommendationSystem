@@ -19,7 +19,7 @@ from src.models.constants import (
     DEFAULT_SAMPLE_USERS,
 )
 from src.eval.splits import build_validation, reporting_and_tuning_users
-from src.eval.eval_artifacts import load_eval_models, run_metadata
+from src.eval.eval_artifacts import knn_eval_scores, load_eval_models, run_metadata
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.models.hybrid import weighted_blend, reciprocal_rank_fusion
 from src.models.baselines import popularity_scores
@@ -108,7 +108,7 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
         seen = train_hist.get(u, set())
 
         # KNN scores and recs
-        knn_scores = knn_model.score_all(u, exclude_seen=True)
+        knn_scores = knn_eval_scores(knn_model, u, seen)
         knn_top = sorted(knn_scores.items(), key=lambda x: x[1], reverse=True)[:k]
         recs_knn[u] = [i for i, _ in knn_top]
 
@@ -118,11 +118,10 @@ def main(k: int, sample_users: int, w_mf: float, w_knn: float, w_pop: float, sav
         for it in seen:
             if it in mf_model.item_to_index:
                 mf_scores_arr[mf_model.item_to_index[it]] = -np.inf
-        # map to dict
-        mf_scores = {mf_model.index_to_item[i]: float(s) for i, s in enumerate(mf_scores_arr) if np.isfinite(s)}
-        mf_top_idx = np.argpartition(-mf_scores_arr, range(min(k, len(mf_scores_arr))))[:k]
-        mf_top_idx = mf_top_idx[np.argsort(-mf_scores_arr[mf_top_idx])]
-        recs_mf[u] = [mf_model.index_to_item[i] for i in mf_top_idx if np.isfinite(mf_scores_arr[i])]
+        # map to dict; a user MF never saw has no MF scores, as with kNN
+        known = u in mf_model.user_to_index
+        mf_scores = {mf_model.index_to_item[i]: float(s) for i, s in enumerate(mf_scores_arr) if np.isfinite(s)} if known else {}
+        recs_mf[u] = mf_model.recommend(u, top_k=k, exclude=seen)
 
         # Popularity recs (mask seen)
         pop_scores = {i: s for i, s in pop_scores_global.items() if i not in seen}

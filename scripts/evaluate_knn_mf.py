@@ -23,7 +23,7 @@ import pandas as pd
 
 from src.models.constants import DATA_PROCESSED_DIR, METRICS_DIR, TOP_K_DEFAULT, DEFAULT_SAMPLE_USERS
 from src.eval.splits import build_validation, sample_user_ids
-from src.eval.eval_artifacts import load_eval_models, run_metadata
+from src.eval.eval_artifacts import knn_eval_recommend, load_eval_models, run_metadata
 from src.eval.metrics import ndcg_at_k, average_precision_at_k
 from src.eval.metrics_extra import item_coverage, gini_index
 
@@ -65,7 +65,7 @@ def main(k: int = TOP_K_DEFAULT, sample_users: int = DEFAULT_SAMPLE_USERS):
     mf_recs: dict[int, list[int]] = {}
     for u in users:
         seen = train_hist.get(u, set())
-        knn_recs[u] = knn_model.recommend(u, top_k=k, exclude_seen=True)
+        knn_recs[u] = knn_eval_recommend(knn_model, u, seen, k)
         mf_recs[u] = mf_model.recommend(u, top_k=k, exclude=seen)
 
     # Debug sample

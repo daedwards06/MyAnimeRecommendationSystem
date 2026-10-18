@@ -97,6 +97,10 @@ class FunkSVDRecommender:
         return scores
 
     def recommend(self, user_id: int, top_k: int = 10, exclude: set[int] | None = None) -> list[int]:
+        # An unknown user scores all-zero, and argpartition would then return items in index
+        # order (first appearance in the training file): an accidental popularity fallback.
+        if self.user_to_index is None or user_id not in self.user_to_index:
+            return []
         scores = self.predict_user(user_id)
         if exclude:
             # mask seen

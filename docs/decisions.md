@@ -5,6 +5,58 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-18 — Implicit ALS is a candidate to replace FunkSVD; two eval exclusion faults fixed
+
+**Status:** Candidate (not served). Source: Task 2.1, `reports/mf_diagnostic.md`
+(`scripts/diagnose_mf.py --sample-users 1000`).
+
+**Context.** On the corrected protocol FunkSVD sat below popularity, after falling from the
+0.0504 first published. MF still drives the *For me* user vector (`src/models/user_embedding.py`)
+and is 4.8% of the Balanced CF blend.
+
+**Findings.**
+- *Snapshot.* The parquet from before the 2026-03-14 refresh (`9813b02d`) holds the same 7.8M rows
+  in the same order as today's. Only the dtypes changed (int64 → int32), so the refresh moved
+  nothing.
+- *The drop was the leak.* Crossing the old and new holdout samplers with the old protocol
+  (full-data fit) and the new one (train split) gives four cells. The old setup reproduces the
+  published 0.0504 exactly, and popularity's 0.0412 too. Moving to the train split costs
+  −0.0230 / −0.0191 (both CIs clear of zero), while the sampler change is a tie (+0.0008). This
+  **reverses the 2026-09-16 entry's measurement** (mean −0.0018 on a 120K-row slice): at full
+  scale, a FunkSVD fit on the held-out rows does lift them into the top 10.
+- *Objective.* FunkSVD treats the 1.48M "watched, not rated" interactions (Kaggle −1, clipped to
+  0 by `clean_interactions`) as the worst possible score. It ranks such a holdout at a median 9,463
+  of 11,200. Refitting without those rows hurts it (−0.0178 [−0.0266, −0.0099]). A popularity prior
+  helps (+0.0171), but only by turning the list into popularity.
+- *Implicit ALS* (`src/models/als_implicit.py`: Hu–Koren–Volinsky with uniform confidence 1 + α,
+  64 factors, α = 5 tuned on users disjoint from the cohort) scores **0.1890 [0.1687, 0.2086]**.
+  That beats FunkSVD by +0.1608, CI [+0.1408, +0.1801], and item-kNN by +0.1258, CI
+  [+0.1032, +0.1468]. It is also the best model on liked holdouts (≥ 8) alone.
+
+**Eval faults fixed in the same change.** Both moved published numbers, and both are now pinned
+by tests in `tests/test_eval_artifacts.py`:
+- `FunkSVDRecommender.recommend` scored an unknown user all-zero and returned items in index order.
+  That order is first appearance in the file, so it worked as a popularity fallback. 33 cohort
+  users have no train history; five got hits this way, worth +0.0044. It now returns `[]`, as kNN
+  does. MF goes 0.0326 → 0.0282 and RRF 0.0586 → 0.0547.
+- kNN eval used the model's own seen-mask, and `getcol().nonzero()` drops explicit zeros, so 0-rated
+  train items stayed eligible: 139 of 10,000 top-10 slots. `knn_eval_scores` now excludes by train
+  history, as MF and popularity already did. kNN goes 0.0628 → 0.0632. This is the Task 0.4 lesson
+  again: an exclusion set must come from the eval split, never the model.
+
+**Decision.** Record ALS as the serving candidate for the MF role and do not swap it here. The swap
+touches `user_embedding.py`, the personalized gate and the artifact loader, and it needs its own
+task.
+
+**What would change this.** This protocol holds out one random *watched* item, which is exactly
+what an implicit objective is trained to predict, so part of ALS's lead is the protocol's choice of
+target. The liked-only bucket is the first check and it holds. Before serving, confirm on a graded
+or liked-only holdout. Also check that ALS's user vector can be built from a profile the way
+`generate_user_embedding` builds FunkSVD's: ALS needs a least-squares solve against fixed item
+factors, not a weighted average.
+
+---
+
 ## 2026-10-18 — Keep the demo awake with a scheduled browser visit; no Hugging Face mirror
 
 **Status:** Adopted (owner decision; implementation is Task 1.9). Answers the "what would change

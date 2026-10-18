@@ -22,18 +22,18 @@ collaborative models fit on the train split only. Intervals are bootstrap over u
 
 | Model | NDCG@10 | NDCG@10 95% CI | MAP@10 | Coverage@10 | Gini@10 | NDCG vs. popularity |
 |:---|---:|:---:|---:|---:|---:|---:|
-| **Hybrid (weighted, re-tuned; served)** | **0.0658** | [0.0535, 0.0795] | **0.0521** | 0.1029 | 0.7596 | **+90%** |
-| Item-kNN | 0.0628 | [0.0503, 0.0767] | 0.0513 | 0.1160 | 0.7280 | +81% |
-| Hybrid (RRF rank fusion) | 0.0586 | [0.0475, 0.0713] | 0.0456 | 0.0784 | 0.8253 | +69% |
+| **Hybrid (weighted, re-tuned; served)** | **0.0658** | [0.0535, 0.0795] | **0.0521** | 0.1029 | 0.7601 | **+90%** |
+| Item-kNN | 0.0632 | [0.0507, 0.0775] | 0.0516 | 0.1168 | 0.7276 | +82% |
+| Hybrid (RRF rank fusion) | 0.0547 | [0.0445, 0.0674] | 0.0419 | 0.0782 | 0.8281 | +58% |
 | Popularity baseline | 0.0347 | [0.0259, 0.0444] | 0.0255 | 0.0056 | 0.7175 | (baseline) |
-| MF (FunkSVD) | 0.0326 | [0.0229, 0.0428] | 0.0266 | 0.0668 | 0.7875 | −6% |
 | Hybrid (weighted, previous config weights) | 0.0324 | [0.0237, 0.0424] | 0.0249 | 0.0615 | 0.7993 | −7% |
+| MF (FunkSVD) | 0.0282 | [0.0196, 0.0379] | 0.0224 | 0.0667 | 0.7910 | −19% |
 | Content-only (TF-IDF) | 0.0211 | [0.0138, 0.0288] | 0.0166 | 0.1711 | 0.6334 | −39% |
 | Content-only (embeddings) | 0.0101 | [0.0059, 0.0154] | 0.0069 | 0.0588 | 0.8620 | −71% |
 
 The served blend beats popularity (+0.031, CI [+0.017, +0.045]) but is tied with item-kNN alone
-(+0.003, CI [−0.003, +0.010]), and matrix factorization on its own is tied with popularity
-(−0.002, CI [−0.014, +0.010]); protocol and caveats are in the
+(+0.003, CI [−0.004, +0.009]), and matrix factorization on its own is tied with popularity
+(−0.006, CI [−0.017, +0.005]); protocol and caveats are in the
 [evaluation report](reports/phase4_evaluation.md) and the [model card](docs/MODEL_CARD.md#metrics).
 
 ## How it works
@@ -68,14 +68,19 @@ are described in the [scoring pipeline guide](docs/scoring_pipeline_integration_
   contains the held-out item. Fixing it made kNN the strongest single model, and the blend had
   to be re-tuned on users disjoint from the reporting cohort, which roughly doubled its NDCG
   (0.0324 → 0.0658). The weights the old sweep chose had been fit to a broken signal.
-- **Matrix factorization does not beat popularity.** FunkSVD is trained to minimize rating
-  error, not to rank the full catalog, and on this protocol it is statistically tied with the
-  popularity baseline. It stays in the blend at 5% for coverage; diagnosing it properly is the
-  next piece of work.
+- **Matrix factorization learned the wrong thing.** FunkSVD fits ratings, and 19% of this
+  dataset's ratings are a "watched, not rated" code that cleaning turned into 0. So it learned that
+  a large share of what people watch is worthless. It ranks those held-out titles near the bottom
+  of the catalog and ties the popularity baseline overall. Dropping the zeros makes it worse. An
+  implicit-feedback ALS trained on watched / not watched scores NDCG@10 0.1890 against
+  FunkSVD's 0.0282 ([MF diagnostic](reports/mf_diagnostic.md)). The same diagnosis turned up two
+  smaller evaluation faults, both fixed: MF scored users it had never seen with an accidental
+  popularity fallback, and kNN's seen-mask let 0-rated titles through. It also showed that an
+  earlier small-slice test which found the train/test leak harmless was wrong at full scale.
 - **Coverage and accuracy pull apart.** Popularity's top-10 lists cover 0.0056 of the catalog
   and TF-IDF content similarity's cover 0.1711, yet TF-IDF ranks below popularity on NDCG. The
   *Diversity* preset serves item-kNN alone because it ties the blend on accuracy with higher
-  coverage (0.1160 vs. 0.1029).
+  coverage (0.1168 vs. 0.1029).
 - **There are no real timestamps.** The rating snapshot has no interaction dates, so the
   "temporal" split is built from row order and is reported as a heuristic only. A true
   time-aware evaluation needs a different dataset.

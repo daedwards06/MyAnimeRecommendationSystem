@@ -134,6 +134,25 @@ def load_eval_models(
     return knn_model, mf_model
 
 
+def knn_eval_scores(knn_model: ItemKNNRecommender, user_id: int, seen: set[int]) -> dict[int, float]:
+    """kNN scores for every item outside `seen`, the user's train-split history.
+
+    The exclusion set must come from the eval's train history, never from the model's own
+    matrix (`exclude_seen=True`). A matrix that contains the held-out item masks the ground
+    truth before scoring (the Task 0.4 bug), and `getcol().nonzero()` drops explicit 0 ratings,
+    so train items a user watched without rating stayed eligible as recommendations.
+    """
+    scores = knn_model.score_all(user_id, exclude_seen=False)
+    for item in seen:
+        scores.pop(item, None)
+    return scores
+
+
+def knn_eval_recommend(knn_model: ItemKNNRecommender, user_id: int, seen: set[int], top_k: int) -> list[int]:
+    scores = knn_eval_scores(knn_model, user_id, seen)
+    return [item for item, _ in sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]]
+
+
 def run_metadata(*, k: int, sample_users: int, generated_at: str | None = None) -> dict[str, Any]:
     """Provenance stamped into every metrics JSON so a row can be traced to its run.
 
