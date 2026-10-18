@@ -942,17 +942,27 @@ python scripts/smoke_artifacts.py --profile-memory   # local peak RSS during loa
 
 **Checklist:**
 - [ ] Cold start (after sleep) and warm load timed on the deployed app, three runs each;
-      record the median and the range in `docs/DEPLOYMENT.md` § Performance with the date
-- [ ] Peak memory during load + first query measured locally (`--profile-memory` on the Task
+      record the median and the range in `docs/DEPLOYMENT.md` § Performance with the date —
+      *2026-10-18: warm done (3 runs, median 10.9 s, range 10.9–11.2 s, Playwright + Edge,
+      fresh browser context per run). Cold not measured: the one run that found the app asleep
+      lost its reading to a broken first-card detector. Owner action: three runs after the app
+      has slept, method in § Performance*
+- [x] Peak memory during load + first query measured locally (`--profile-memory` on the Task
       0.8 smoke script, using `tracemalloc` or `psutil` RSS); replace the "~600–800 MB" estimate
-      with the measured number
+      with the measured number — *519 MB peak RSS (psutil, 20 ms sampling); a local
+      `streamlit run` process peaked at 501 MB*
 - [ ] If cold start > 30 s or peak memory > 800 MB: record options in `docs/decisions.md`
       (lazy-load the neural model, memory-map artifacts, Hugging Face mirror) and decide with
-      the owner; do not implement here
-- [ ] Python version: confirm the Task 0.6 ablation reproduces under 3.11 (CI's and Cloud's
-      version) to the published rounding, or record that it was checked and differs
-- [ ] README demo note under the badge uses the measured cold-start figure
-- [ ] Tests + ruff green
+      the owner; do not implement here — *memory is under the threshold (519 MB), so nothing
+      to record; the cold-start half waits on the cold runs above*
+- [x] Python version: confirm the Task 0.6 ablation reproduces under 3.11 (CI's and Cloud's
+      version) to the published rounding, or record that it was checked and differs — *3.11.9,
+      same library versions, eval models refit: `phase4_ablation.md` byte-identical, max CSV
+      difference 1.8e-13. `requirements.txt` floors (not pins) noted in § Performance*
+- [ ] README demo note under the badge uses the measured cold-start figure — *interim: the
+      note now gives the measured warm figure (~11 s) and says waking takes longer, replacing
+      the unmeasured "~10–20 seconds"*
+- [x] Tests + ruff green
 
 ---
 

@@ -6,6 +6,10 @@ with the per-request item-kNN vectors the app builds.
 
 Run:
     python scripts/smoke_artifacts.py        (or: make smoke)
+    python scripts/smoke_artifacts.py --profile-memory
+
+--profile-memory samples the process RSS (psutil) every 20 ms and prints it after each stage
+plus the peak, i.e. what the app process needs to load the bundle and serve its first queries.
 
 Exit code is non-zero when an expected family (EXPECTED_MODEL_FAMILIES) did not load, or
 when either query returns fewer than TOP_N results.
@@ -13,8 +17,10 @@ when either query returns fewer than TOP_N results.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +59,43 @@ def _print_top(title: str, recs: list[dict], titles: dict[int, str]) -> None:
         print(f"  {i:2d}. {titles.get(aid, f'Anime {aid}')}  [{aid}]")
 
 
+class _RssSampler:
+    """Background RSS sampler; RSS is what counts against a container memory limit."""
+
+    def __init__(self, interval_s: float = 0.02) -> None:
+        import psutil
+
+        self._proc = psutil.Process()
+        self._interval_s = interval_s
+        self._stop = threading.Event()
+        self.peak = self._proc.memory_info().rss
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self.stages: list[tuple[str, int]] = []
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval_s):
+            self.peak = max(self.peak, self._proc.memory_info().rss)
+
+    def start(self) -> _RssSampler:
+        self.mark("start (imports done)")
+        self._thread.start()
+        return self
+
+    def mark(self, stage: str) -> None:
+        rss = self._proc.memory_info().rss
+        self.peak = max(self.peak, rss)
+        self.stages.append((stage, rss))
+
+    def report(self) -> None:
+        self._stop.set()
+        self._thread.join()
+        mb = 1024 * 1024
+        print("\nMemory (process RSS)")
+        for stage, rss in self.stages:
+            print(f"  {stage:<32} {rss / mb:7.0f} MB")
+        print(f"  {'peak':<32} {self.peak / mb:7.0f} MB")
+
+
 def _finish(recs: list[dict], ctx: ScoringContext) -> list[dict]:
     recs = finalize_explanation_shares(recs)
     recs = apply_post_filters(recs, ctx)
@@ -60,7 +103,19 @@ def _finish(recs: list[dict], ctx: ScoringContext) -> list[dict]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--profile-memory", action="store_true", help="report process RSS per stage and peak")
+    args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    sampler = _RssSampler().start() if args.profile_memory else None
+    try:
+        return _run(sampler)
+    finally:
+        if sampler is not None:
+            sampler.report()
+
+
+def _run(sampler: _RssSampler | None) -> int:
     failures: list[str] = []
 
     bundle = build_artifacts(
@@ -69,6 +124,8 @@ def main() -> int:
         reports_dir=ROOT_DIR / "reports",
     )
     load_report = bundle["load_report"]
+    if sampler:
+        sampler.mark("bundle loaded")
 
     print("Model families")
     for family in sorted(set(load_report) | set(EXPECTED_MODEL_FAMILIES)):
@@ -87,6 +144,8 @@ def main() -> int:
     if engine.recommender is None or engine.components is None:
         failures.append("recommender engine did not build")
         return _report(failures)
+    if sampler:
+        sampler.mark("engine built")
 
     hygiene = build_ranked_candidate_hygiene_exclude_ids(metadata)
     models = bundle["models"]
@@ -122,6 +181,8 @@ def main() -> int:
     seed_result = run_seed_based_pipeline(seed_ctx)
     seed_recs = _finish(seed_result.ranked_items, seed_ctx)
     _print_top(f"Seed-based: {seed_title} ({seed_result.active_scoring_path})", seed_recs, titles)
+    if sampler:
+        sampler.mark("seed query done")
     if len(seed_recs) < TOP_N:
         failures.append(f"seed query returned {len(seed_recs)} < {TOP_N} results")
 
@@ -161,6 +222,8 @@ def main() -> int:
         failures.append(f"personalized query blocked: {pers_result.personalization_blocked_reason}")
     pers_recs = _finish(pers_result.ranked_items, pers_ctx)
     _print_top(f"Personalized: {profile.get('username')} ({PROFILE_USERNAME}_profile.json)", pers_recs, titles)
+    if sampler:
+        sampler.mark("personalized query done")
     if len(pers_recs) < TOP_N:
         failures.append(f"personalized query returned {len(pers_recs)} < {TOP_N} results")
 

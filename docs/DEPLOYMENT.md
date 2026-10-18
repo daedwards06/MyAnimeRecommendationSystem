@@ -268,13 +268,16 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
   - **This fix is already applied in the repository**
 
 ### 2. Model Loading Time
-- **Symptom:** App shows "Please wait..." for 30-60 seconds on first load
-- **Cause:** Loading ~250 MB of models from disk
-- **Solution:** Normal behavior. Models are cached after first load.
+- **Symptom:** The first visitor after a boot waits while ~250 MB of models load
+- **Cause:** `build_artifacts()` loads every model family eagerly; `st.cache_resource` keeps
+  them for later sessions
+- **Measured:** see [Performance](#performance). Locally the first card takes ~28 s on a fresh
+  server and ~9 s after that.
 
 ### 3. Memory Limits
 - **Limit:** Streamlit Cloud free tier has 1 GB RAM
-- **Current usage:** ~600-800 MB with all models loaded
+- **Current usage:** 519 MB peak RSS with all models loaded plus one seed-based and one
+  personalized query (measured locally, see [Performance](#performance))
 - **If exceeded:** Consider:
   - Using smaller models
   - Lazy loading (load models only when needed)
@@ -286,9 +289,10 @@ MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 - **Solution:** Expected behavior. For persistence, add database backend (future enhancement).
 
 ### 5. Cold Starts
-- **Symptom:** App is slow after 5+ minutes of inactivity
+- **Symptom:** A visitor lands on a "This app has gone to sleep" page
 - **Cause:** Streamlit Cloud spins down idle apps
-- **Solution:** Normal for free tier. First request wakes the app (~10 seconds).
+- **Solution:** Normal for free tier. Waking reboots the container, which then pays the model
+  load above. Timings are under [Performance](#performance).
 
 ### 6. Path Issues
 - **Symptom:** FileNotFoundError for data/models
@@ -365,6 +369,66 @@ Monitor app health via Streamlit Cloud dashboard:
 - **Memory usage** - track if approaching 1 GB limit
 - **Errors** - console logs for debugging
 
+## Performance
+
+*Measured 2026-10-18 (Task 1.8).*
+
+**Time to first card on the deployed app.** This is a first-time visitor's view: a fresh
+browser context (no cookies) per run, timed from navigation until the default "Similar to
+Fullmetal Alchemist: Brotherhood" results show their header and first poster. Playwright drove
+Edge from a home connection.
+
+| Load | Runs | Median | Range |
+|:---|---:|---:|---:|
+| Warm (app awake, models cached) | 3 | 10.9 s | 10.9–11.2 s |
+| Cold (app asleep, woken by the visitor) | 0 | not yet measured | |
+
+About 2 s of the warm figure is the pipeline itself: the results heading appears at ~9 s and the
+first poster ~2 s later. The rest is Streamlit Cloud's auth redirect handshake, the frontend
+bundle and the websocket session.
+
+Cold start is still open. The one run that found the app asleep (the sleep page appeared 7.1 s
+after navigation) recorded the wake, but its first-card detector failed, so it has no number. A
+cold run needs the app to have slept first (Community Cloud sleeps an app after a period with no
+traffic), so three runs take three idle periods. To time one: open the app in a private window
+after it has slept, click the wake button, and stop the clock at the first poster. Add the
+median and range to the table above and to the README note under the badge.
+
+Locally (Windows, Python 3.12, same machine as the deployed-app timings), `streamlit run` takes
+28.5 s to the first card on a fresh server and 8.7 s on the next session. The difference is the
+eager model load in `build_artifacts()`, which the deployed app also pays on every wake.
+
+**Memory.** Measured with `python scripts/smoke_artifacts.py --profile-memory`, which samples
+the process RSS every 20 ms while loading the real bundle and running one seed-based and one
+personalized query:
+
+| Stage | RSS |
+|:---|---:|
+| Imports done | 155 MB |
+| Bundle loaded | 512 MB |
+| Engine built | 512 MB |
+| Seed-based query | 515 MB |
+| Personalized query | 515 MB |
+| **Peak** | **519 MB** |
+
+As a cross-check, a local `streamlit run` process peaked at 501 MB (Windows peak working set)
+after serving two sessions. Both figures are under half the 1 GB limit, so none of the
+memory-reduction options (lazy-loading the neural model, memory-mapping artifacts, a Hugging
+Face mirror) is needed now. These are Windows numbers. Community Cloud runs Linux, where RSS for
+the same arrays should be close but is not guaranteed equal, and the Cloud dashboard's memory
+graph is the authoritative reading.
+
+**Python version.** Cloud and CI run Python 3.11.9 (`.python-version`); the published ablation was
+produced in the local 3.12.3 venv. Re-run under 3.11.9 with the same library versions (numpy
+2.4.3, pandas 2.2.2, scikit-learn 1.5.2, scipy 1.16.3, joblib 1.4.2), with the train-split kNN
+and MF refit from scratch, then `evaluate_knn_mf`, `evaluate_hybrid` and
+`evaluate_content_only` (`--k 10 --sample-users 1000`), `aggregate_phase4_metrics.py --cohort
+1000` and `generate_phase4_ablation.py`: `phase4_ablation.md` came out byte-identical, and the
+largest difference in any `phase4_ablation.csv` column was 1.8e-13. The Python version does not
+move the published numbers. `requirements.txt` uses `>=` floors, not pins, so the library
+versions Cloud resolves can drift from the ones the evaluation used; this check does not cover
+that.
+
 ## Cost & Limits (Free Tier)
 
 Streamlit Community Cloud free tier includes:
@@ -377,7 +441,7 @@ Streamlit Community Cloud free tier includes:
 
 **Current MARS usage:**
 - Storage: ~338 MB ✓
-- RAM: ~600-800 MB ✓
+- RAM: 519 MB peak, measured locally ✓
 - Public repository ✓
 
 ## Troubleshooting
