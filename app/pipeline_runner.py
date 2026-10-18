@@ -567,7 +567,11 @@ def _execute_pipeline(
         )
 
     # Finalise shares, post-filters, trim
-    recs = finalize_explanation_shares(recs)
+    recs = finalize_explanation_shares(
+        recs,
+        pop_pct_fn=engine.pop_pct_for_anime_id,
+        has_profile=bool(_personalization_enabled and _active_profile),
+    )
     recs = apply_post_filters(recs, ctx)
     recs = recs[: sidebar.top_n]
 

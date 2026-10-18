@@ -722,26 +722,34 @@ streamlit run app/main.py   # visual: card reads e.g. "Shares Sci-Fi and Suspens
 ```
 
 **Checklist:**
-- [ ] `explain_in_words(contributions, seed_titles, item_genres) -> str` in
+- [x] `explain_in_words(contributions, seed_titles, item_genres) -> str` in
       `src/app/explanations.py`: up to three clauses chosen by which signal dominates
       (genre/theme overlap → "Shares X and Y with <seed>"; synopsis sim above the high-sim
       threshold → "very similar story"; **kNN** share is the largest CF share → "fans of <seed>
       also rate it highly" (that sentence is literally what item-item CF measures; MF gets its
       own phrasing, e.g. "matches the taste of people who liked <seed>", and neither fires on a
       fixed share threshold tuned to the old 93/7 weights); popularity band → "a well-known
-      pick" / "a hidden gem"); deterministic; never mentions a component with zero share
-- [ ] Fix `_DISPLAY_LABELS` first: `knn` is labelled as the collaborative signal it is (e.g.
+      pick" / "a hidden gem"); deterministic; never mentions a component with zero share —
+      *MF phrasing does not name the seed: in seed mode the MF term is the mean-user (or
+      profile) vector and never depends on the seed, so it reads "rated well by MAL viewers
+      overall" / "matches the taste of viewers who rate like you". "Hidden gem" describes the
+      item (popularity percentile ≥ 0.5), not the popularity signal, so it has no share gate*
+- [x] Fix `_DISPLAY_LABELS` first: `knn` is labelled as the collaborative signal it is (e.g.
       "Similar-item CF"), not "Content". Check whether "CF" for `mf` stays unambiguous once
-      both are CF — "Matrix factorization" / "Similar-item CF" / "Popularity" reads honestly
-- [ ] Card renders the sentence where the share line is now; the share line
+      both are CF — "Matrix factorization" / "Similar-item CF" / "Popularity" reads honestly —
+      *relabelling alone would have been false in seed mode, where ~85–90% of the `knn` raw share
+      was genre/coverage/Stage-1/synopsis/metadata terms. Those now go to a separate `content`
+      component (`COMPONENT_ORDER` mf/knn/content/pop), so `knn` holds only item-kNN. The card
+      breakdown for Steins;Gate reads e.g. "Similar-item CF 7.2% | Content 88.1% | Popularity 4.7%"*
+- [x] Card renders the sentence where the share line is now; the share line
       (`format_explanation`) moves into "More details" under a "Signal breakdown" caption
-- [ ] Multi-seed: "Matches 2 of 3 seeds" stays, appended to the sentence
-- [ ] Tests: one test per clause type, a zero-share test, a multi-seed test.
+- [x] Multi-seed: "Matches 2 of 3 seeds" stays, appended to the sentence
+- [x] Tests: one test per clause type, a zero-share test, a multi-seed test.
       `test_truthful_shares` **does** change: `test_format_explanation_hides_unused_components`
       asserts on the literal string `"Content"` and its comment reads "Content (knn)" — both
       move to the new label. The behavioural contract (unused components stay hidden) is what
       must survive, not the wording
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

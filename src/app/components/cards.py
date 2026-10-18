@@ -493,6 +493,11 @@ def render_card(
             st.caption(pop_tooltip)
             st.caption(nov_tooltip)
 
+            signal_breakdown = rec.get("signal_breakdown")
+            if signal_breakdown:
+                st.markdown("**Signal breakdown**")
+                st.caption(signal_breakdown)
+
             # Full synopsis if truncated
             if display_synopsis and len(display_synopsis) > 280:
                 st.markdown(f"**Full synopsis:** {display_synopsis}")

@@ -49,7 +49,21 @@ def test_negative_raw_contributions_are_not_shown_as_negative_share():
 
 
 def test_format_explanation_hides_unused_components():
-    # Only mf+pop are used; Content (knn) should not appear in the formatted string.
-    s = format_explanation({"mf": 0.8, "knn": 0.2, "pop": 0.2, "_used": ["mf", "pop"]})
+    # Only mf+pop are used; Similar-item CF (knn) and Content should not appear.
+    s = format_explanation({"mf": 0.8, "knn": 0.2, "content": 0.3, "pop": 0.2, "_used": ["mf", "pop"]})
+    assert "Similar-item CF" not in s
     assert "Content" not in s
     assert "knn" not in s.lower()
+    assert "Matrix factorization" in s and "Popularity" in s
+
+
+def test_format_explanation_labels_knn_as_collaborative_not_content():
+    s = format_explanation({"mf": 0.0, "knn": 0.6, "content": 0.4, "pop": 0.0, "_used": ["knn", "content"]})
+    assert s == "Similar-item CF 60.0% | Content 40.0%"
+
+
+def test_content_is_its_own_share_component():
+    shares = compute_component_shares({"knn": 1.0, "content": 3.0}, used_components=["knn", "content"])
+    assert shares["knn"] == 0.25
+    assert shares["content"] == 0.75
+    assert shares["_used"] == ["knn", "content"]

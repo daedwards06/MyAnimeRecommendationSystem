@@ -84,7 +84,7 @@ from src.app.diversity import (
     genre_jaccard_similarity,
     mmr_rerank,
 )
-from src.app.explanations import format_explanation
+from src.app.explanations import explain_in_words, format_explanation
 from src.app.franchise_cap import apply_franchise_cap
 from src.app.metadata_features import (
     METADATA_AFFINITY_COLD_START_COEF,
@@ -96,6 +96,7 @@ from src.app.metadata_features import (
     theme_stage2_tiebreak_bonus,
 )
 from src.app.recommender import (
+    COMPONENT_ORDER,
     HybridComponents,
     HybridRecommender,
     compute_component_shares,
@@ -1466,7 +1467,8 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             continue
 
         raw_mf = 0.0
-        raw_knn = (
+        raw_knn = 0.0
+        raw_content = (
             (STAGE2_RAW_KNN_GENRE_OVERLAP_WEIGHT * weighted_overlap)
             + (STAGE2_RAW_KNN_SEED_COVERAGE_WEIGHT * seed_coverage)
             + (STAGE2_RAW_KNN_STAGE1_WEIGHT * float(s1))
@@ -1477,7 +1479,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             + float(theme_bonus)
         )
         raw_pop = STAGE2_POPULARITY_BOOST_WEIGHT * popularity_boost
-        used_components: list[str] = ["knn", "pop"]
+        used_components: list[str] = ["content", "pop"]
         if aid in id_to_index:
             idx = id_to_index[aid]
             try:
@@ -1490,10 +1492,10 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 
             used_components = sorted(
                 set(used_components) | set(recommender.used_components_for_weights(weights)),
-                key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
+                key=lambda k: {"mf": 0, "knn": 1, "content": 2, "pop": 3}.get(k, 99),
             )
 
-        raw_components = {"mf": raw_mf, "knn": raw_knn, "pop": raw_pop}
+        raw_components = {"mf": raw_mf, "knn": raw_knn, "content": raw_content, "pop": raw_pop}
         shares = compute_component_shares(raw_components, used_components=used_components)
 
         explanation = {
@@ -1545,6 +1547,10 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
                 "_explanation_meta": {
                     "seed_titles": selected_seed_titles,
                     "seeds_matched": num_seeds_matched,
+                    "seed_genres": seed_genre_map,
+                    "item_genres": sorted(item_genres),
+                    "synopsis_neural_sim": float(synopsis_neural_sim),
+                    "synopsis_tfidf_sim": float(synopsis_tfidf_sim),
                 },
             }
         )
@@ -1749,12 +1755,12 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
                             rec["score"] = float(rec.get("score", 0.0)) + bonus
                             raw = rec.get("_raw_components")
                             if isinstance(raw, dict):
-                                raw["knn"] = float(raw.get("knn", 0.0)) + bonus
+                                raw["content"] = float(raw.get("content", 0.0)) + bonus
                             else:
-                                rec["_raw_components"] = {"mf": 0.0, "knn": bonus, "pop": 0.0}
+                                rec["_raw_components"] = {"mf": 0.0, "knn": 0.0, "content": bonus, "pop": 0.0}
                             used = rec.get("_used_components")
-                            if isinstance(used, list) and "knn" not in used:
-                                used.append("knn")
+                            if isinstance(used, list) and "content" not in used:
+                                used.append("content")
 
                         # Synopsis TF-IDF nudge in personalized mode
                         if synopsis_sims_by_id:
@@ -1777,12 +1783,12 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
                                         rec["score"] = float(rec.get("score", 0.0)) + tfidf_bonus
                                         raw = rec.get("_raw_components")
                                         if isinstance(raw, dict):
-                                            raw["knn"] = float(raw.get("knn", 0.0)) + tfidf_bonus
+                                            raw["content"] = float(raw.get("content", 0.0)) + tfidf_bonus
                                         else:
-                                            rec["_raw_components"] = {"mf": 0.0, "knn": tfidf_bonus, "pop": 0.0}
+                                            rec["_raw_components"] = {"mf": 0.0, "knn": 0.0, "content": tfidf_bonus, "pop": 0.0}
                                         used = rec.get("_used_components")
-                                        if isinstance(used, list) and "knn" not in used:
-                                            used.append("knn")
+                                        if isinstance(used, list) and "content" not in used:
+                                            used.append("content")
 
                 personalized_recs.sort(key=lambda x: (-float(x.get("score", 0.0)), int(x.get("anime_id", 0))))
                 personalized_recs = personalized_recs[:n_requested]
@@ -1876,12 +1882,14 @@ def blend_personalized_and_seed(
             + ((1 - personalization_strength) * float(sr.get("mf", 0.0))),
             "knn": (personalization_strength * float(pr.get("knn", 0.0)))
             + ((1 - personalization_strength) * float(sr.get("knn", 0.0))),
+            "content": (personalization_strength * float(pr.get("content", 0.0)))
+            + ((1 - personalization_strength) * float(sr.get("content", 0.0))),
             "pop": (personalization_strength * float(pr.get("pop", 0.0)))
             + ((1 - personalization_strength) * float(sr.get("pop", 0.0))),
         }
         used_components = sorted(
             set(personalized_used.get(aid, [])) | set(seed_used.get(aid, [])),
-            key=lambda k: {"mf": 0, "knn": 1, "pop": 2}.get(k, 99),
+            key=lambda k: {"mf": 0, "knn": 1, "content": 2, "pop": 3}.get(k, 99),
         )
 
         blended.append(
@@ -2012,11 +2020,15 @@ def apply_post_filters(
 
 def finalize_explanation_shares(
     recs: list[dict],
+    *,
+    pop_pct_fn: Callable[[int], float] | None = None,
+    has_profile: bool = False,
 ) -> list[dict]:
-    """Recompute truthful MF/kNN/Pop shares and format explanation text.
+    """Recompute truthful component shares and write the card explanation.
 
-    This runs after optional personalized explanation text generation so we
-    can append truthful share percentages.
+    ``rec["explanation"]`` becomes the plain-language sentence (appended to any
+    personalized text generated earlier); ``rec["signal_breakdown"]`` holds the
+    per-component share line shown under "More details".
     """
     for rec in recs:
         raw = rec.get("_raw_components")
@@ -2025,22 +2037,25 @@ def finalize_explanation_shares(
             continue
         shares = compute_component_shares(raw, used_components=used)
 
-        contributions = {
-            "mf": shares.get("mf", 0.0),
-            "knn": shares.get("knn", 0.0),
-            "pop": shares.get("pop", 0.0),
-            "_used": shares.get("_used", used),
-        }
+        contributions: dict[str, Any] = {k: shares.get(k, 0.0) for k in COMPONENT_ORDER}
+        contributions["_used"] = shares.get("_used", used)
+        contributions["has_profile"] = bool(has_profile)
+        if pop_pct_fn is not None and rec.get("anime_id") is not None:
+            contributions["popularity_pct"] = float(pop_pct_fn(int(rec["anime_id"])))
         meta = rec.get("_explanation_meta")
         if isinstance(meta, dict):
             contributions.update(meta)
-        share_text = format_explanation(contributions)
+
+        rec["signal_breakdown"] = format_explanation(contributions)
+        sentence = explain_in_words(
+            contributions,
+            contributions.get("seed_titles"),
+            contributions.get("item_genres"),
+        )
 
         existing = rec.get("explanation")
-        if isinstance(existing, str) and existing.strip():
-            rec["explanation"] = f"{existing} • {share_text}"
-        else:
-            rec["explanation"] = share_text
+        existing_text = existing.strip() if isinstance(existing, str) else ""
+        rec["explanation"] = " • ".join(t for t in (existing_text, sentence) if t) or None
     return recs
 
 

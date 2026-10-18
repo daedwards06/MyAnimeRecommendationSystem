@@ -313,7 +313,7 @@ class HybridRecommender:
         return result
 
 
-COMPONENT_ORDER: tuple[str, ...] = ("mf", "knn", "pop")
+COMPONENT_ORDER: tuple[str, ...] = ("mf", "knn", "content", "pop")
 
 
 def compute_component_shares(
@@ -329,7 +329,7 @@ def compute_component_shares(
       - If clamp_negative_to_zero=True, negative raw contributions are treated as 0 for sharing.
       - If the (clamped) total is <= 0, all shares are 0.
 
-    Returns a dict with keys mf/knn/pop always present plus:
+    Returns a dict with keys mf/knn/content/pop always present plus:
       - _used: ordered list of the components considered
     """
     used_set = set(used_components) if used_components is not None else set(COMPONENT_ORDER)
@@ -343,7 +343,7 @@ def compute_component_shares(
         contrib[k] = v
     total = float(sum(contrib.values()))
 
-    out: dict[str, float] = {"mf": 0.0, "knn": 0.0, "pop": 0.0}
+    out: dict[str, float] = {"mf": 0.0, "knn": 0.0, "content": 0.0, "pop": 0.0}
     if total > 0.0:
         for k in used_ordered:
             out[k] = contrib[k] / total
