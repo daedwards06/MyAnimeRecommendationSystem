@@ -29,6 +29,7 @@ import pandas as pd
 from .constants import (
     DEFAULT_KNN_MODEL_STEM,
     DEFAULT_MF_MODEL_STEM,
+    EXPECTED_MODEL_FAMILIES,
     METADATA_PARQUET,
     MIN_METADATA_COLUMNS,
     RANDOM_SEED,
@@ -225,11 +226,16 @@ def _prune_metadata(df: pd.DataFrame) -> pd.DataFrame:
     return work.loc[:, MIN_METADATA_COLUMNS].copy()
 
 
-def _load_models(models_dir: Path) -> dict[str, Any]:
+def _load_models(models_dir: Path, *, skipped: dict[str, str] | None = None) -> dict[str, Any]:
+    """Load every ``*.joblib`` in ``models_dir``.
+
+    Files skipped for a missing dependency are recorded in ``skipped`` (stem -> reason).
+    """
     if not models_dir.exists():
         raise FileNotFoundError(f"Models directory not found: {models_dir}")
     models: dict[str, Any] = {}
-    skipped: list[str] = []
+    if skipped is None:
+        skipped = {}
     for f in models_dir.glob("*.joblib"):
         try:
             models[f.stem] = joblib.load(f)
@@ -237,13 +243,13 @@ def _load_models(models_dir: Path) -> dict[str, Any]:
             # Skip models that require unavailable dependencies (e.g. torch).
             # These are optional; the pipeline checks for their presence.
             logger.warning("Skipping model '%s' (missing dependency: %s)", f.name, e)
-            skipped.append(f.name)
+            skipped[f.stem] = f"missing dependency: {e}"
         except Exception as e:
             raise RuntimeError(f"Failed loading model '{f}': {e}") from e
     if not models:
         raise RuntimeError(f"No .joblib models found in {models_dir}")
     if skipped:
-        logger.info("Skipped %d model(s) due to missing dependencies: %s", len(skipped), ", ".join(skipped))
+        logger.info("Skipped %d model(s) due to missing dependencies: %s", len(skipped), ", ".join(sorted(skipped)))
     return models
 
 
@@ -257,6 +263,77 @@ def _load_json_glob(root: Path, pattern: str) -> dict[str, Any]:
             # Non-critical; skip with warning semantics via logging.
             logger.warning(f"Could not load JSON artifact {f}: {e}")
     return out
+
+
+# (family, stem prefixes, selection env var, label, preferred stem)
+_OPTIONAL_FAMILIES: list[tuple[str, tuple[str, ...], str, str, str | None]] = [
+    ("knn", ("item_knn", "knn"), "APP_KNN_MODEL_STEM", "kNN", DEFAULT_KNN_MODEL_STEM),
+    ("synopsis_tfidf", ("synopsis_tfidf",), "APP_SYNOPSIS_TFIDF_STEM", "Synopsis TF-IDF", None),
+    ("synopsis_embeddings", ("synopsis_embeddings",), "APP_SYNOPSIS_EMBEDDINGS_STEM", "Synopsis embeddings", None),
+    (
+        "synopsis_neural_embeddings",
+        ("synopsis_neural_embeddings",),
+        "APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM",
+        "Synopsis neural embeddings",
+        None,
+    ),
+]
+
+FAMILY_LABELS: dict[str, str] = {"mf": "MF", **{f[0]: f[3] for f in _OPTIONAL_FAMILIES}}
+
+
+def _family_entry(models_dir: Path, stem: str | None, reason: str | None = None) -> dict[str, Any]:
+    size_mb: float | None = None
+    if stem is not None:
+        path = models_dir / f"{stem}.joblib"
+        if path.exists():
+            size_mb = round(path.stat().st_size / 1e6, 1)
+    return {"loaded": reason is None and stem is not None, "stem": stem, "size_mb": size_mb, "reason": reason}
+
+
+def _alias_optional_family(
+    models: dict[str, Any],
+    *,
+    family: str,
+    prefixes: tuple[str, ...],
+    env_var: str,
+    label: str,
+    preferred_stem: str | None,
+    models_dir: Path,
+    skipped: dict[str, str],
+    load_report: dict[str, dict[str, Any]],
+) -> None:
+    """Alias ``models[family]`` when its stem is unambiguous; record the outcome either way."""
+    candidates = sorted(k for k in models if k.startswith(prefixes))
+    try:
+        stem = _select_model_stem(
+            models,
+            candidates=candidates,
+            env_var=env_var,
+            label=label,
+            preferred_stem=preferred_stem,
+        )
+    except ArtifactContractError as e:
+        skipped_here = sorted(s for s in skipped if s.startswith(prefixes))
+        if not candidates and skipped_here:
+            reason = f"{skipped_here[0]}.joblib skipped ({skipped[skipped_here[0]]})"
+        else:
+            reason = " ".join([str(e), *e.details])
+        logger.warning("%s not loaded: %s", label, reason)
+        load_report[family] = _family_entry(models_dir, None, reason)
+        return
+    models[family] = models[stem]
+    models[f"_{family}_stem"] = stem
+    load_report[family] = _family_entry(models_dir, stem)
+
+
+def missing_expected_families(
+    load_report: dict[str, dict[str, Any]] | None,
+    expected: tuple[str, ...] = EXPECTED_MODEL_FAMILIES,
+) -> list[str]:
+    """Return the expected families that the load report does not mark as loaded."""
+    report = load_report or {}
+    return [f for f in expected if not report.get(f, {}).get("loaded", False)]
 
 
 def build_artifacts(
@@ -278,7 +355,8 @@ def build_artifacts(
     Returns
     -------
     ArtifactBundle
-        Dictionary with keys: 'metadata', 'models', 'explanations', 'diversity'.
+        Dictionary with keys: 'metadata', 'models', 'explanations', 'diversity', and
+        'load_report' (model family -> loaded / stem / size_mb / reason).
     """
     set_determinism()
 
@@ -309,7 +387,8 @@ def build_artifacts(
             ],
         )
 
-    models = _load_models(models_dir_p)
+    skipped: dict[str, str] = {}
+    models = _load_models(models_dir_p, skipped=skipped)
 
     # --- Required: MF model selection + validation ------------------------
     mf_candidates = sorted([k for k in models.keys() if k.startswith("mf_") or k.startswith("mf")])
@@ -324,6 +403,9 @@ def build_artifacts(
     _validate_mf_model(mf_model, stem=mf_stem, models_dir=models_dir_p)
     models["mf"] = mf_model
     models["_mf_stem"] = mf_stem
+    load_report: dict[str, dict[str, Any]] = {
+        "mf": _family_entry(models_dir_p, mf_stem),
+    }
 
     # Compute mean-user vector for seed-based CF baseline (Phase 2, Task 2.1)
     # When no personalization is active, use the mean of all training user vectors
@@ -345,72 +427,18 @@ def build_artifacts(
         models["mf_mean_user_vector"] = None
         models["mf_mean_user_scores"] = None
 
-    # Optional: kNN model alias (only if unambiguous or explicitly chosen)
-    knn_candidates = sorted([k for k in models.keys() if k.startswith("item_knn") or k.startswith("knn")])
-    try:
-        knn_stem = _select_model_stem(
+    for family, prefixes, env_var, label, preferred in _OPTIONAL_FAMILIES:
+        _alias_optional_family(
             models,
-            candidates=knn_candidates,
-            env_var="APP_KNN_MODEL_STEM",
-            label="kNN",
-            preferred_stem=DEFAULT_KNN_MODEL_STEM,
+            family=family,
+            prefixes=prefixes,
+            env_var=env_var,
+            label=label,
+            preferred_stem=preferred,
+            models_dir=models_dir_p,
+            skipped=skipped,
+            load_report=load_report,
         )
-        models["knn"] = models[knn_stem]
-        models["_knn_stem"] = knn_stem
-    except ArtifactContractError:
-        # kNN is optional for Phase 1; do not block app startup.
-        pass
-
-    # Optional: synopsis TF-IDF artifact (Phase 4 semantic rerank experiment).
-    # Only alias when unambiguous or explicitly chosen.
-    synopsis_tfidf_candidates = sorted([k for k in models.keys() if k.startswith("synopsis_tfidf")])
-    try:
-        synopsis_tfidf_stem = _select_model_stem(
-            models,
-            candidates=synopsis_tfidf_candidates,
-            env_var="APP_SYNOPSIS_TFIDF_STEM",
-            label="Synopsis TF-IDF",
-            preferred_stem=None,
-        )
-        models["synopsis_tfidf"] = models[synopsis_tfidf_stem]
-        models["_synopsis_tfidf_stem"] = synopsis_tfidf_stem
-    except ArtifactContractError:
-        # TF-IDF is optional; do not block app startup.
-        pass
-
-    # Optional: synopsis embeddings artifact (Phase 4 semantic rerank experiment; successor to TF-IDF).
-    # Only alias when unambiguous or explicitly chosen.
-    synopsis_embeddings_candidates = sorted([k for k in models.keys() if k.startswith("synopsis_embeddings")])
-    try:
-        synopsis_embeddings_stem = _select_model_stem(
-            models,
-            candidates=synopsis_embeddings_candidates,
-            env_var="APP_SYNOPSIS_EMBEDDINGS_STEM",
-            label="Synopsis embeddings",
-            preferred_stem=None,
-        )
-        models["synopsis_embeddings"] = models[synopsis_embeddings_stem]
-        models["_synopsis_embeddings_stem"] = synopsis_embeddings_stem
-    except ArtifactContractError:
-        # Embeddings are optional; do not block app startup.
-        pass
-
-    # Optional: synopsis neural embeddings artifact (Phase 5 semantic generalization).
-    # Built offline in WSL2; Windows runtime only loads the serialized arrays.
-    synopsis_neural_candidates = sorted([k for k in models.keys() if k.startswith("synopsis_neural_embeddings")])
-    try:
-        synopsis_neural_stem = _select_model_stem(
-            models,
-            candidates=synopsis_neural_candidates,
-            env_var="APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM",
-            label="Synopsis neural embeddings",
-            preferred_stem=None,
-        )
-        models["synopsis_neural_embeddings"] = models[synopsis_neural_stem]
-        models["_synopsis_neural_embeddings_stem"] = synopsis_neural_stem
-    except ArtifactContractError:
-        # Neural embeddings are optional; do not block app startup.
-        pass
 
     explanations = _load_json_glob(reports_dir_p, "**/*explanations*.json")
     diversity = _load_json_glob(reports_dir_p, "**/*diversity*.json")
@@ -420,7 +448,14 @@ def build_artifacts(
         "models": models,
         "explanations": explanations,
         "diversity": diversity,
+        "load_report": load_report,
     }
 
 
-__all__ = ["ArtifactContractError", "build_artifacts", "set_determinism"]
+__all__ = [
+    "FAMILY_LABELS",
+    "ArtifactContractError",
+    "build_artifacts",
+    "missing_expected_families",
+    "set_determinism",
+]

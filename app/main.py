@@ -28,6 +28,7 @@ if root_str not in sys.path:
 # ── Project imports ──────────────────────────────────────────────────────────
 from app.display import (
     inject_css,
+    render_artifact_notice,
     render_empty_state,
     render_footer,
     render_header,
@@ -116,6 +117,7 @@ inject_css(theme)
 _ui_mode_for_header = str(st.session_state.get("ui_mode", "Seed-based"))
 render_header(_ui_mode_for_header, theme)
 render_import_light_warning()
+render_artifact_notice(bundle.get("load_report"))
 render_onboarding_section(_ui_mode_for_header)
 
 # ── First-run experience: auto-populate default seed ─────────────────────────
@@ -210,6 +212,7 @@ if pipeline_result.recs:
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
         theme=theme,
+        load_report=bundle.get("load_report"),
     )
 elif sidebar_state.browse_mode and sidebar_state.genre_filter:
     # Browse returned zero results

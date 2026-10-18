@@ -540,3 +540,96 @@ def test_one_artifact_per_model_family():
     for family in families:
         matches = [a for a in artifacts if a.startswith(family)]
         assert len(matches) <= 1, f"Multiple {family} artifacts: {matches}"
+
+
+# ---------------------------------------------------------------------------
+# Tests: Load report + expected-family notice
+# ---------------------------------------------------------------------------
+
+
+def _build(dirs: dict[str, Any]) -> dict[str, Any]:
+    return build_artifacts(
+        data_dir=dirs["data_dir"],
+        models_dir=dirs["models_dir"],
+        reports_dir=dirs["reports_dir"],
+    )
+
+
+def test_load_report_marks_absent_family_missing(temp_artifacts_dir: dict[str, Any], caplog):
+    """With only MF on disk, every optional family is reported missing with a reason and a warning."""
+    with caplog.at_level("WARNING", logger="src.app.artifacts_loader"):
+        bundle = _build(temp_artifacts_dir)
+
+    report = bundle["load_report"]
+    assert report["mf"]["loaded"] is True
+    assert report["mf"]["stem"] == "mf_sgd_v1.0"
+    for family in ("knn", "synopsis_tfidf", "synopsis_embeddings", "synopsis_neural_embeddings"):
+        assert report[family]["loaded"] is False
+        assert report[family]["stem"] is None
+        assert report[family]["reason"]
+    assert "Synopsis TF-IDF not loaded" in caplog.text
+
+
+def test_load_report_marks_present_family_loaded(temp_artifacts_dir: dict[str, Any]):
+    joblib.dump({"vectorizer": "mock"}, temp_artifacts_dir["models_dir"] / "synopsis_tfidf_v1.joblib")
+
+    report = _build(temp_artifacts_dir)["load_report"]
+
+    assert report["synopsis_tfidf"]["loaded"] is True
+    assert report["synopsis_tfidf"]["stem"] == "synopsis_tfidf_v1"
+    assert report["synopsis_tfidf"]["size_mb"] is not None
+    assert report["synopsis_tfidf"]["reason"] is None
+
+
+def test_load_report_names_ambiguous_family(temp_artifacts_dir: dict[str, Any]):
+    models_dir = temp_artifacts_dir["models_dir"]
+    joblib.dump({"a": 1}, models_dir / "synopsis_tfidf_v1.joblib")
+    joblib.dump({"b": 2}, models_dir / "synopsis_tfidf_v2.joblib")
+
+    bundle = _build(temp_artifacts_dir)
+
+    entry = bundle["load_report"]["synopsis_tfidf"]
+    assert entry["loaded"] is False
+    assert "ambiguous" in entry["reason"]
+    assert "APP_SYNOPSIS_TFIDF_STEM" in entry["reason"]
+    assert "synopsis_tfidf" not in bundle["models"]
+
+
+def test_missing_expected_families():
+    from src.app.artifacts_loader import missing_expected_families
+
+    report = {
+        "mf": {"loaded": True},
+        "knn": {"loaded": False, "reason": "gone"},
+    }
+    assert missing_expected_families(report, expected=("mf", "knn", "synopsis_tfidf")) == [
+        "knn",
+        "synopsis_tfidf",
+    ]
+    assert missing_expected_families(report, expected=("mf",)) == []
+
+
+def test_expected_family_notice_fires(temp_artifacts_dir: dict[str, Any]):
+    from app import display
+
+    report = _build(temp_artifacts_dir)["load_report"]
+
+    notice = display.artifact_notice(report)
+    assert notice is not None
+    assert "Synopsis TF-IDF" in notice
+    assert "MF," not in notice
+    with patch.object(display.st, "warning") as warn:
+        display.render_artifact_notice(report)
+    warn.assert_called_once_with(notice)
+
+
+def test_expected_family_notice_silent_when_all_loaded():
+    from app import display
+    from src.app.constants import EXPECTED_MODEL_FAMILIES
+
+    report = {f: {"loaded": True} for f in EXPECTED_MODEL_FAMILIES}
+    assert display.artifact_notice(report) is None
+    assert display.artifact_notice(None) is None
+    with patch.object(display.st, "warning") as warn:
+        display.render_artifact_notice(report)
+    warn.assert_not_called()

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 import streamlit as st
 
+from src.app.artifacts_loader import FAMILY_LABELS, missing_expected_families
 from src.app.badges import badge_payload
 from src.app.components.cards import render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
@@ -230,6 +231,27 @@ def render_import_light_warning() -> None:
         )
 
 
+def artifact_notice(load_report: dict | None) -> str | None:
+    """One-line notice naming expected model families that did not load, or None."""
+    if load_report is None:
+        return None
+    missing = missing_expected_families(load_report)
+    if not missing:
+        return None
+    names = ", ".join(FAMILY_LABELS.get(f, f) for f in missing)
+    return (
+        f"Some model artifacts did not load ({names}); recommendations run without them. "
+        "Details under Scoring details."
+    )
+
+
+def render_artifact_notice(load_report: dict | None) -> None:
+    """Show the missing-artifact notice under the header when an expected family failed."""
+    notice = artifact_notice(load_report)
+    if notice:
+        st.warning(notice)
+
+
 def render_onboarding_section(ui_mode: str) -> None:
     """Render onboarding instructions for the current mode."""
     render_onboarding(ui_mode=ui_mode)
@@ -247,6 +269,7 @@ def render_results(
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
     theme: dict | None = None,
+    load_report: dict | None = None,
 ) -> None:
     """Render recommendation results: scoring details, count, mix bar, cards.
 
@@ -268,6 +291,10 @@ def render_results(
             and blocked_reason
         ):
             st.caption(f"Personalization note: {blocked_reason}")
+        if load_report is not None:
+            for family in missing_expected_families(load_report):
+                reason = (load_report.get(family) or {}).get("reason") or "not in the load report"
+                st.caption(f"Not loaded: {FAMILY_LABELS.get(family, family)} — {reason}")
 
     # Result count
     total_anime = len(metadata)

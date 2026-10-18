@@ -64,8 +64,9 @@ Based on current artifacts:
 those constants, so the metrics describe the model that is served.
 
 Adding a second artifact for a family without updating the constant makes `_select_model_stem`
-ambiguous: MF selection then fails the app at startup, and the optional kNN and synopsis families
-are dropped silently. Replace the artifact and update the constant in the same change, or set
+ambiguous: MF selection then fails the app at startup, and the kNN and synopsis families are
+dropped. A dropped family is logged at warning level, recorded in `bundle["load_report"]`, and
+shown as a notice under the app header (reason under Scoring details); the app keeps running. Replace the artifact and update the constant in the same change, or set
 `APP_MF_MODEL_STEM` / `APP_KNN_MODEL_STEM` / `APP_SYNOPSIS_TFIDF_STEM` /
 `APP_SYNOPSIS_EMBEDDINGS_STEM` / `APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM` to disambiguate.
 
@@ -78,6 +79,39 @@ Verify with:
 ```powershell
 git lfs ls-files -s   # expect 5 entries, one per family
 ```
+
+### Artifact smoke check
+
+CI runs with `APP_IMPORT_LIGHT=1` and does not fetch LFS objects, so it never loads the real
+models. That is how two synopsis families went unloaded in the deployed app unnoticed. The smoke
+check covers that gap:
+
+```powershell
+python scripts/smoke_artifacts.py   # or: make smoke
+```
+
+It loads the real bundle, prints one line per model family (loaded / stem / size, or the reason
+it is missing), and runs a seed-based query (Steins;Gate) and a personalized query (the example
+profile) through the scoring-pipeline functions. It exits non-zero when a family in
+`EXPECTED_MODEL_FAMILIES` (`src/app/constants.py`) did not load or either query returns fewer
+than 10 results. Run it after replacing any artifact, before pushing. It takes about a minute.
+
+`.github/workflows/smoke.yml` runs the same check on GitHub: on demand (Actions → Artifact
+smoke → Run workflow), and on pushes to `main` that touch `models/**`, the artifact loader, or
+the stem / expected-family constants. It is not on a schedule: the artifacts rarely change, so a
+periodic run would mostly re-check the same files.
+
+**LFS bandwidth cost:** a run that misses the cache downloads ~250 MB of LFS objects, which
+counts against the account's Git LFS bandwidth quota (Streamlit Cloud's clones use the same
+quota). The workflow caches `.git/lfs` keyed on the LFS object IDs, so the full download happens
+when an artifact changes (exactly when the check is worth running) or when the cache has been
+evicted (GitHub evicts caches unused for 7 days). A code-only push reuses the cache only if
+another run happened within the last 7 days. Expect a full download on most runs, but only a
+handful of runs a year; check the quota under GitHub → Settings → Billing if that changes.
+
+The workflow runs alongside the Streamlit Cloud redeploy triggered by the same push, so it
+reports a broken artifact minutes after deploy rather than blocking it. Run the script locally
+before pushing an artifact change.
 
 ## Step-by-Step Deployment
 

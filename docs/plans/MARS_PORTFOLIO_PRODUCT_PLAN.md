@@ -526,22 +526,24 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `build_artifacts` records which families loaded and why any did not (e.g. a
+- [x] `build_artifacts` records which families loaded and why any did not (e.g. a
       `bundle["load_report"]` dict); the optional-family blocks log at warning level with the
       reason, instead of passing silently
-- [ ] The app shows a visible notice when a family that is expected for deployment fails to load
+- [x] The app shows a visible notice when a family that is expected for deployment fails to load
       (one line under the header, details in Scoring details). It keeps running, but says what
       is off. Which families count as "expected" is one constant in `src/app/constants.py`
-- [ ] `scripts/smoke_artifacts.py` + `make smoke`: loads the real bundle, prints the load
+- [x] `scripts/smoke_artifacts.py` + `make smoke`: loads the real bundle, prints the load
       report, runs one seed query and one personalized query through the pipeline functions,
       exits non-zero if an expected family is missing or either query returns fewer than 10
       results
 - [ ] Optional: a `workflow_dispatch` + weekly `schedule` GitHub workflow with `lfs: true` that
       runs `make smoke`. Note the LFS bandwidth cost in `docs/DEPLOYMENT.md`; owner decides
-      whether to enable it
-- [ ] Tests: the load report marks a family missing when its artifact is absent (temp-dir
+      whether to enable it *(`.github/workflows/smoke.yml` + DEPLOYMENT.md section written,
+      manual + path-filtered push trigger instead of a schedule, see DEPLOYMENT.md; not yet
+      run on GitHub)*
+- [x] Tests: the load report marks a family missing when its artifact is absent (temp-dir
       fixtures, like `tests/test_artifacts_loader.py`); the expected-family notice fires
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

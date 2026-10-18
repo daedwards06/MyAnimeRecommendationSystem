@@ -1,6 +1,6 @@
 # Simple task runner (works in Git Bash; on Windows PowerShell, prefer the explicit commands shown in README)
 
-.PHONY: setup test app fetch-jikan features discover-new refresh-all refresh-season lint fmt venv-minimal venv-kernel venv-all phase4-artifacts
+.PHONY: setup test smoke app fetch-jikan features discover-new refresh-all refresh-season lint fmt venv-minimal venv-kernel venv-all phase4-artifacts
 
 # Create .venv and install full project requirements
 setup:
@@ -26,6 +26,12 @@ test:
 # Run tests with CI configuration (mirrors GitHub Actions)
 ci:
 	. .venv/Scripts/activate && APP_IMPORT_LIGHT=1 pytest -x -q --tb=short
+
+# Load the real model artifacts and run one seed + one personalized query (needs LFS objects).
+# The scheduled workflow overrides PY=python; locally it uses the venv interpreter.
+PY ?= .venv/Scripts/python
+smoke:
+	$(PY) scripts/smoke_artifacts.py
 
 app:
 	. .venv/Scripts/activate && streamlit run app/main.py

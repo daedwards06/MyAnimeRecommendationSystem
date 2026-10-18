@@ -60,6 +60,16 @@ PERSONAS_JSON = "data/samples/personas.json"
 DEFAULT_MF_MODEL_STEM = MF_MODEL_STEM
 DEFAULT_KNN_MODEL_STEM = KNN_MODEL_STEM
 
+# Model families the deployed app is expected to load (keys of bundle["load_report"]). The app
+# keeps running when one is missing but shows a notice; scripts/smoke_artifacts.py exits non-zero.
+EXPECTED_MODEL_FAMILIES: tuple[str, ...] = (
+    "mf",
+    "knn",
+    "synopsis_tfidf",
+    "synopsis_embeddings",
+    "synopsis_neural_embeddings",
+)
+
 
 def _env_bool(name: str, default: bool) -> bool:
     val = os.environ.get(name)

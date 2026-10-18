@@ -1,0 +1,54 @@
+name: Artifact smoke
+
+# Loads the real Git LFS model artifacts (~250 MB), which CI never does. Runs on demand and on
+# pushes that touch the artifacts or the code that loads them; see docs/DEPLOYMENT.md
+# ("Artifact smoke check") for the LFS bandwidth cost.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'models/**'
+      - 'src/app/artifacts_loader.py'
+      - 'src/app/constants.py'
+      - 'src/models/constants.py'
+      - '.github/workflows/smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Cache LFS objects keyed on their OIDs so the ~250 MB download only recurs when an
+      # artifact changes.
+      - name: List LFS objects
+        run: git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+
+      - name: Restore LFS cache
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+
+      - name: Pull LFS objects
+        run: git lfs pull
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r requirements.txt
+
+      - name: Smoke check
+        run: make smoke PY=python
