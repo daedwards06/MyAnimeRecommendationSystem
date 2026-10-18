@@ -393,6 +393,9 @@ cold run needs the app to have slept first (Community Cloud sleeps an app after 
 traffic), so three runs take three idle periods. To time one: open the app in a private window
 after it has slept, click the wake button, and stop the clock at the first poster. Add the
 median and range to the table above and to the README note under the badge.
+Decided 2026-10-18 without the cold runs: rather than measure the wake, keep the app from
+sleeping with a scheduled headless-browser visit (`docs/decisions.md`; plan Task 1.9). That
+job records a cold reading whenever it finds the app asleep.
 
 Locally (Windows, Python 3.12, same machine as the deployed-app timings), `streamlit run` takes
 28.5 s to the first card on a fresh server and 8.7 s on the next session. The difference is the

@@ -4,8 +4,8 @@
 > Revised: 2026-10-17 after Task 0.4's corrected evaluation reordered the models (Task 0.6 added,
 > Task 2.1 retargeted from kNN to MF, Tasks 1.3 / 2.2 / 2.3 / 2.5 and the success criteria updated);
 > then Tasks 0.7, 0.8, 1.8 and a Cut Line added; then Task 0.9 added after Task 0.6 found the app
-> never serves kNN
-> Executor: Claude via Claude Code (protocol in `CLAUDE.md`) | Est. effort: 4 phases, 22 tasks + a deferred list
+> never serves kNN; then Task 1.9 added after Task 1.8 (keep the demo awake)
+> Executor: Claude via Claude Code (protocol in `CLAUDE.md`) | Est. effort: 4 phases, 23 tasks + a deferred list
 > Owner: data scientist; this is the single portfolio project, so every task is judged by
 > "what does a hiring manager see in the first five minutes?"
 
@@ -941,28 +941,81 @@ python scripts/smoke_artifacts.py --profile-memory   # local peak RSS during loa
 ```
 
 **Checklist:**
-- [ ] Cold start (after sleep) and warm load timed on the deployed app, three runs each;
+- [x] ~~Cold start (after sleep) and~~ warm load timed on the deployed app, three runs each;
       record the median and the range in `docs/DEPLOYMENT.md` § Performance with the date —
       *2026-10-18: warm done (3 runs, median 10.9 s, range 10.9–11.2 s, Playwright + Edge,
       fresh browser context per run). Cold not measured: the one run that found the app asleep
-      lost its reading to a broken first-card detector. Owner action: three runs after the app
-      has slept, method in § Performance*
+      lost its reading to a broken first-card detector. Cold runs superseded 2026-10-18
+      (owner decision): the wake is known to be slow and Task 1.9 keeps the app from sleeping;
+      its job logs a cold reading whenever it finds the app asleep*
 - [x] Peak memory during load + first query measured locally (`--profile-memory` on the Task
       0.8 smoke script, using `tracemalloc` or `psutil` RSS); replace the "~600–800 MB" estimate
       with the measured number — *519 MB peak RSS (psutil, 20 ms sampling); a local
       `streamlit run` process peaked at 501 MB*
 - [ ] If cold start > 30 s or peak memory > 800 MB: record options in `docs/decisions.md`
       (lazy-load the neural model, memory-map artifacts, Hugging Face mirror) and decide with
-      the owner; do not implement here — *memory is under the threshold (519 MB), so nothing
-      to record; the cold-start half waits on the cold runs above*
+      the owner; do not implement here — *memory is under the threshold (519 MB). Cold start
+      decided without the cold runs (owner, 2026-10-18): keep the app awake with a scheduled
+      headless-browser visit; Hugging Face mirror stays deferred (free Spaces also sleep after
+      48 h). Options and reasons in `docs/decisions.md`; implementation is Task 1.9*
 - [x] Python version: confirm the Task 0.6 ablation reproduces under 3.11 (CI's and Cloud's
       version) to the published rounding, or record that it was checked and differs — *3.11.9,
       same library versions, eval models refit: `phase4_ablation.md` byte-identical, max CSV
       difference 1.8e-13. `requirements.txt` floors (not pins) noted in § Performance*
-- [ ] README demo note under the badge uses the measured cold-start figure — *interim: the
-      note now gives the measured warm figure (~11 s) and says waking takes longer, replacing
-      the unmeasured "~10–20 seconds"*
+- [x] ~~README demo note under the badge uses the measured cold-start figure~~ — *superseded
+      2026-10-18: the note gives the measured warm figure (~11 s) and says waking takes longer,
+      replacing the unmeasured "~10–20 seconds". Task 1.9 rewrites it once the app is kept
+      awake*
 - [x] Tests + ruff green
+
+---
+
+## Task 1.9: Keep the Demo Awake
+
+*(Added 2026-10-18, from the Task 1.8 decision.)*
+
+**Why:** Success criterion 1 is a visitor seeing recommendations within 30 seconds. Awake, the
+deployed app shows its first card in ~11 s; asleep, the visitor first gets a wake page and then
+waits for a container reboot and the full model load. The owner decided (`docs/decisions.md`,
+2026-10-18) to keep the app awake with a scheduled headless-browser visit rather than add a
+second host or pay for always-on hardware. A plain HTTP ping does not work: a sleeping app still
+answers `curl` with `200`, and only a browser session wakes it.
+
+**Preflight Files:**
+- `docs/decisions.md` (2026-10-18 keep-awake entry: options, known limits)
+- `docs/DEPLOYMENT.md` (§ Performance: how first card was detected, the failed cold run;
+  § Verify From Outside: why `curl` is not a check)
+- `.github/workflows/smoke.yml` (house style for workflows; this one needs no LFS checkout)
+- `README.md` (the note under the badge)
+
+**Validation Commands:**
+```powershell
+python scripts/check_live_app.py          # exit 0, prints time to first card and was_asleep
+# then on GitHub: Actions → Keep demo awake → Run workflow (owner; gh is not authenticated here)
+$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
+ruff check src/ tests/ app/
+```
+
+**Checklist:**
+- [ ] `scripts/check_live_app.py`: Playwright, fresh browser context, opens the deployed URL,
+      clicks the wake button if the sleep page shows, waits for the first card (the "N
+      recommendations" header plus a poster image inside the app iframe). Prints time to first
+      card and whether the app was asleep; exits non-zero and saves a screenshot on timeout.
+      Playwright is installed by the workflow only, not added to `requirements.txt`
+- [ ] Before trusting a reading, the detector is checked against the live page both ways (it
+      fires on a rendered page and times out on a page without cards). Task 1.8 lost its only
+      cold reading to a detector looking for a button the cards no longer have
+- [ ] `.github/workflows/keep-awake.yml`: `schedule` every 6 hours, `workflow_dispatch`, and a
+      run after pushes to `main` that first waits for the redeploy; no checkout of LFS objects.
+      The time to first card and `was_asleep` go to the job summary; the screenshot is uploaded
+      as an artifact on failure
+- [ ] `docs/DEPLOYMENT.md`: a "Keeping the demo awake" section (what the job does, the
+      60-day scheduled-workflow disable and how to re-enable, how to read a failure); any
+      `was_asleep` run's time goes into § Performance as a cold-start reading
+- [ ] README note under the badge: says the demo is kept awake and what to expect if it is
+      ever found asleep, using a measured figure only
+- [ ] Owner action: run the workflow once by hand and confirm it is green
+- [ ] Tests + ruff green
 
 ---
 
@@ -1204,8 +1257,9 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 
 Recorded so they are not lost. None block the phases above.
 
-- **Hugging Face Spaces mirror** of the Streamlit app so the demo does not sleep; decision
-  recorded in Task 0.1. Bring it forward if Task 1.8's measured cold start or memory doesn't fit.
+- **Hugging Face Spaces mirror** of the Streamlit app; decision recorded in Task 0.1, revisited
+  after Task 1.8 (2026-10-18): stays deferred, because free Spaces also sleep after 48 h and the
+  cold start is handled by Task 1.9. Only worth it on paid always-on hardware.
 - **Git history rewrite** to drop `data/raw/rating.csv` and the MAL XMLs from history
   (`git filter-repo`); shrinks the pack from ~800 MB. **Task 0.2 untracked these files but
   deliberately did not touch history**, so a rewrite is now the only remaining step: the
@@ -1236,7 +1290,7 @@ Recorded so they are not lost. None block the phases above.
 Phase 0  0.1 public link (owner) → 0.2 raw data out → 0.3 LFS prune + stems → 0.4 one-cohort eval table → 0.5 tidy
          → 0.6 re-tune blend + intervals → 0.7 README-numbers test → 0.8 artifact smoke check
 Phase 1  1.1 name + panels → 1.2 sidebar IA → 1.3 explanations → 1.4 discovery default → 1.5 badge
-         → 1.6 demo profiles → 1.8 measure first load → 1.7 README + GIF
+         → 1.6 demo profiles → 1.8 measure first load → 1.7 README + GIF → 1.9 keep the demo awake
 Phase 2  2.1 MF diagnostic → 2.2 full ablation + hero chart → 2.3 learned reranker → 2.4 segment notebook
          → 2.5 write-up
 Phase 3  as decided
@@ -1247,6 +1301,7 @@ signal), 1.7 (the README numbers and the "93% MF" text), 2.2 and 2.3. 1.1, 1.2, 
 do not depend on 0.6 and can go ahead in parallel with it. 0.7 follows 0.6 (it pins the
 numbers 0.6 publishes). 0.8 is independent; 1.1's Scoring details move is where its load
 report surfaces. 1.8 follows 0.6 and 0.8 (it reuses the smoke script) and precedes 1.7.
+**Added 2026-10-18:** 1.9 follows 1.8 (its decision) and is independent of Phase 2.
 
 ## Cut Line
 
@@ -1255,7 +1310,7 @@ send" before it is finished. Tasks in order of how much a reviewer would notice 
 
 | Tier | Tasks | Ships as |
 |---|---|---|
-| **Must** — portfolio-ready | 0.5, 0.6, 0.7, 0.8, 0.9, 1.1, 1.3, 1.6, 1.8, 1.7, **2.5 short form** | The first five minutes are clean, the headline result is correct with intervals and enforced by a test, the demo shows personalization in one click, and a ~600-word write-up exists |
+| **Must** — portfolio-ready | 0.5, 0.6, 0.7, 0.8, 0.9, 1.1, 1.3, 1.6, 1.8, 1.7, 1.9, **2.5 short form** | The first five minutes are clean, the headline result is correct with intervals and enforced by a test, the demo shows personalization in one click, and a ~600-word write-up exists |
 | **Strong** — do next | 2.1, 2.2, 1.2, 1.4, 1.5 | Each one is a visible improvement, but missing it won't put a reviewer off |
 | **Nice to have** | 2.3, 2.4, Phase 3 | Interview depth more than first-impression value |
 

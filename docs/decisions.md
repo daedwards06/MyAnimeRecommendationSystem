@@ -5,6 +5,55 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-18 — Keep the demo awake with a scheduled browser visit; no Hugging Face mirror
+
+**Status:** Adopted (owner decision; implementation is Task 1.9). Answers the "what would change
+this" of the 2026-09-16 hosting entry: hosting stays on Community Cloud.
+
+**Context.** Task 1.8 measured the deployed app awake: first card at a median of 10.9 s (range
+10.9–11.2 s, three runs). Waking it reboots the container, which reloads every model before the
+first card (locally that load is ~20 s of a 28.5 s first card). The cold start itself was not
+measured: the one run that found the app asleep lost its reading. The owner already knew the
+wake was slow enough to lose visitors and decided not to spend three sleep cycles confirming it.
+Memory is not a constraint (519 MB peak against the 1 GB limit). The goal is that a visitor
+does not wait for a wake, without paying for hosting.
+
+**Options considered.**
+- *Hugging Face Spaces mirror (free tier).* The 2026-09-16 entry named it as the first
+  alternative, but free `cpu-basic` Spaces also pause after 48 hours of inactivity, so it would
+  sleep less often, not never. Hugging Face's Spaces overview now also says compute Spaces
+  (Gradio or Docker) need a paid plan; not confirmed against the pricing page. Either way it adds
+  a second host that can break or serve a stale build.
+- *Paid always-on hardware (Spaces or elsewhere).* Removes sleep entirely; ruled out on cost.
+- *Lazy-load or memory-map the artifacts.* Shortens a wake but does not prevent it, and since the
+  app serves item-kNN (2026-10-18 entry below) the largest artifact (189 MB) is needed for the
+  first card anyway. Deferring it would move the wait, not remove it.
+- *Keep it awake with a scheduled visit.* A GitHub Actions job opens the app in a headless
+  browser every few hours, well inside the sleep window. A plain HTTP request does not count:
+  `curl` gets a `200` from a sleeping app (DEPLOYMENT.md, "Verify From Outside"), and only a
+  browser session wakes it.
+
+**Decision.** Keep the app awake with a scheduled headless-browser visit that waits for the first
+card. The Hugging Face mirror stays deferred.
+
+**Why.** It costs nothing, changes nothing in the app, and keeps one host. It also answers the
+objection that ruled out the mirror, "a second thing that can break silently": the visit fails
+the job when no card appears, and GitHub emails the owner, so a broken demo surfaces within
+hours rather than when a reviewer finds it. Each run logs time to first card, and a run that
+finds the app asleep is a cold-start reading for free.
+
+**Known limits.** A push to `main` redeploys and reboots the app, so the first visitor after a
+push pays the model load unless the job also runs after pushes. GitHub disables scheduled
+workflows in a repository with no commits for 60 days (it emails first; re-enabling is one
+click). Community Cloud's exact sleep window is not pinned down here; the schedule starts at
+every 6 hours and is tightened if the job's logs show it finding the app asleep.
+
+**What would change this.** Community Cloud's terms or behavior stop treating scheduled visits as
+traffic (the app sleeps despite the job); the app outgrows 1 GB; or paid hosting becomes
+acceptable. A Spaces deployment on upgraded hardware is then the next option.
+
+---
+
 ## 2026-10-18 — The app serves item-kNN: Balanced is the re-tuned blend, Diversity is kNN alone
 
 **Status:** Adopted (supersedes the "served weights stay" decision of 2026-10-17)
@@ -297,7 +346,8 @@ the matching `APP_*_STEM` env var, or the optional families drop out silently ag
 
 ## 2026-09-16 — Demo hosting stays on Streamlit Community Cloud; Hugging Face Spaces mirror deferred
 
-**Status:** Deferred (revisit in Phase 3)
+**Status:** Deferred (revisit in Phase 3). Revisited 2026-10-18: hosting stays; the cold start is
+handled by keeping the app awake (newest entry)
 
 **Context.** The README badge is the first click a reviewer makes, and the portfolio plan opened
 with a finding that the link was broken for anonymous visitors: `curl` on it returns `303` to
