@@ -1,7 +1,10 @@
 # MARS Portfolio + Product Plan — From Working Recommender to Credible Portfolio Piece
 
 > Generated: 2026-09-12 | Scope decided with the project owner over a product + portfolio review
-> Executor: Claude via Claude Code (protocol in `CLAUDE.md`) | Est. effort: 4 phases, 17 tasks + a deferred list
+> Revised: 2026-10-17 after Task 0.4's corrected evaluation reordered the models (Task 0.6 added,
+> Task 2.1 retargeted from kNN to MF, Tasks 1.3 / 2.2 / 2.3 / 2.5 and the success criteria updated);
+> then Tasks 0.7, 0.8, 1.8 and a Cut Line added
+> Executor: Claude via Claude Code (protocol in `CLAUDE.md`) | Est. effort: 4 phases, 21 tasks + a deferred list
 > Owner: data scientist; this is the single portfolio project, so every task is judged by
 > "what does a hiring manager see in the first five minutes?"
 
@@ -20,8 +23,9 @@ told.
 | ~~The public demo link never renders for an anonymous visitor~~ **Not reproduced (2026-09-16)** | The `303` to `share.streamlit.io/-/auth/app` is the anonymous-session cookie handshake every Community Cloud app performs, not an auth wall. Followed with a cookie jar it completes in three hops and serves the app with `200`; the dashboard was already "public and searchable". The original finding inspected only the first hop |
 | The README headline lift is the baseline compared with itself | **Corrected 2026-09-16.** `+43% NDCG / +61% MAP` is popularity@500 (0.043849 / 0.029593) over popularity@300 (0.030722 / 0.018332) — the lift percentages match those rows exactly. The hybrid is absent from the ablation table entirely (see the next row), so **no hybrid lift has ever been published**; hybrid@500 is 0.044411 (+44.6%), a number that appears nowhere. In the 1,000-user cohort: popularity 0.0412, MF 0.0504, hybrid 0.0497 — but see the conflicting-rows note in Task 0.4 |
 | The ablation table is mislabeled | `generate_phase4_ablation.py` filters on model names `mf`/`hybrid` that do not exist in the parquet (`mf_sgd`/`hybrid_weighted`), so MF and hybrid are silently dropped and the output is ten rows all labeled `popularity` at three different cohort sizes. `compute_lifts` takes `iloc[0]` as the baseline (popularity@300) and the output drops `users_evaluated`, making the mismatch invisible. **This table is where the README's headline number comes from.** Regenerating it reproduces the committed CSV value-for-value |
-| MF alone beats the hybrid on accuracy | 1,000-user cohort: MF NDCG 0.0504 / coverage 0.071 vs. hybrid 0.0497 / 0.066. The honest story is "hybrid ≈ MF, both far above popularity on coverage", and it is not told |
-| Item-kNN scores near zero offline | NDCG@10 of 0.0017 at 1,000 users, 30× below MF; either a bug or a result that needs explaining before it carries 7% of the blend |
+| ~~MF alone beats the hybrid on accuracy~~ **Superseded by Task 0.4 (2026-09-17)** | Original: MF NDCG 0.0504 vs. hybrid 0.0497. On the corrected protocol hybrid ≈ MF still holds (0.0324 vs. 0.0326), but **both sit below popularity** (0.0347) and MF fell 35% from the figure quoted here — see Task 2.1 |
+| ~~Item-kNN scores near zero offline~~ **Resolved by Task 0.4 — it was the evaluation** | Original: NDCG@10 0.0017. `recommend(exclude_seen=True)` masked items using the model's own matrix, so a full-fit artifact removed the held-out item before scoring. On train-split artifacts item-kNN is the **best** model: 0.0628, +81% vs. popularity |
+| The shipped blend is mistuned *(added 2026-10-17)* | `BALANCED_WEIGHTS` (mf 0.931 / knn 0.066 / pop 0.003) came from an Optuna sweep run while kNN could not score, so it weights the weakest CF model highest. RRF over the same three sources reaches 0.0586 vs. the shipped blend's 0.0324. `reports/phase4_evaluation.md` §8 names re-tuning the top open item; Task 0.6 does it |
 | The evaluation report is labeled a draft | `reports/phase4_evaluation.md` opens with "Draft artifact – populate after running"; the model card says the ablation CSV is a draft with duplicate rows |
 | The primary action is fourth in the sidebar | Order is Mode → Profile → Personalization → Search → Filters; the README screenshot shows the sidebar already scrolled |
 | Cards show debug output as the explanation | `CF 0.0% \| Content 94.9% \| Popularity 5.1%` renders on every card; to a user "CF 0.0%" reads as "the model did nothing" |
@@ -51,8 +55,10 @@ told.
    README, the first screen, the first card.
 2. **One cohort, one script, one table.** Every number in the README comes from a single
    reproducible run at one sample size and one seed, produced by a script that is in the repo.
-3. **Say what the model is.** Hybrid ≈ MF on accuracy; the value is coverage and explainability.
-   Tell that story instead of a lift that does not survive a matched comparison.
+3. **Say what the model is.** Tell the result the matched comparison actually gives, including
+   the parts that are unflattering. As of Task 0.4 that is: item-kNN wins, the shipped blend ≈ MF
+   ≈ popularity on accuracy with ~11× popularity's coverage, and the blend was tuned under a
+   broken protocol. Every "≈" or "beats" claim carries an interval (Task 0.6).
 4. **Users see words, reviewers see numbers.** Plain-language explanations on the card; raw
    shares, timings, and weights behind an expander.
 5. **Additive UI changes.** Session-state keys, modes, and the pipeline contract stay; the
@@ -214,6 +220,13 @@ streamlit run app/main.py   # visual: app boots; "Scoring details" shows the ste
 > delta −0.0018, between-seed spread 0.0040). Do not expect the provisional figures quoted in this
 > task to move much; do expect to be able to say the split was clean. See `docs/decisions.md`,
 > "One CF trainer; offline evaluation gets its own train-split artifacts".
+>
+> **Outcome (2026-10-17): that prediction was wrong.** The figures moved a lot. Item-kNN went
+> from 0.0017 to 0.0628: the train split stopped `recommend(exclude_seen=True)` from masking the
+> held-out item. MF went from 0.0504 to 0.0326, and the interaction snapshot changed between the
+> two runs (refreshed 2026-03-14), so this is not a clean before/after. The provisional figures
+> below are kept as history. The current table is `reports/phase4_ablation.md`. Task 0.6 and
+> Task 2.1 follow up.
 
 
 **Why:** *(premise corrected 2026-09-16 — the original was wrong in a way that widens this
@@ -279,8 +292,10 @@ ruff check src/ tests/
       `gini` columns; add a "vs. MF" lift column next to "vs. popularity"; sort rows by NDCG
 - [x] `run_unified_eval.py`: pass `--sample-users` through consistently and write the seed and
       artifact stems (Task 0.3 constants) into every JSON
-- [ ] Re-run at 1,000 users, seed 42, against the app's stems; commit the regenerated
-      `phase4_ablation.{csv,md}` and `metrics_by_k.parquet`
+- [x] Re-run at 1,000 users, seed 42, against **train-split artifacts** (per the precondition;
+      every JSON records the served stems alongside); commit the regenerated
+      `phase4_ablation.{csv,md}` and `metrics_by_k.parquet` — *done in `70818e07`. The item
+      originally said "against the app's stems", which the train-split precondition supersedes*
 - [x] README § Results: one table (model, NDCG@10, MAP@10, Coverage@10, Gini@10, lift vs.
       popularity), one sentence that says hybrid ≈ MF on accuracy with ~11× the coverage of
       popularity; **move** the synthetic temporal-split table out of the README into
@@ -339,6 +354,178 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
       `UX_Suggestions.md` into `docs/ui_design.md` § Backlog before removing it
 - [ ] `docs/index.md`: replace the placeholder with a one-screen table of contents linking
       every doc and report (it becomes the write-up landing page in Task 2.5)
+- [ ] Stale test counts: README (pitch paragraph and project tree) and `CLAUDE.md` say 246
+      tests; use the count from this task's own green run. Prefer wording that does not go stale
+      (e.g. "~290 tests") over an exact number
+- [ ] Tests + ruff green
+
+---
+
+## Task 0.6: Re-tune the Blend Under the Corrected Protocol, With Intervals
+
+*(Added 2026-10-17.)*
+
+**Why:** Task 0.4 showed that the app serves a blend weighted toward its weakest CF model.
+`BALANCED_WEIGHTS` (mf 0.931 / knn 0.066 / pop 0.003) came from an Optuna sweep run while
+item-kNN could not score at all. On the corrected protocol, kNN alone gets NDCG@10 0.0628, RRF
+over the same three sources gets 0.0586, and the shipped weighted blend gets 0.0324, which is
+below popularity. `reports/phase4_evaluation.md` §8 calls this the highest-value open item.
+
+This task runs before Phase 1 because three later tasks depend on which signal dominates: the
+card wording in 1.3, the variants in 2.2, and the baseline the learned reranker has to beat in
+2.3.
+
+Two problems with how the old sweep was set up:
+- **It tuned on the test users.** `tune_hybrid_optuna.py` and the eval scripts both call
+  `sample_user_ids(val_df users, n)` with `RANDOM_SEED = 42` on the same population, so the
+  sweep users almost certainly overlap the 1,000-user reporting cohort. Weights tuned on the
+  reporting cohort make the next headline number optimistic by construction.
+- **No published comparison has an interval.** A −0.6% "hybrid ≈ MF" gap and a −6% "MF vs.
+  popularity" gap come from one seed with no spread.
+
+**Preflight Files:**
+- `scripts/tune_hybrid_optuna.py` (`_prepare_cache` lines 21–30: the user sample; `tune_hybrid`
+  writes `experiments/optuna_studies/hybrid_weights_best.json`)
+- `src/eval/splits.py` (`build_validation`, `sample_user_ids`)
+- `src/eval/eval_artifacts.py` (`load_eval_models`, `run_metadata`)
+- `scripts/evaluate_hybrid.py` (weighted and RRF paths; `--w-mf/--w-knn/--w-pop`)
+- `scripts/run_unified_eval.py`, `scripts/aggregate_phase4_metrics.py`,
+  `scripts/generate_phase4_ablation.py`
+- `src/app/constants.py` (`BALANCED_WEIGHTS`, `DIVERSITY_EMPHASIZED_WEIGHTS`)
+- `src/app/recommender.py` (`choose_weights` line ~318)
+- `src/models/constants.py` (`DEFAULT_HYBRID_WEIGHTS`)
+- `src/app/recommender.py`, `src/app/scoring_pipeline.py` (where the weights are consumed —
+  confirm whether RRF could be served without changing the pipeline contract)
+- `reports/phase4_evaluation.md` §8–§9, `docs/MODEL_CARD.md` § Metrics, `README.md` § Results
+
+**Validation Commands:**
+```powershell
+python scripts/tune_hybrid_optuna.py --trials 100 --sample-users 1000
+# Expect: the printed tuning-user set has zero overlap with the reporting cohort
+python scripts/run_unified_eval.py --k 10 --sample-users 1000
+python scripts/aggregate_phase4_metrics.py --cohort 1000
+python scripts/generate_phase4_ablation.py
+# Expect: phase4_ablation.md has ndcg@10 95% CI columns and rows for hybrid_weighted (old),
+# hybrid_weighted (re-tuned), hybrid_rrf, item_knn_sklearn
+$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
+ruff check src/ tests/
+```
+
+**Checklist:**
+- [ ] Tuning users come from the validation users **minus** the reporting cohort (one helper in
+      `src/eval/splits.py`, used by both scripts). Record the tuning-set size and seed in the
+      Optuna output JSON
+- [ ] Per-user metric vectors are kept, and the ablation reports a 95% bootstrap CI on NDCG@10
+      and MAP@10 (users resampled, 1,000 resamples, fixed seed), plus a paired bootstrap CI on
+      the NDCG difference vs. popularity and vs. MF. Paired, because every model is scored on
+      the same users
+- [ ] Re-tune the weighted blend; evaluate on the reporting cohort: old weights, re-tuned
+      weights, RRF, kNN alone
+- [ ] Decide what the app serves, using the paired intervals: re-tuned weights, RRF, or kNN
+      alone. Record it in `docs/decisions.md` with the numbers. If the winner is RRF and serving
+      it would change the pipeline contract, stop: ship the best *weighted* blend now and record
+      RRF as a follow-up
+- [ ] Update `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (and `DIVERSITY_EMPHASIZED_WEIGHTS`
+      if a diversity-aware re-tune changes it); confirm the README Key Features and the
+      architecture diagram's "93% MF + 7% kNN" are updated to match
+- [ ] Regenerate the ablation, then update README § Results, model card § Metrics and
+      `reports/phase4_evaluation.md` §8 (the "re-tune is the top open item" text becomes the
+      result). No claim of "≈" or "beats" whose paired CI says otherwise
+- [ ] Visual check: the app boots in all three modes with the new weights; Steins;Gate seed
+      still gives sensible results (seed mode reranks with these CF scores too)
+- [ ] Tests: tuning and reporting user sets are disjoint; bootstrap CI is deterministic with a
+      seed and brackets the point estimate; existing weight-selection tests updated on purpose
+- [ ] Tests + ruff green
+
+---
+
+## Task 0.7: A Test That the README Numbers Match the Ablation Table
+
+*(Added 2026-10-17.)*
+
+**Why:** Success criterion 2 (every README number appears verbatim in the ablation) has been
+enforced by hand, and by-hand is how the original headline lift came about. A test that reads
+both files makes the criterion something CI checks. It needs no model artifacts, so it runs in
+CI as-is.
+
+**Preflight Files:**
+- `README.md` § Results (the ablation table and the lift sentence after it)
+- `reports/phase4_ablation.csv`, `reports/phase4_ablation.md`
+- `scripts/generate_phase4_ablation.py` (column names and rounding, which the README copies)
+- `docs/MODEL_CARD.md` § Metrics (quotes the same table)
+- `tests/test_phase4_aggregate.py` (style of the existing evaluation tests)
+
+**Validation Commands:**
+```powershell
+$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q tests/test_published_numbers.py
+# Then change one README value by 0.0001 and confirm the test fails, then revert
+$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
+ruff check src/ tests/
+```
+
+**Checklist:**
+- [ ] `tests/test_published_numbers.py`: parse the README Results table (model label → NDCG,
+      MAP, coverage, Gini, lift) and assert each value equals the CSV value rounded the way the
+      README shows it; same for the model card's table
+- [ ] A small explicit label map (README display name → ablation model id) in the test, and
+      the test fails on any README row the map doesn't cover. A renamed row can't silently
+      drop out of the check
+- [ ] Prose numbers in the Results paragraph (e.g. "10.9× popularity's coverage", "within
+      0.6%") are recomputed from the CSV and checked too; keep the list short and explicit
+- [ ] Mutation check from the Validation Commands done and reverted
+- [ ] Tests + ruff green
+
+---
+
+## Task 0.8: Smoke Check Against the Real Artifacts; Optional Models Fail Loudly
+
+*(Added 2026-10-17.)*
+
+**Why:** CI runs with `APP_IMPORT_LIGHT=1` and checks out no LFS objects, so no automated check
+has ever loaded the real models. That is how synopsis TF-IDF and synopsis embeddings went
+unloaded in the deployed app with nobody noticing (found in Task 0.3). `build_artifacts` still
+catches `ArtifactContractError` for kNN, TF-IDF, embeddings and neural embeddings and carries on
+(`src/app/artifacts_loader.py` lines ~360–412), which works against the convention that the
+app never silently falls back. Pulling ~250 MB of LFS on every CI run would use up GitHub's
+free LFS bandwidth, so the smoke check runs locally or on a schedule, not on every push.
+
+**Preflight Files:**
+- `src/app/artifacts_loader.py` (`build_artifacts`, `_load_models`, the optional-family
+  `except ArtifactContractError` blocks)
+- `app/main.py` (`@st.cache_resource` around `build_artifacts()` line ~63)
+- `app/display.py` (Scoring details expander, which moves to the footer in Task 1.1)
+- `src/app/scoring_pipeline.py` (`run_seed_based_pipeline`, `run_personalized_pipeline`: the
+  smoke run calls these, not Streamlit)
+- `Makefile` (`test`, `ci` targets: pattern for a new `smoke` target)
+- `.github/workflows/ci.yml` (no LFS checkout, light import mode)
+- `docs/DEPLOYMENT.md`
+
+**Validation Commands:**
+```powershell
+python scripts/smoke_artifacts.py
+# Expect: one line per model family (loaded / stem / size), a seed-mode top-10 for Steins;Gate and a
+# personalized top-10 for the example profile, exit 0
+# Then rename one synopsis artifact, re-run: expect non-zero exit naming that family; restore it
+$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
+ruff check src/ tests/
+```
+
+**Checklist:**
+- [ ] `build_artifacts` records which families loaded and why any did not (e.g. a
+      `bundle["load_report"]` dict); the optional-family blocks log at warning level with the
+      reason, instead of passing silently
+- [ ] The app shows a visible notice when a family that is expected for deployment fails to load
+      (one line under the header, details in Scoring details). It keeps running, but says what
+      is off. Which families count as "expected" is one constant in `src/app/constants.py`
+- [ ] `scripts/smoke_artifacts.py` + `make smoke`: loads the real bundle, prints the load
+      report, runs one seed query and one personalized query through the pipeline functions,
+      exits non-zero if an expected family is missing or either query returns fewer than 10
+      results
+- [ ] Optional: a `workflow_dispatch` + weekly `schedule` GitHub workflow with `lfs: true` that
+      runs `make smoke`. Note the LFS bandwidth cost in `docs/DEPLOYMENT.md`; owner decides
+      whether to enable it
+- [ ] Tests: the load report marks a family missing when its artifact is absent (temp-dir
+      fixtures, like `tests/test_artifacts_loader.py`); the expected-family notice fires
 - [ ] Tests + ruff green
 
 ---
@@ -426,10 +613,14 @@ explanation. The data to write a sentence already exists in the contributions di
 
 **The line is also factually wrong, so this is a correctness fix and not only a presentation
 one** (found 2026-09-16). `_DISPLAY_LABELS` maps `knn → "Content"`, but the blend has exactly
-three signals — `mf` 0.931, `knn` 0.066, `pop` 0.003 (`DEFAULT_HYBRID_WEIGHTS`) — and **no
-content signal at all**. Item-kNN is collaborative filtering over the user-item matrix, so
-"Content 94.9%" is the kNN share under a false name. Moving that line into an expander without
-renaming it would preserve the error somewhere less visible.
+three signals — `mf` 0.931, `knn` 0.066, `pop` 0.003 (`DEFAULT_HYBRID_WEIGHTS` before Task
+0.6) — and **no content signal at all**. Item-kNN is collaborative filtering over the user-item
+matrix, so "Content 94.9%" is the kNN share under a false name. Moving that line into an expander
+without renaming it would preserve the error somewhere less visible.
+
+**Runs after Task 0.6** *(added 2026-10-17)*. The sentence clauses are chosen by which signal
+dominates, and Task 0.6 decides that. Under the old weights an "MF share > 0.5" rule would fire
+on almost every card.
 
 **Preflight Files:**
 - `src/app/explanations.py` (`format_explanation`, `format_seed_explanation`, `_DISPLAY_LABELS`
@@ -458,9 +649,11 @@ streamlit run app/main.py   # visual: card reads e.g. "Shares Sci-Fi and Suspens
 - [ ] `explain_in_words(contributions, seed_titles, item_genres) -> str` in
       `src/app/explanations.py`: up to three clauses chosen by which signal dominates
       (genre/theme overlap → "Shares X and Y with <seed>"; synopsis sim above the high-sim
-      threshold → "very similar story"; MF share > 0.5 → "fans of <seed> also rate it highly";
-      popularity band → "a well-known pick" / "a hidden gem"); deterministic; never mentions
-      a component with zero share
+      threshold → "very similar story"; **kNN** share is the largest CF share → "fans of <seed>
+      also rate it highly" (that sentence is literally what item-item CF measures; MF gets its
+      own phrasing, e.g. "matches the taste of people who liked <seed>", and neither fires on a
+      fixed share threshold tuned to the old 93/7 weights); popularity band → "a well-known
+      pick" / "a hidden gem"); deterministic; never mentions a component with zero share
 - [ ] Fix `_DISPLAY_LABELS` first: `knn` is labelled as the collaborative signal it is (e.g.
       "Similar-item CF"), not "Content". Check whether "CF" for `mf` stays unambiguous once
       both are CF — "Matrix factorization" / "Similar-item CF" / "Popularity" reads honestly
@@ -616,52 +809,122 @@ ruff check src/ tests/ app/
 - [ ] New order: 2-sentence pitch → demo badge + GIF (10–15 s: pick a seed, read a card's
       explanation, switch to a demo profile) → Results (one table + one sentence, from Task 0.4)
       → How it works (existing Mermaid diagram, trimmed) → What was hard / what I learned
-      (5 bullets: MF ≈ hybrid, kNN result, coverage vs. accuracy, synthetic timestamps,
-      hand-tuned gates) → Quick Start → Links (docs index, model card, write-up)
+      (5 bullets: the evaluation bug that hid kNN and the re-tune it forced, MF vs. popularity
+      (Task 2.1), coverage vs. accuracy, synthetic timestamps, hand-tuned gates) → Quick Start → Links (docs index, model card, write-up)
 - [ ] Catalog refresh, project structure, and tech stack move to `docs/` pages linked from
       the index
 - [ ] Record the GIF with the final UI; keep a still PNG as fallback; both under
       `app/assets/`; each under 5 MB
-- [ ] Every number in the README is copied from `reports/phase4_ablation.md`
+- [ ] Every number in the README is copied from `reports/phase4_ablation.md` (the Task 0.7
+      test enforces this; extend its prose-number list for any new number the rewrite adds)
+- [ ] Tests + ruff green
+
+---
+
+## Task 1.8: Measure the First Load
+
+*(Added 2026-10-17.)*
+
+**Why:** Success criterion 1 says a visitor sees recommendations within 30 seconds, but that has
+never been measured. Wake-up alone is 10–20 s, then the app loads ~250 MB of models on Community
+Cloud's 1 GB RAM tier. `docs/DEPLOYMENT.md` estimates memory at "~600–800 MB", and nobody has
+measured that either. Task 0.6 can change what loads at startup, and if the measurements don't
+fit, that is a reason to bring the Phase 3 Hugging Face mirror forward. Do this after Task 0.6
+and before Task 1.7 records the GIF.
+
+**Preflight Files:**
+- `docs/DEPLOYMENT.md` (§ Streamlit Cloud limits, § Memory Limits, the RAM estimate)
+- `app/main.py` (`st.set_page_config`, cached `build_artifacts()`, first render path)
+- `src/app/artifacts_loader.py` (`build_artifacts`: what loads eagerly)
+- `.python-version` (3.11.9, what Cloud runs) vs. the local 3.12 venv
+- `requirements.txt` (pinned versions; confirm the eval-time library versions match)
+
+**Validation Commands:**
+```powershell
+# After the app has slept: time to first card, three runs, by stopwatch or browser devtools
+# Warm: reload, time to first card
+python scripts/smoke_artifacts.py --profile-memory   # local peak RSS during load + one query
+```
+
+**Checklist:**
+- [ ] Cold start (after sleep) and warm load timed on the deployed app, three runs each;
+      record the median and the range in `docs/DEPLOYMENT.md` § Performance with the date
+- [ ] Peak memory during load + first query measured locally (`--profile-memory` on the Task
+      0.8 smoke script, using `tracemalloc` or `psutil` RSS); replace the "~600–800 MB" estimate
+      with the measured number
+- [ ] If cold start > 30 s or peak memory > 800 MB: record options in `docs/decisions.md`
+      (lazy-load the neural model, memory-map artifacts, Hugging Face mirror) and decide with
+      the owner; do not implement here
+- [ ] Python version: confirm the Task 0.6 ablation reproduces under 3.11 (CI's and Cloud's
+      version) to the published rounding, or record that it was checked and differs
+- [ ] README demo note under the badge uses the measured cold-start figure
 - [ ] Tests + ruff green
 
 ---
 
 # Phase 2 — Data-Science Credibility
 
-## Task 2.1: Item-kNN Diagnostic
+## Task 2.1: MF Diagnostic — Why Matrix Factorization Sits Below Popularity
 
-**Why:** Offline item-kNN NDCG@10 is 0.0017 at 1,000 users, 30× below MF and 25× below
-popularity. Either the evaluation path is wrong (`recommend` vs `score_all`, exclude-seen,
-user-profile shrinkage, the popularity prior) or kNN genuinely fails on this data. Either answer
-must be known before kNN carries 7% of the blend and a line in the README.
+*(Retargeted 2026-10-17. This was the item-kNN diagnostic. Task 0.4 answered that question:
+kNN's 0.0017 came from `recommend(exclude_seen=True)` masking the held-out item in a full-fit
+artifact, and on train-split artifacts kNN is the best model. One piece of that work carries
+over, a regression test. The open question is now MF.)*
+
+**Why:** On the corrected protocol, FunkSVD scores NDCG@10 0.0326, below the popularity
+baseline's 0.0347. It also fell 35% from the 0.0504 the plan first quoted, and two things changed
+between those runs: the protocol and the interaction snapshot (refreshed 2026-03-14). There is a
+well-known candidate explanation. FunkSVD is fit to minimize rating error (RMSE) on observed
+ratings, and that objective is often weak at top-N ranking over the full catalog. Sparse items
+can get high predicted ratings, and the model has no signal for which items a user *chose to
+watch*. If that is the cause, it is a good finding to explain, not a bug. It still has to be
+shown rather than assumed, because MF drives the personalized mode, and still dominates the
+blend unless Task 0.6 changes that.
 
 **Preflight Files:**
-- `src/models/knn_sklearn.py` (`ItemKNNRecommender.fit`, `_user_profile`, `recommend`,
-  `score_all`; k=40 cosine, shrinkage, popularity prior)
-- `scripts/evaluate_knn_mf.py` (lines 55–100: builds `knn_recs` via `recommend(exclude_seen=True)`)
-- `scripts/evaluate_hybrid.py` (uses `score_all` — compare the two paths on the same users)
-- `src/eval/metrics.py` (`ndcg_at_k`, `average_precision_at_k`, `evaluate_ranking`)
-- `src/eval/splits.py` (`build_validation` — check that val items for a user are not in train)
-- `experiments/optuna_studies/hybrid_weights_best.json` (the 0.066 kNN weight came from Optuna
-  on validation NDCG — confirm what kNN contributed there)
+- `src/models/mf_sgd.py` (`FunkSVDRecommender.fit`, `recommend(exclude=...)`; the training loss)
+- `src/models/knn_sklearn.py` (`recommend(exclude_seen=True)`: which matrix the seen-mask comes
+  from; this is the Task 0.4 finding the regression test pins)
+- `src/eval/eval_artifacts.py` (`load_eval_models`, the fingerprint cache)
+- `scripts/evaluate_knn_mf.py`, `scripts/evaluate_hybrid.py` (MF eval path; exclusion set built
+  from train history)
+- `src/eval/splits.py` (`build_validation`: the held-out item is one random rating per user, not
+  necessarily a *liked* item, so check what "relevant" means for a 3/10 rating)
+- `experiments/optuna_studies/mf_sgd_best.json`, `mf_sgd_trials.csv` (what the MF sweep
+  optimized; `docs/decisions.md` notes the "tuned" values equal the class defaults)
+- `reports/phase4_evaluation.md` §8, `reports/phase3_summary.md` (superseded MF figures and the
+  snapshot note)
 
 **Validation Commands:**
 ```powershell
-python scripts/diagnose_knn.py --sample-users 300
-# Expect: a table of NDCG@10 for kNN under each hypothesis (as-is, no popularity prior, score_all path, no shrinkage, k in {20,40,100}) and a one-paragraph conclusion
+python scripts/diagnose_mf.py --sample-users 1000
+# Expect: a table of NDCG@10 / coverage@10 with paired CIs vs. popularity for: MF as-is; MF on the
+# pre-2026-03-14 snapshot (if recoverable) vs. current; MF with a popularity-debiased score; MF
+# scored on liked holdouts only (rating >= 8); an implicit-feedback MF (BPR or ALS on watched/not
+# watched); and a short conclusion
 $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `scripts/diagnose_knn.py`: runs the hypotheses above on one user sample and prints a
-      table; writes `reports/knn_diagnostic.md`
-- [ ] If a bug: fix it in `knn_sklearn.py` or the eval script with a regression test; re-run
-      Task 0.4's pipeline and update the table
-- [ ] If not a bug: `reports/knn_diagnostic.md` explains why (sparsity, rating-weighted
-      profiles, prior), and the model card + README "What I learned" cite it
-- [ ] Decide whether the kNN weight in `BALANCED_WEIGHTS` stays; record in `docs/decisions.md`
+- [ ] **Carry-over regression test (from the kNN finding):** a kNN model fit on data that
+      contains a user's held-out item, evaluated with that user's *train* history, must not mask
+      the held-out item. Whichever exclusion source the eval path uses, the test fails if it
+      goes back to the model's own matrix
+- [ ] Separate the 0.0504 → 0.0326 drop into a protocol part and a snapshot part. Run old protocol
+      on new data, and new protocol on new data. Run on old data too if that snapshot can be
+      rebuilt; if not, say so
+- [ ] Relevance definition: re-score all models with the holdout restricted to liked items
+      (rating ≥ 8) as a sensitivity check. Report whether the model ordering changes
+- [ ] Objective: add an implicit-feedback MF variant (BPR or ALS; prefer a small numpy
+      implementation or the `implicit` package in `requirements-dev.txt`, not the app's
+      requirements) and evaluate it on the same cohort with the Task 0.6 intervals
+- [ ] `scripts/diagnose_mf.py` writes `reports/mf_diagnostic.md`: table, conclusion, and what
+      it means for the served personalized mode
+- [ ] If implicit MF clearly beats FunkSVD (paired CI excludes 0): record it in
+      `docs/decisions.md` as a candidate for serving. Swapping the served MF is a separate task
+      (it touches `user_embedding.py` and the personalized gate). Not done here
+- [ ] Model card § Limitations and README "What I learned" cite the result
 - [ ] Tests + ruff green
 
 ---
@@ -688,15 +951,18 @@ python scripts/run_unified_eval.py --k 10 --sample-users 1000 --variants all
 python scripts/aggregate_phase4_metrics.py --cohort 1000
 python scripts/generate_phase4_ablation.py
 python scripts/plot_ablation_tradeoff.py
-# Expect: reports/figures/ablation_accuracy_vs_coverage.png with 9 labeled points; reports/phase4_ablation.md with 9 rows
+# Expect: reports/figures/ablation_accuracy_vs_coverage.png with one labeled point per variant (10, or 11 with implicit MF); reports/phase4_ablation.md with the same rows
 $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] Variants: popularity, item-kNN, MF, MF+kNN (no pop), hybrid balanced (Optuna weights),
-      hybrid diversity-emphasized, hybrid RRF, content TF-IDF, content embeddings — all at
-      K ∈ {5, 10, 20}, 1,000 users, seed 42, with coverage and Gini for every row
+- [ ] Variants: popularity, item-kNN, MF, MF+kNN (no pop), hybrid balanced (**Task 0.6
+      re-tuned weights**), hybrid with the pre-0.6 weights (labelled as such, so the re-tune is
+      visible on the chart), hybrid diversity-emphasized, hybrid RRF, content TF-IDF, content
+      embeddings, plus implicit MF if Task 2.1 added it. All at K ∈ {5, 10, 20}, 1,000 users,
+      seed 42, with coverage, Gini and the Task 0.6 bootstrap CIs for every row
+- [ ] The trade-off plot draws the NDCG CI as a horizontal error bar on each point
 - [ ] `scripts/plot_ablation_tradeoff.py`: NDCG@10 (x) vs Coverage@10 (y), one point per
       variant, labeled, popularity and MF highlighted; also NDCG@K curves now that K varies
 - [ ] `reports/phase4_evaluation.md` §2–§4 embed the new figures and table; §8 narrative
@@ -719,7 +985,9 @@ material; only a clear win changes the app.
   signal keys: `mf`/`knn`/`pop` scores, `weighted_overlap`, `metadata_affinity`,
   `synopsis_neural_sim`, `synopsis_tfidf_sim`, `synopsis_embed_sim`, `theme_overlap`,
   `mal_score`, popularity percentile)
-- `src/app/recommender.py` (hybrid blend — the baseline the ranker must beat)
+- `src/app/recommender.py` (hybrid blend — the baseline the ranker must beat, **with the Task 0.6
+  re-tuned weights**. Beating the pre-0.6 weights is not a result: RRF already beats them by 80%
+  with no learning. Report the RRF row too)
 - `src/models/user_embedding.py` (`generate_user_embedding`, `compute_personalized_scores` —
   per-user MF scores for held-out users)
 - `src/eval/splits.py`, `src/eval/metrics.py`
@@ -741,8 +1009,8 @@ ruff check src/ tests/
 - [ ] `scripts/train_learned_reranker.py`: user-level train/val split disjoint from the eval
       cohort; reports metrics for hand-weighted vs learned on identical candidates; writes
       `reports/learned_reranker.md` with feature importance and a one-paragraph conclusion
-- [ ] If learned NDCG@10 beats hand-weighted by more than the seed-to-seed spread (run 3
-      seeds): wire it behind `RERANKER_MODE=learned` in `constants.py` and the personalized
+- [ ] If learned NDCG@10 beats the re-tuned hand-weighted blend by more than the seed-to-seed
+      spread (run 3 seeds) and the paired bootstrap CI on the difference excludes 0: wire it behind `RERANKER_MODE=learned` in `constants.py` and the personalized
       pipeline only; otherwise the app is untouched and the report says why
 - [ ] README "What I learned" gets the one-line result either way
 - [ ] Tests: feature frame shape and no label leakage (val items absent from features);
@@ -789,6 +1057,11 @@ ruff check src/ tests/
 
 ## Task 2.5: The Write-Up
 
+**Short form first** *(added 2026-10-17; see Cut Line)*: a ~600-word version (problem, approach,
+corrected result, what went wrong and how it was caught) is written right after Task 1.7 and
+linked from the README. It does not wait for 2.1–2.4. This task then extends that same file to
+full length.
+
 **Why:** A 1,500-word narrative is what a reviewer reads when they want to know how the owner
 thinks. The repo has the material scattered across a model card, a draft report, a proposal,
 and commit messages.
@@ -798,8 +1071,8 @@ and commit messages.
   `docs/WRITEUP.md`)
 - `docs/PROJECT_PROPOSAL.md` (original goals — useful for "what changed from the plan")
 - `docs/MODEL_CARD.md` (limitations and ethics sections)
-- `reports/phase4_evaluation.md`, `reports/phase4_ablation.md`, `reports/knn_diagnostic.md`,
-  `reports/learned_reranker.md` (Tasks 0.4, 2.1–2.3 outputs)
+- `reports/phase4_evaluation.md`, `reports/phase4_ablation.md`, `reports/mf_diagnostic.md`,
+  `reports/learned_reranker.md` (Tasks 0.4, 0.6, 2.1–2.3 outputs)
 - `notebooks/03_segment_and_error_analysis.ipynb` (Task 2.4 takeaways)
 - `docs/decisions.md` (dated decision log started in Task 0.1)
 
@@ -811,8 +1084,10 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 
 **Checklist:**
 - [ ] `docs/WRITEUP.md` sections: the problem and data → approach (why three stages, why
-      hybrid) → results (the hero chart, one paragraph) → what did not work (RRF, kNN,
-      embeddings below TF-IDF for cold start, synthetic timestamps) → product decisions
+      hybrid) → results (the hero chart, one paragraph) → what went wrong and how it was caught
+      (the self-compared headline lift, the exclude-seen masking that hid kNN, weights tuned
+      under that protocol and on the reporting cohort) → what did not work (rating-trained MF for
+      top-N, embeddings below TF-IDF for cold start, synthetic timestamps) → product decisions
       (explanations, discovery default, demo profiles) → what I would do next
 - [ ] Written in first person, past tense, no marketing language; numbers copied from the
       reports, not retyped
@@ -826,7 +1101,7 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 Recorded so they are not lost. None block the phases above.
 
 - **Hugging Face Spaces mirror** of the Streamlit app so the demo does not sleep; decision
-  recorded in Task 0.1.
+  recorded in Task 0.1. Bring it forward if Task 1.8's measured cold start or memory doesn't fit.
 - **Git history rewrite** to drop `data/raw/rating.csv` and the MAL XMLs from history
   (`git filter-repo`); shrinks the pack from ~800 MB. **Task 0.2 untracked these files but
   deliberately did not touch history**, so a rewrite is now the only remaining step: the
@@ -837,6 +1112,13 @@ Recorded so they are not lost. None block the phases above.
 - **Lint `scripts/`** (394 ruff errors, 352 auto-fixable); add to CI when green.
 - **Ruff format** the tree (`ruff format --check src/ tests/` would reformat 50 files) in one
   commit with no logic changes.
+- **Offline evaluation of seed-based mode** *(added 2026-10-17)*. The ablation measures
+  recommendations from a user's rating history, which is the personalized path. The mode most
+  visitors see, "similar to a title", reranks with ten-plus hand-tuned signals and only has
+  golden-query regression checks (`scripts/evaluate_phase4_golden.py`). A simple protocol: for
+  each sampled user, seed with one liked title (rating ≥ 8) and score whether their other
+  held-out liked titles appear in the top 10, against popularity and pure-CF baselines. This
+  would also give Task 1.4's discovery default a number.
 - **In-app feedback logging** (thumbs up/down per card to a local table) as the seed of an
   online evaluation story.
 - **A second, smaller portfolio project** in a different problem class (forecasting,
@@ -848,28 +1130,54 @@ Recorded so they are not lost. None block the phases above.
 
 ```
 Phase 0  0.1 public link (owner) → 0.2 raw data out → 0.3 LFS prune + stems → 0.4 one-cohort eval table → 0.5 tidy
+         → 0.6 re-tune blend + intervals → 0.7 README-numbers test → 0.8 artifact smoke check
 Phase 1  1.1 name + panels → 1.2 sidebar IA → 1.3 explanations → 1.4 discovery default → 1.5 badge
-         → 1.6 demo profiles → 1.7 README + GIF
-Phase 2  2.1 kNN diagnostic → 2.2 full ablation + hero chart → 2.3 learned reranker → 2.4 segment notebook
+         → 1.6 demo profiles → 1.8 measure first load → 1.7 README + GIF
+Phase 2  2.1 MF diagnostic → 2.2 full ablation + hero chart → 2.3 learned reranker → 2.4 segment notebook
          → 2.5 write-up
 Phase 3  as decided
 ```
+
+**Added 2026-10-17:** 0.6 depends on 0.4 and blocks 1.3 (the clauses depend on the dominant
+signal), 1.7 (the README numbers and the "93% MF" text), 2.2 and 2.3. 1.1, 1.2, 1.4, 1.5 and 1.6
+do not depend on 0.6 and can go ahead in parallel with it. 0.7 follows 0.6 (it pins the
+numbers 0.6 publishes). 0.8 is independent; 1.1's Scoring details move is where its load
+report surfaces. 1.8 follows 0.6 and 0.8 (it reuses the smoke script) and precedes 1.7.
+
+## Cut Line
+
+*(Added 2026-10-17.)* This is a portfolio piece, so the plan has to reach "good enough to
+send" before it is finished. Tasks in order of how much a reviewer would notice them missing:
+
+| Tier | Tasks | Ships as |
+|---|---|---|
+| **Must** — portfolio-ready | 0.5, 0.6, 0.7, 0.8, 1.1, 1.3, 1.6, 1.8, 1.7, **2.5 short form** | The first five minutes are clean, the headline result is correct with intervals and enforced by a test, the demo shows personalization in one click, and a ~600-word write-up exists |
+| **Strong** — do next | 2.1, 2.2, 1.2, 1.4, 1.5 | Each one is a visible improvement, but missing it won't put a reviewer off |
+| **Nice to have** | 2.3, 2.4, Phase 3 | Interview depth more than first-impression value |
+
+The short-form write-up is Task 2.5 cut to the problem, the approach, the corrected result,
+and what went wrong and how it was caught. It is written right after 1.7 and later extended
+in place as Phase 2 tasks land. It is not a separate document.
 
 Task 0.1 is closed (2026-09-16: the app was already public; the finding did not reproduce).
 Tasks 0.2 and 0.5 are independent of everything else, but **0.3 blocks 0.4** — re-running the
 evaluation before the artifact stems are settled would republish metrics from the wrong MF
 model, which is the defect 0.3 exists to fix. Task 1.7 waits for the rest of Phase 1 and for
-Task 0.4. Task 2.2 depends on 0.3, 0.4, and 2.1. Task 2.5 is last.
+Task 0.4. Task 2.2 depends on 0.3, 0.4, 0.6, and 2.1. Task 2.5 is last.
 
 ## Success Criteria
 
 1. An anonymous visitor clicks the README badge and sees recommendations within 30 seconds,
    with the first card visible without scrolling and a sentence, not a share line, explaining it.
-2. Every number in the README appears verbatim in `reports/phase4_ablation.md`, comes from one
-   run at one cohort and seed, and the README says plainly that hybrid ≈ MF on accuracy.
-3. A fresh clone pulls no raw Kaggle data, no personal exports, and one artifact per model
+2. Every number in the README appears verbatim in `reports/phase4_ablation.md` and comes from one
+   run at one cohort and seed. Every comparative claim ("≈", "beats") is backed by a paired
+   bootstrap CI. The README says plainly how the served blend compares with its strongest
+   component and with popularity.
+3. The served blend weights were tuned on users disjoint from the reporting cohort, under the
+   corrected protocol, and the decision is recorded in `docs/decisions.md`.
+4. A fresh clone pulls no raw Kaggle data, no personal exports, and one artifact per model
    family; `git lfs ls-files` lists five files.
-4. The kNN result is explained, the learned-reranker experiment has a written conclusion, and
-   a segment-analysis notebook and a write-up exist and are linked from the README.
-5. `$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x` green and `ruff check src/ tests/ app/`
+5. The MF-below-popularity result is explained, the learned-reranker experiment has a written
+   conclusion, and a segment-analysis notebook and a write-up exist and are linked from the README.
+6. `$env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x` green and `ruff check src/ tests/ app/`
    at 0 after every task.
