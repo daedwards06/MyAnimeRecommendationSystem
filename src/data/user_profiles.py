@@ -92,6 +92,10 @@ def load_profile(username: str) -> dict | None:
         if 'status_map' in profile_data:
             profile_data['status_map'] = {int(k): v for k, v in profile_data['status_map'].items()}
 
+        # The file name is the profile's identity (list/load/save all key on it). A JSON whose
+        # 'username' disagrees made the sidebar reload and rerun forever.
+        profile_data['username'] = username
+
         logger.info(f"Loaded profile for {username} ({len(profile_data.get('watched_ids', []))} anime)")
         return profile_data
 

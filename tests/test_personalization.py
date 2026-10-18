@@ -421,3 +421,22 @@ class TestPerformance:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_loaded_profile_username_is_the_file_key(tmp_path, monkeypatch):
+    """The sidebar compares the dropdown key with profile['username'] and reruns on mismatch;
+    a JSON whose 'username' differed from its file name looped forever."""
+    import json
+
+    from src.data import user_profiles
+
+    monkeypatch.setattr(user_profiles, "PROFILES_DIR", tmp_path)
+    (tmp_path / "demo_profile.json").write_text(
+        json.dumps({"username": "someone_else", "mal_username": "someone_else", "ratings": {"1": 8}}),
+        encoding="utf-8",
+    )
+    assert user_profiles.list_profiles() == ["demo"]
+    profile = user_profiles.load_profile("demo")
+    assert profile["username"] == "demo"
+    assert profile["mal_username"] == "someone_else"
+    assert profile["ratings"] == {1: 8}
