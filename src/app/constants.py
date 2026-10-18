@@ -120,7 +120,7 @@ def _normalize_seed_ranking_mode(val: str) -> str:
     s = str(val or "").strip().lower()
     if s in {"completion", "discover", "discovery"}:
         return "discovery" if s != "completion" else "completion"
-    return "completion"
+    return "discovery"
 
 
 # ---------------------------------------------------------------------------
@@ -218,12 +218,13 @@ QUALITY_PRIOR_COEF: float = min(0.20, max(0.0, _env_float("QUALITY_PRIOR_COEF", 
 # - Discovery: limit franchise-dominance deterministically using `title_overlap`.
 #
 # Contract:
-# - Default must preserve current behavior: completion.
+# - Default is discovery (Portfolio plan Task 1.4): "similar vibes" should not
+#   surface the seed's own TV special at #1. Sequels are opt-in in the sidebar.
 # - Configurable via env var SEED_RANKING_MODE (completion|discovery).
 # - Discovery mode applies a post-score selection cap; it does not change scores.
 # ---------------------------------------------------------------------------
 
-SEED_RANKING_MODE: str = _normalize_seed_ranking_mode(_env_str("SEED_RANKING_MODE", "completion"))
+SEED_RANKING_MODE: str = _normalize_seed_ranking_mode(_env_str("SEED_RANKING_MODE", "discovery"))
 
 # Define "franchise-like" based on existing title overlap heuristic.
 FRANCHISE_TITLE_OVERLAP_THRESHOLD: float = _env_float("FRANCHISE_TITLE_OVERLAP_THRESHOLD", 0.50)
@@ -239,6 +240,10 @@ FRANCHISE_STRONG_MATCH_ENABLED: bool = _env_bool("FRANCHISE_STRONG_MATCH_ENABLED
 FRANCHISE_STRONG_MATCH_MIN_SEED_LEN: int = _env_int("FRANCHISE_STRONG_MATCH_MIN_SEED_LEN", 5)
 
 # Caps apply to the *output prefix*.
+# TOPN covers the requested (displayed) prefix; a negative value disables it so
+# only the top-20/top-50 caps apply.
+FRANCHISE_CAP_TOPN: int = _env_int("FRANCHISE_CAP_TOPN", 0)
+
 FRANCHISE_CAP_TOP20: int = _env_int("FRANCHISE_CAP_TOP20", 6)
 
 # Optional: only meaningful when selecting/reporting top-50.

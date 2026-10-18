@@ -244,6 +244,18 @@ def artifact_notice(load_report: dict | None) -> str | None:
     )
 
 
+def franchise_hidden_text(diagnostics: dict | None) -> str | None:
+    """Footer line for franchise entries the discovery cap kept out of the shown results."""
+    hidden = int((diagnostics or {}).get("franchise_items_dropped_count_topn", 0) or 0)
+    if hidden <= 0:
+        return None
+    noun = "entry" if hidden == 1 else "entries"
+    return (
+        f"{hidden} franchise {noun} hidden — check the box to show them "
+        "(Advanced → Include sequels & spin-offs)."
+    )
+
+
 def render_artifact_notice(load_report: dict | None) -> None:
     """Show the missing-artifact notice under the header when an expected family failed."""
     notice = artifact_notice(load_report)
@@ -644,6 +656,9 @@ def _render_scoring_details(
                 and blocked_reason
             ):
                 st.caption(f"Personalization note: {blocked_reason}")
+        hidden_text = franchise_hidden_text(st.session_state.get("franchise_cap_diagnostics"))
+        if hidden_text:
+            st.caption(hidden_text)
         if pipeline_ms is not None:
             st.caption(f"Last pipeline: {pipeline_ms:.0f} ms")
         if load_report is not None:

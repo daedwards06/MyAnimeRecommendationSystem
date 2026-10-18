@@ -11,7 +11,7 @@ import json
 
 import streamlit as st
 
-from src.app.constants import DEFAULT_TOP_N
+from src.app.constants import DEFAULT_TOP_N, SEED_RANKING_MODE
 
 DEFAULT_SEED_TITLE = "Fullmetal Alchemist: Brotherhood"
 
@@ -72,6 +72,8 @@ def init_session_state() -> None:
         "_default_seed_active": False,
         "intro_dismissed": False,
         "help_expanded": False,
+        "seed_ranking_mode": SEED_RANKING_MODE,
+        "franchise_cap_diagnostics": {},
     }.items():
         if key not in st.session_state:
             st.session_state[key] = default

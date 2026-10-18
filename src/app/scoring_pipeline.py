@@ -53,6 +53,7 @@ from src.app.constants import (
     FORCE_NEURAL_TOPK,
     FRANCHISE_CAP_TOP20,
     FRANCHISE_CAP_TOP50,
+    FRANCHISE_CAP_TOPN,
     FRANCHISE_TITLE_OVERLAP_THRESHOLD,
     OBSCURITY_LOW_MAL_PENALTY_SCALE,
     OBSCURITY_LOW_MAL_THRESHOLD,
@@ -327,7 +328,7 @@ class ScoringContext:
     weights: dict[str, float] = field(default_factory=lambda: dict(BALANCED_WEIGHTS))
     """Hybrid weight preset."""
 
-    seed_ranking_mode: str = "completion"
+    seed_ranking_mode: str = SEED_RANKING_MODE
     """'completion' or 'discovery' — controls franchise cap behaviour."""
 
     # --- Filter inputs -------------------------------------------------------
@@ -1580,6 +1581,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             threshold=float(FRANCHISE_TITLE_OVERLAP_THRESHOLD),
             cap_top20=int(FRANCHISE_CAP_TOP20),
             cap_top50=int(FRANCHISE_CAP_TOP50),
+            cap_topn=int(FRANCHISE_CAP_TOPN),
             title_overlap=lambda r: float(r.get("_title_overlap", 0.0)),
             title=lambda r: str(r.get("_title_display", "")),
             anime_id=lambda r: int(r.get("anime_id", 0)),
@@ -1590,6 +1592,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             "franchise_cap_threshold": cap_diag.franchise_cap_threshold,
             "franchise_cap_top20": cap_diag.franchise_cap_top20,
             "franchise_cap_top50": cap_diag.franchise_cap_top50,
+            "franchise_cap_topn": cap_diag.franchise_cap_topn,
             "top20_franchise_like_count_before": cap_diag.top20_franchise_like_count_before,
             "top20_franchise_like_count_after": cap_diag.top20_franchise_like_count_after,
             "top50_franchise_like_count_before": cap_diag.top50_franchise_like_count_before,
@@ -1597,6 +1600,7 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
             "franchise_items_dropped_count": cap_diag.franchise_items_dropped_count,
             "franchise_items_dropped_count_top20": cap_diag.franchise_items_dropped_count_top20,
             "franchise_items_dropped_count_top50": cap_diag.franchise_items_dropped_count_top50,
+            "franchise_items_dropped_count_topn": cap_diag.franchise_items_dropped_count_topn,
             "franchise_items_dropped_examples_top5": cap_diag.franchise_items_dropped_examples_top5,
         }
         recs = scored_capped

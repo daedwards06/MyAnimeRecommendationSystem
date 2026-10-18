@@ -31,6 +31,7 @@ class FranchiseCapDiagnostics:
     franchise_cap_threshold: float
     franchise_cap_top20: int
     franchise_cap_top50: int
+    franchise_cap_topn: int | None
 
     top20_franchise_like_count_before: int
     top20_franchise_like_count_after: int
@@ -40,6 +41,7 @@ class FranchiseCapDiagnostics:
     franchise_items_dropped_count: int
     franchise_items_dropped_count_top20: int
     franchise_items_dropped_count_top50: int
+    franchise_items_dropped_count_topn: int
     franchise_items_dropped_examples_top5: list[dict[str, Any]]
 
     # Optional debug-only diagnostics (not intended for core UI display).
@@ -189,6 +191,7 @@ def apply_franchise_cap(
     threshold: float,
     cap_top20: int,
     cap_top50: int,
+    cap_topn: int | None = None,
 ) -> tuple[list[dict[str, Any]], FranchiseCapDiagnostics]:
     """Return selected items and franchise-cap diagnostics.
 
@@ -203,10 +206,16 @@ def apply_franchise_cap(
     title_overlap/title/anime_id/neural_sim:
         Accessors over `items_sorted`.
 
+    cap_topn:
+        Cap on franchise-like items within the first ``n`` returned. ``None`` or
+        a negative value disables it; the top-20/top-50 caps then apply alone.
+
     Notes
     -----
-    - Caps apply to the *output prefix* (top-20 and top-50). For n > 20, the
-      top-20 cap is still enforced within the first 20 returned.
+    - Caps apply to the *output prefix* (top-n, top-20 and top-50). The tightest
+      cap for a position wins: within the first ``n`` the top-n cap applies, after
+      that the top-20 then top-50 caps. For n > 20, the top-20 cap is still
+      enforced within the first 20 returned.
     """
 
     mode = str(seed_ranking_mode or "").strip().lower()
@@ -332,6 +341,8 @@ def apply_franchise_cap(
     dropped: list[dict[str, Any]] = []
     dropped_top20 = 0
     dropped_top50 = 0
+    dropped_topn = 0
+    capn = None if cap_topn is None or int(cap_topn) < 0 else int(cap_topn)
 
     if mode != "discovery":
         selected_full = list(items_sorted[:n_diag])
@@ -380,12 +391,16 @@ def apply_franchise_cap(
                 cap_here = cap50
             else:
                 cap_here = None
+            if capn is not None and next_pos <= n_req:
+                cap_here = capn if cap_here is None else min(capn, cap_here)
 
             if is_franchise_like and cap_here is not None and franchise_kept >= int(cap_here):
                 if next_pos <= 20:
                     dropped_top20 += 1
                 if next_pos <= 50:
                     dropped_top50 += 1
+                if next_pos <= n_req:
+                    dropped_topn += 1
                 ex: dict[str, Any] = {
                     "anime_id": aid,
                     "title": str(cand_title or ""),
@@ -417,6 +432,7 @@ def apply_franchise_cap(
         franchise_cap_threshold=float(threshold),
         franchise_cap_top20=int(cap_top20),
         franchise_cap_top50=int(cap_top50),
+        franchise_cap_topn=capn,
         top20_franchise_like_count_before=int(top20_before),
         top20_franchise_like_count_after=int(top20_after),
         top50_franchise_like_count_before=int(top50_before),
@@ -424,6 +440,7 @@ def apply_franchise_cap(
         franchise_items_dropped_count=len(dropped),
         franchise_items_dropped_count_top20=int(dropped_top20),
         franchise_items_dropped_count_top50=int(dropped_top50),
+        franchise_items_dropped_count_topn=int(dropped_topn),
         franchise_items_dropped_examples_top5=list(dropped[:5]),
         franchise_seed_norm=str(franchise_seed_norm or ""),
         franchise_like_examples_top10=list(franchise_like_examples[:10]),

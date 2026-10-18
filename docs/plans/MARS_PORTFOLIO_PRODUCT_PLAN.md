@@ -780,16 +780,16 @@ streamlit run app/main.py   # visual: Steins;Gate seed → no Steins;Gate-titled
 ```
 
 **Checklist:**
-- [ ] Default `SEED_RANKING_MODE = "discovery"`; new `FRANCHISE_CAP_TOPN` (default 0) applied
+- [x] Default `SEED_RANKING_MODE = "discovery"`; new `FRANCHISE_CAP_TOPN` (default 0) applied
       to the displayed top-N in discovery mode, with `FRANCHISE_CAP_TOP20/50` kept for the
       longer prefixes; env overrides preserved
-- [ ] Sidebar control becomes a single checkbox "Include sequels & spin-offs" (unchecked =
+- [x] Sidebar control becomes a single checkbox "Include sequels & spin-offs" (unchecked =
       discovery); internal values unchanged
-- [ ] Diagnostics (`FranchiseCapDiagnostics`) surface in the footer Scoring details as
+- [x] Diagnostics (`FranchiseCapDiagnostics`) surface in the footer Scoring details as
       "N franchise entries hidden — check the box to show them"
-- [ ] Tests: cap 0 removes all franchise-like items from the top-N; completion mode unchanged;
+- [x] Tests: cap 0 removes all franchise-like items from the top-N; completion mode unchanged;
       env override still works; the existing default-behavior test updated deliberately
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

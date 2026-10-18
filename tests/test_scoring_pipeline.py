@@ -627,6 +627,129 @@ class TestFranchiseCap:
         # For this test, just verify it doesn't return all franchise entries
         assert aot_count <= 2, "Franchise cap should limit Attack on Titan entries"
 
+    def test_discovery_hides_franchise_entries_from_top_n(self, mock_scoring_context: ScoringContext):
+        """FRANCHISE_CAP_TOPN=0: the seed's sequel is kept out and counted as hidden."""
+        mock_scoring_context.seed_ranking_mode = "discovery"
+        mock_scoring_context.seed_ids = [4]
+        mock_scoring_context.seed_titles = ["Attack on Titan"]
+
+        result = run_seed_based_pipeline(mock_scoring_context)
+
+        ids = [item["anime_id"] for item in result.ranked_items]
+        assert ids, "discovery should still return non-franchise results"
+        assert 10 not in ids
+        diag = result.franchise_cap_diagnostics
+        assert diag["franchise_cap_topn"] == 0
+        assert diag["franchise_items_dropped_count_topn"] >= 1
+
+    def test_completion_keeps_franchise_entries(self, mock_scoring_context: ScoringContext):
+        """Completion mode applies no cap and records no diagnostics."""
+        mock_scoring_context.seed_ranking_mode = "completion"
+        mock_scoring_context.seed_ids = [4]
+        mock_scoring_context.seed_titles = ["Attack on Titan"]
+
+        result = run_seed_based_pipeline(mock_scoring_context)
+
+        assert 10 in [item["anime_id"] for item in result.ranked_items]
+        assert result.franchise_cap_diagnostics == {}
+
+    def test_default_mode_is_discovery(self, monkeypatch: pytest.MonkeyPatch):
+        """Deliberate contract change (Portfolio plan Task 1.4): discovery is the default."""
+        monkeypatch.delenv("SEED_RANKING_MODE", raising=False)
+        monkeypatch.delenv("FRANCHISE_CAP_TOPN", raising=False)
+        constants = _reload_constants()
+        assert constants.SEED_RANKING_MODE == "discovery"
+        assert constants.FRANCHISE_CAP_TOPN == 0
+        assert constants.FRANCHISE_CAP_TOP20 == 6
+        assert constants.FRANCHISE_CAP_TOP50 == 15
+        assert ScoringContext.__dataclass_fields__["seed_ranking_mode"].default == "discovery"
+
+    def test_env_overrides_still_apply(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("SEED_RANKING_MODE", "completion")
+        monkeypatch.setenv("FRANCHISE_CAP_TOPN", "2")
+        monkeypatch.setenv("FRANCHISE_CAP_TOP20", "4")
+        try:
+            constants = _reload_constants()
+            assert constants.SEED_RANKING_MODE == "completion"
+            assert constants.FRANCHISE_CAP_TOPN == 2
+            assert constants.FRANCHISE_CAP_TOP20 == 4
+        finally:
+            monkeypatch.undo()
+            _reload_constants()
+
+
+def _reload_constants():
+    import importlib
+
+    import src.app.constants as constants
+
+    return importlib.reload(constants)
+
+
+class TestApplyFranchiseCap:
+    """Direct tests of the selection step over a synthetic ranked list."""
+
+    @staticmethod
+    def _items() -> list[dict]:
+        # Odd ids are franchise-like (overlap 1.0); ids are already in score order.
+        return [{"anime_id": i, "title": f"T{i}", "ov": 1.0 if i % 2 else 0.0} for i in range(1, 81)]
+
+    @staticmethod
+    def _run(items: list[dict], *, mode: str, n: int, cap_topn: int | None):
+        from src.app.franchise_cap import apply_franchise_cap
+
+        return apply_franchise_cap(
+            items,
+            n=n,
+            seed_ranking_mode=mode,
+            seed_titles=None,
+            title_overlap=lambda r: r["ov"],
+            title=lambda r: r["title"],
+            anime_id=lambda r: r["anime_id"],
+            threshold=0.5,
+            cap_top20=6,
+            cap_top50=15,
+            cap_topn=cap_topn,
+        )
+
+    def test_cap_zero_removes_all_franchise_like_from_top_n(self):
+        out, diag = self._run(self._items(), mode="discovery", n=10, cap_topn=0)
+        assert len(out) == 10
+        assert all(r["ov"] == 0.0 for r in out)
+        assert diag.franchise_items_dropped_count_topn == 10
+        assert diag.franchise_cap_topn == 0
+
+    def test_longer_prefixes_keep_top20_top50_caps(self):
+        _, diag = self._run(self._items(), mode="discovery", n=10, cap_topn=0)
+        assert diag.top20_franchise_like_count_after <= 6
+        assert diag.top50_franchise_like_count_after <= 15
+
+    def test_negative_topn_falls_back_to_top20_cap(self):
+        out, diag = self._run(self._items(), mode="discovery", n=20, cap_topn=-1)
+        assert sum(1 for r in out if r["ov"] == 1.0) == 6
+        assert diag.franchise_cap_topn is None
+        assert diag.franchise_items_dropped_count_topn == diag.franchise_items_dropped_count_top20
+
+    def test_completion_mode_is_unchanged(self):
+        items = self._items()
+        out, diag = self._run(items, mode="completion", n=20, cap_topn=0)
+        assert out == items[:20]
+        assert diag.franchise_items_dropped_count == 0
+
+
+def test_footer_franchise_hidden_text():
+    from app.display import franchise_hidden_text
+
+    assert franchise_hidden_text(None) is None
+    assert franchise_hidden_text({}) is None
+    assert franchise_hidden_text({"franchise_items_dropped_count_topn": 0}) is None
+    assert franchise_hidden_text({"franchise_items_dropped_count_topn": 1}).startswith(
+        "1 franchise entry hidden — check the box to show them"
+    )
+    assert franchise_hidden_text({"franchise_items_dropped_count_topn": 3}).startswith(
+        "3 franchise entries hidden — check the box to show them"
+    )
+
 
 # ---------------------------------------------------------------------------
 # Tests: Edge Cases

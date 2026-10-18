@@ -873,27 +873,19 @@ def _render_advanced_section(result: SidebarResult, clear_cache_fn: Callable[[],
 
 
     if result.show_seeds_controls:
-        _goal_opts = [
-            "Goal: Completion (more from franchise)",
-            "Goal: Discovery (similar vibes)",
-        ]
-        _mode_default = (
+        _mode_current = (
             str(st.session_state.get("seed_ranking_mode", SEED_RANKING_MODE) or SEED_RANKING_MODE).strip().lower()
         )
-        _goal_index = 0 if _mode_default != "discovery" else 1
-        _goal_label = st.radio(
-            "Seed goal",
-            _goal_opts,
-            index=_goal_index,
-            horizontal=False,
-            key="seed_goal_ui",
+        _include_franchise = st.checkbox(
+            "Include sequels & spin-offs",
+            value=_mode_current == "completion",
             help=(
-                "Completion lets sequels/spin-offs surface freely. "
-                "Discovery limits franchise dominance in top results "
-                "using a deterministic title-overlap cap."
+                "Off: entries from the seed's own franchise are kept out of your results, "
+                "so you see similar shows rather than more of the same one. "
+                "On: sequels, movies and specials can rank freely."
             ),
         )
-        st.session_state["seed_ranking_mode"] = "discovery" if "Discovery" in str(_goal_label) else "completion"
+        st.session_state["seed_ranking_mode"] = "completion" if _include_franchise else "discovery"
 
     st.markdown("---")
     _render_reload_button(clear_cache_fn)

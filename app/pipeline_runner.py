@@ -501,6 +501,8 @@ def _execute_pipeline(
     recs: list[dict] = []
     personalization_applied = False
 
+    st.session_state["franchise_cap_diagnostics"] = {}
+
     # ── Seed-based pipeline ──────────────────────────────────────────────
     if selected_seed_ids:
         seed_result = run_seed_based_pipeline(ctx)
