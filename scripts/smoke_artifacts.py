@@ -1,7 +1,8 @@
 """Smoke check against the real model artifacts (not the CI light-import stubs).
 
 Loads the real bundle, prints which model families loaded, then runs one seed-based query
-and one personalized query through the scoring-pipeline functions (no Streamlit runtime).
+and one personalized query through the scoring-pipeline functions (no Streamlit runtime),
+with the per-request item-kNN vectors the app builds.
 
 Run:
     python scripts/smoke_artifacts.py        (or: make smoke)
@@ -89,11 +90,11 @@ def main() -> int:
 
     hygiene = build_ranked_candidate_hygiene_exclude_ids(metadata)
     models = bundle["models"]
+    if engine.knn_model is None:
+        failures.append("kNN model has no item_user_matrix; item-kNN cannot be served")
     common = {
         "metadata": metadata,
         "bundle": bundle,
-        "recommender": engine.recommender,
-        "components": engine.components,
         "weights": dict(BALANCED_WEIGHTS),
         "top_n": TOP_N,
         "pop_pct_fn": engine.pop_pct_for_anime_id,
@@ -104,9 +105,19 @@ def main() -> int:
     }
 
     # Seed-based: same request size as the app with no profile and no filters.
+    # Per-request kNN vectors, built the way app/pipeline_runner.py builds them.
     seed_title = titles.get(SEED_ANIME_ID, str(SEED_ANIME_ID))
+    seed_knn = engine.knn_scores({SEED_ANIME_ID: 1.0}, center=False)
+    if seed_knn is None:
+        failures.append("seed has no item-kNN vector")
+    seed_rec, seed_components = engine.for_request(seed_knn)
     seed_ctx = ScoringContext(
-        **common, seed_ids=[SEED_ANIME_ID], seed_titles=[seed_title], n_requested=TOP_N
+        **common,
+        recommender=seed_rec,
+        components=seed_components,
+        seed_ids=[SEED_ANIME_ID],
+        seed_titles=[seed_title],
+        n_requested=TOP_N,
     )
     seed_result = run_seed_based_pipeline(seed_ctx)
     seed_recs = _finish(seed_result.ranked_items, seed_ctx)
@@ -128,8 +139,15 @@ def main() -> int:
     )
     if float(np.linalg.norm(embedding)) <= 1e-8:
         failures.append("profile ratings do not overlap the MF training set (zero embedding)")
+    profile_knn = engine.knn_scores(profile.get("ratings", {}), center=True)
+    if profile_knn is None:
+        failures.append("profile ratings do not overlap the kNN index (no item-kNN vector)")
+    pers_rec, pers_components = engine.for_request(profile_knn)
     pers_ctx = ScoringContext(
         **common,
+        recommender=pers_rec,
+        components=pers_components,
+        personal_knn_scores=profile_knn,
         user_embedding=embedding,
         user_embedding_meta={"mf_stem": models.get("_mf_stem")},
         personalization_enabled=True,

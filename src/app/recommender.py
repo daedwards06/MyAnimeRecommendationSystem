@@ -10,9 +10,10 @@ constructing placeholder score arrays for missing artifacts.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 import numpy as np
 
@@ -45,6 +46,65 @@ class HybridComponents:
     @property
     def num_items(self) -> int:
         return int(self.item_ids.shape[0])
+
+
+def knn_scores_from_ratings(
+    knn_model: Any,
+    item_ids: np.ndarray,
+    ratings: Mapping[int, float],
+    *,
+    center: bool,
+) -> np.ndarray | None:
+    """Item-kNN scores for a profile that is not a training user, in ``item_ids`` order.
+
+    Mirrors ``ItemKNNRecommender.score_all`` (cosine against a rating-weighted profile,
+    shrinkage, popularity prior), but builds the profile from ``ratings`` instead of a
+    training-user id. Items outside the kNN index score 0. Returns None when no rated item
+    is in the index, so callers can tell "no kNN signal" from "kNN scored everything low".
+    """
+    it2i = getattr(knn_model, "item_to_index", None)
+    item_mat = getattr(knn_model, "item_user_matrix", None)
+    if not it2i or item_mat is None:
+        return None
+    rows: list[int] = []
+    vals: list[float] = []
+    for aid, rating in ratings.items():
+        idx = it2i.get(int(aid))
+        if idx is not None:
+            rows.append(int(idx))
+            vals.append(float(rating))
+    if not rows:
+        return None
+
+    w = np.asarray(vals, dtype=np.float64)
+    if center and getattr(knn_model, "center_ratings", True):
+        centered = w - w.mean()
+        # All-equal ratings centre to zero; they still say "liked these", so keep them as-is.
+        if np.any(centered != 0.0):
+            w = centered
+    power = float(getattr(knn_model, "rating_weight_power", 1.0))
+    if power != 1.0:
+        w = np.sign(w) * (np.abs(w) ** power)
+
+    profile = np.asarray(item_mat[rows].T @ w).ravel()
+    shrinkage = float(getattr(knn_model, "profile_shrinkage", 0.0))
+    if shrinkage > 0:
+        profile *= len(rows) / (len(rows) + shrinkage)
+    norm = float(np.linalg.norm(profile))
+    if norm == 0.0:
+        return None
+
+    sims = np.asarray(item_mat @ profile).ravel() / norm
+    item_pop = getattr(knn_model, "item_pop", None)
+    pop_weight = float(getattr(knn_model, "popularity_weight", 0.0))
+    if item_pop is not None and pop_weight != 0.0:
+        sims = sims + pop_weight * np.asarray(item_pop, dtype=np.float64)
+
+    knn_idx = np.fromiter((it2i.get(int(a), -1) for a in item_ids), dtype=np.int64, count=len(item_ids))
+    out = np.zeros(len(item_ids), dtype=np.float32)
+    present = knn_idx >= 0
+    out[present] = sims[knn_idx[present]]
+    return out
 
 
 class HybridRecommender:
@@ -177,7 +237,11 @@ class HybridRecommender:
         weights: dict[str, float] | None = None,
         exclude_item_ids: Sequence[int] | None = None,
     ) -> list[dict[str, float]]:
-        """Compute top-N personalized recommendations using user embedding."""
+        """Compute top-N personalized recommendations using user embedding.
+
+        The kNN term reads row 0 of ``components.knn``: the per-request vector built from the
+        profile's ratings (see ``knn_scores_from_ratings``).
+        """
         w = weights or BALANCED_WEIGHTS
 
         # Enforce MF artifact contract for personalization.
@@ -204,8 +268,10 @@ class HybridRecommender:
             if item_id in personalized_mf_scores:
                 mf_scores_array[idx] = personalized_mf_scores[item_id]
 
-        # Blend personalized MF with popularity (kNN is not used in this path today)
+        knn_row = self.c.knn[0] if self.c.knn is not None else None
         scores = float(w.get("mf", 0.0)) * mf_scores_array
+        if knn_row is not None:
+            scores = scores + float(w.get("knn", 0.0)) * knn_row
         if self.c.pop is not None:
             scores += float(w.get("pop", 0.0)) * self.c.pop
 
@@ -221,15 +287,20 @@ class HybridRecommender:
         used: list[str] = []
         if float(w.get("mf", 0.0)) != 0.0:
             used.append("mf")
+        if knn_row is not None and float(w.get("knn", 0.0)) != 0.0:
+            used.append("knn")
         if self.c.pop is not None and float(w.get("pop", 0.0)) != 0.0:
             used.append("pop")
 
         for i in ordered:
             raw_mf = float(w.get("mf", 0.0)) * float(mf_scores_array[int(i)])
+            raw_knn = 0.0
+            if knn_row is not None:
+                raw_knn = float(w.get("knn", 0.0)) * float(knn_row[int(i)])
             raw_pop = 0.0
             if self.c.pop is not None:
                 raw_pop = float(w.get("pop", 0.0)) * float(self.c.pop[int(i)])
-            raw = {"mf": raw_mf, "knn": 0.0, "pop": raw_pop}
+            raw = {"mf": raw_mf, "knn": raw_knn, "pop": raw_pop}
             result.append(
                 {
                     "anime_id": int(self.c.item_ids[i]),
@@ -330,4 +401,5 @@ __all__ = [
     "compute_component_shares",
     "compute_dense_similarity",
     "get_content_only_recs_for_new_item",
+    "knn_scores_from_ratings",
 ]

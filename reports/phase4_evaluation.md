@@ -62,9 +62,10 @@ Intervals are percentile bootstrap over users (1,000 resamples, seed 42); the Δ
 scored on one cohort. An interval that spans zero is a tie. The CSV also carries the paired
 difference against MF and the MAP intervals.
 
-`hybrid_weighted` uses the weights still in the app config (`DEFAULT_HYBRID_WEIGHTS`: mf 0.931,
-knn 0.066, pop 0.003). `hybrid_weighted_tuned` uses the Task 0.6 re-tune (mf 0.048, knn 0.952,
-pop 0.0003): 100 TPE trials on 1,000 validation users **disjoint** from the reporting cohort.
+`hybrid_weighted` uses the weights the app served before Task 0.9 (mf 0.931, knn 0.066,
+pop 0.003). `hybrid_weighted_tuned` uses the Task 0.6 re-tune (mf 0.048, knn 0.952, pop 0.0003),
+now `DEFAULT_HYBRID_WEIGHTS` and the app's Balanced preset: 100 TPE trials on 1,000 validation
+users **disjoint** from the reporting cohort.
 `hybrid_rrf` is reciprocal rank fusion over the same three sources, which weights them by rank
 position rather than by score magnitude.
 
@@ -92,9 +93,10 @@ Example (User 14593, Top-5 items component shares):
 | 32281   | 8.1645   | 0.0069    | 0.1923    | 0.9762   | 0.0008    | 0.0230   | 8.3637 |
 | 19      | 8.1503   | 0.0145    | 0.1982    | 0.9746   | 0.0017    | 0.0237   | 8.3630 |
 
-Observation: the MF term takes >97% of the blended score under the current weights, and the kNN
-term contributes ~0.1%. Read alongside §4 and §8 this is the problem, not a curiosity: the weights
-concentrate the blend on the weaker of the two CF models.
+Observation: the MF term takes >97% of the blended score under the previous config weights (the
+example above), and the kNN term contributes ~0.1%. Read alongside §4 and §8 this was the
+problem, not a curiosity: those weights concentrated the blend on the weaker of the two CF models.
+The examples predate the re-tune and have not been regenerated.
 
 ## 6. Temporal Robustness
 Artifact: `reports/artifacts/temporal_split_comparison.json`
@@ -172,20 +174,21 @@ alone** (+0.0031, CI [−0.0033, +0.0097]), nor is RRF (−0.0042 vs. kNN, CI [�
 The honest summary: *item-kNN is the model; adding MF and popularity to it, by weights or by
 rank fusion, buys nothing measurable on accuracy.*
 
-**The app does not serve that ranking yet.** `app/pipeline_runner.py` builds its CF components
-with `knn=None` and reads the kNN artifact only for its popularity vector. The served CF signal is
-`w_mf·MF + w_pop·pop`, and the "kNN" share on cards is made up of content signals. Writing the
-re-tuned weights into the config would shrink the MF term about 20× beneath hand-tuned Stage-2
-coefficients without adding any kNN, an unmeasured change rather than the measured one. The
-config weights therefore stay, and serving kNN is the follow-up (`docs/decisions.md`,
-2026-10-17).
+**The app now serves it (Task 0.9).** Until then the app built its CF components with
+`knn=None`, so its CF signal was `w_mf·MF + w_pop·pop`. It now scores item-kNN per request from
+the seed titles, or from the profile's ratings when personalized, with the formula `score_all`
+uses offline. The Balanced preset is the re-tuned blend, and Diversity is item-kNN alone. The
+Stage-2 CF coefficient moved from 0.15 to 0.42 to keep CF's spread across the shortlist where it
+was. The offline table scores the CF blend alone; in the app it is one Stage-2 signal next to the
+content signals, so the end-to-end ranking is not what the table measures (`docs/decisions.md`,
+2026-10-18).
 
 **Concentration remains real.** Popularity has the lowest Gini (0.717) only because it shows the
 same narrow set to everyone; its coverage is 0.56% of the catalog. Every CF method trades higher
 Gini for an order of magnitude more of the catalog exposed.
 
 ## 9. Next Steps (Phase 5 Preview)
-- Wire per-user item-kNN scores into the app (seeds in seed mode, profile ratings when personalized), then serve item-kNN alone or the re-tuned blend; the two are tied offline.
+- Measure the app's end-to-end ranking (Stage 2 with content signals), not only the CF blend it contains.
 - Integrate explanation JSON and curve data into Streamlit components.
 - Add badges for cold-start items using content-only rationale.
 - Build a cold-start cohort that actually contains cold items, so §7 can report a real number.

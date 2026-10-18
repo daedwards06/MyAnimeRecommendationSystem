@@ -5,9 +5,71 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-18 — The app serves item-kNN: Balanced is the re-tuned blend, Diversity is kNN alone
+
+**Status:** Adopted (supersedes the "served weights stay" decision of 2026-10-17)
+
+**Context.** The 2026-10-17 entry left the app on its old weights because it had no kNN
+component. `ItemKNNRecommender.score_all` only scores a *training* user, and an app visitor is
+never one. `knn_scores_from_ratings` (`src/app/recommender.py`) builds the same profile from any
+`{anime_id: rating}` dict. It applies the same centring, rating power, shrinkage and popularity
+prior, and matches `score_all` to ~1e-7 on real training users, at ~40 ms per request. The app
+builds one vector per request and leaves the shared engine untouched:
+
+| Path | kNN profile from |
+|:---|:---|
+| Seed-based | the seed titles, each counted as one liked item (no centring: equal weights would centre to zero) |
+| Personalized | the profile's ratings, mean-centred like the training users |
+| Seeds + personalization | seeds rank the pool; the profile's kNN re-ranks it, mixed by the strength slider like personal MF |
+| Seedless (no seeds, no profile) | nothing to build from: ranks by MF with the old popularity prior (`COMMUNITY_BASELINE_WEIGHTS`), whatever preset is selected |
+
+**Decision.** Balanced serves the re-tuned blend (mf 0.0475 / knn 0.9522 / pop 0.0003, now
+`DEFAULT_HYBRID_WEIGHTS`). Diversity serves item-kNN alone. `STAGE2_HYBRID_CF_WEIGHT` goes from
+0.15 to 0.42.
+
+**Why the blend and not kNN alone for Balanced.** The plan preferred the simpler option, and
+offline the two are tied (+0.0031, CI [−0.0033, +0.0097]). The app has one path the table does
+not have, though: a seedless run has no kNN profile. With kNN alone, every candidate there would
+score 0. The blend keeps the same code path meaningful wherever a profile exists, and the MF term
+is a tiebreak where one doesn't. Item-kNN alone is still served, as Diversity. It is the measured
+choice for that label: higher coverage (0.116 vs 0.103) and lower Gini (0.728 vs 0.760) at tied
+NDCG. It replaces an "illustrative" 0.80/0.18/0.02 preset that was never measured, and that
+before this change was *more* popularity-weighted, not less.
+
+**Popularity scale.** The tuned `pop` weight was fit on the offline popularity score
+(log-count × mean rating, max ~82). The app's popularity vector is kNN's normalised log-count
+(max 1), so the served `pop` term is about 80× smaller than the one tuned. Checked on the
+reporting cohort with the train-split artifacts: the tuned blend reproduces at 0.0658; with
+app-scale popularity it scores 0.0696 (paired +0.0038, CI [+0.0009, +0.0068]), with no
+popularity term 0.0697. The served form is therefore no worse than the measured one. 0.0696 is
+not published as a result: it was read off the reporting cohort after the fact, and the gain is
+small.
+
+**Stage-2 coefficient.** 0.15 was set against an MF-dominated CF score: mean-user MF, ~6.2 ± 0.3
+across a shortlist. The served CF score is ~0.5 ± 0.1. Across 12 popular seeds, the spread of CF
+scores among CF-covered candidates fell by a median factor of 2.8, so 0.15 × 2.8 ≈ 0.42 keeps CF's
+influence within the shortlist where it was. One effect is intended and visible: items with no CF
+data (titles newer than the ratings snapshot) used to trail CF-covered ones by ~0.9 in score,
+because MF scores *everything* near 6. They now trail by ~0.2. At 0.15, *Demon Lord 2099* reached
+#3 for an FMA:B seed; at 0.42 it sits at #5, and the CF-covered *Steins;Gate* movie and *The
+Future Diary* return to the Steins;Gate top 10.
+
+**Limits.** The ablation scores the CF blend on its own. In the app it is one Stage-2 signal
+next to genre, synopsis and metadata signals, so the end-to-end ranking is unmeasured. The "kNN"
+share on cards still mixes real kNN with content signals (`STAGE2_RAW_KNN_*`); that is a display
+question for the card-explanation task. `scripts/evaluate_phase4_golden.py` keeps its own copy of
+the old 0.93/0.07 `hybrid_cf_score`. The ablation is not regenerated, and `evaluate_hybrid.py`
+keeps `hybrid_weighted` pinned to the legacy weights, so its labels keep their published meaning.
+
+**What would change this.** An end-to-end offline evaluation of the Stage-2 ranking, which would
+let the 0.42 coefficient be tuned rather than matched. Or a seedless path that is itself
+personal, which would remove the reason to keep MF in the Balanced blend.
+
+---
+
 ## 2026-10-17 — Blend re-tuned offline on disjoint users; the app keeps its weights until it can serve kNN
 
-**Status:** Decided (serving change deferred to a follow-up task)
+**Status:** Superseded 2026-10-18 (the app now serves kNN; see the entry above)
 
 **Context.** `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (mf 0.931 / knn 0.066 / pop 0.003)
 came from an Optuna sweep run while item-kNN could not score, and that sweep drew its users with

@@ -46,6 +46,7 @@ import pandas as pd
 
 # Local imports — NO streamlit allowed here.
 from src.app.constants import (
+    BALANCED_WEIGHTS,
     CONTENT_FIRST_ALPHA,
     DEFAULT_TOP_N,
     FORCE_NEURAL_MIN_SIM,
@@ -317,8 +318,12 @@ class ScoringContext:
     personalization_blocked_reason: str | None = None
     """If set, personalization cannot run (reason string)."""
 
+    personal_knn_scores: np.ndarray | None = None
+    """Item-kNN scores from the profile's ratings, in ``components.item_ids`` order. With seeds,
+    ``components.knn`` holds the seeds' kNN vector and this one re-ranks like personal MF does."""
+
     # --- Weights & mode ------------------------------------------------------
-    weights: dict[str, float] = field(default_factory=lambda: {"mf": 0.93078, "knn": 0.06625, "pop": 0.00297})
+    weights: dict[str, float] = field(default_factory=lambda: dict(BALANCED_WEIGHTS))
     """Hybrid weight preset."""
 
     seed_ranking_mode: str = "completion"
@@ -1188,13 +1193,16 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
     except Exception:
         blended_scores = None
 
-    # When personalization is enabled with seeds, blend personal MF scores
+    # When personalization is enabled with seeds, blend personal MF and kNN scores
     # into the hybrid CF component. Seeds shape the candidate pool (Stage 0/1),
     # personal taste re-ranks within that pool via the CF signal.
+    _pers_knn = ctx.personal_knn_scores if _pers_mf_array is not None else None
     if _pers_mf_array is not None and blended_scores is not None:
         _pers_blended = np.zeros(components.num_items, dtype=np.float32)
         _pers_blended += float(weights.get("mf", 0.0)) * _pers_mf_array
-        if components.knn is not None:
+        if _pers_knn is not None:
+            _pers_blended += float(weights.get("knn", 0.0)) * _pers_knn
+        elif components.knn is not None:
             _pers_blended += float(weights.get("knn", 0.0)) * components.knn[user_index]
         if components.pop is not None:
             _pers_blended += float(weights.get("pop", 0.0)) * components.pop
@@ -1243,7 +1251,11 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
                 knn_base = float(components.knn[user_index, idx]) if components.knn is not None else 0.0
             except Exception:
                 knn_base = 0.0
-            hybrid_cf_score = float((0.93 * mf_base) + (0.07 * knn_base))
+            if _pers_knn is not None:
+                knn_base = _pers_strength * float(_pers_knn[idx]) + (1.0 - _pers_strength) * knn_base
+            hybrid_cf_score = float(
+                (float(weights.get("mf", 0.0)) * mf_base) + (float(weights.get("knn", 0.0)) * knn_base)
+            )
 
         # Gated content-first scoring
         synopsis_neural_sim = float(c.get("synopsis_neural_sim", 0.0))

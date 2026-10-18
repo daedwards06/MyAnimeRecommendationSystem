@@ -571,18 +571,28 @@ weaker side of that table. Changing the weights alone cannot fix it (see `docs/d
 - `docs/decisions.md` 2026-10-17, `reports/phase4_ablation.md`
 
 **Checklist:**
-- [ ] kNN scores in the app from a profile vector: seeds in seed mode, profile ratings when
-      personalized; `components.knn` populated (or an equivalent per-request vector)
-- [ ] Serve item-kNN alone or the re-tuned blend; they are tied offline, so prefer the simpler
-      one unless the visual check says otherwise. Record the choice in `docs/decisions.md`
-- [ ] Replace the hard-coded 0.93 / 0.07 in `hybrid_cf_score` with the served weights; re-check
-      the Stage-2 coefficients against the new CF magnitude
-- [ ] Update `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (and the diversity preset); README
+- [x] kNN scores in the app from a profile vector: seeds in seed mode, profile ratings when
+      personalized; `components.knn` populated (or an equivalent per-request vector) —
+      *`knn_scores_from_ratings` matches `score_all` to ~1e-7, ~40 ms/request; per-request
+      components, shared engine untouched*
+- [x] Serve item-kNN alone or the re-tuned blend; they are tied offline, so prefer the simpler
+      one unless the visual check says otherwise. Record the choice in `docs/decisions.md` —
+      *both: Balanced = re-tuned blend (seedless runs have no kNN profile, where kNN alone would
+      score every item 0), Diversity = kNN alone (higher coverage, lower Gini). Decision 2026-10-18*
+- [x] Replace the hard-coded 0.93 / 0.07 in `hybrid_cf_score` with the served weights; re-check
+      the Stage-2 coefficients against the new CF magnitude — *`STAGE2_HYBRID_CF_WEIGHT`
+      0.15 → 0.42, matching the old CF spread over 12 seeds; cold-start gates use `== 0` and are
+      magnitude-independent*
+- [x] Update `BALANCED_WEIGHTS` / `DEFAULT_HYBRID_WEIGHTS` (and the diversity preset); README
       Key Features and architecture diagram describe what is served
-- [ ] Visual check: all three modes boot; Steins;Gate seed still gives sensible results
-- [ ] Tests: kNN component present in seed and personalized paths; weight-selection tests
+- [x] Visual check: all three modes boot; Steins;Gate seed still gives sensible results —
+      *driven with Streamlit `AppTest` on the real artifacts (Seed-based both presets, seedless,
+      Browse, Personalized with the example profile). Picking `example` first hung: a pre-existing
+      bug, not the harness. Its JSON `username` (`example_user`) differed from its file key, so the
+      sidebar reloaded and reran forever. Fixed in `load_profile` (the file key is the username)*
+- [x] Tests: kNN component present in seed and personalized paths; weight-selection tests
       updated on purpose
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

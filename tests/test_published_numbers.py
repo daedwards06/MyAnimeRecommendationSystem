@@ -19,12 +19,12 @@ MODEL_CARD = ROOT / "docs" / "MODEL_CARD.md"
 ABLATION_CSV = ROOT / "reports" / "phase4_ablation.csv"
 
 README_LABELS = {
-    "Hybrid (weighted, re-tuned)": "hybrid_weighted_tuned",
+    "Hybrid (weighted, re-tuned; served)": "hybrid_weighted_tuned",
     "Item-kNN": "item_knn_sklearn",
     "Hybrid (RRF rank fusion)": "hybrid_rrf",
     "Popularity baseline": "popularity",
     "MF (FunkSVD)": "mf_sgd",
-    "Hybrid (weighted, current config weights)": "hybrid_weighted",
+    "Hybrid (weighted, previous config weights)": "hybrid_weighted",
     "Content-only (TF-IDF)": "content_tfidf",
     "Content-only (embeddings)": "content_embeddings",
 }

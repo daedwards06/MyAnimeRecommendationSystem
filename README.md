@@ -17,7 +17,7 @@ A **hybrid recommendation engine** that combines collaborative filtering, conten
 ## Key Features
 
 - **Three-stage ranking pipeline** — candidate generation (neural + metadata + popularity pools), semantic shortlisting, hybrid reranking with 10+ scoring signals
-- **Collaborative filtering** — FunkSVD matrix factorization with a popularity prior in the app; item-kNN and a re-tuned kNN-led blend evaluated offline (see Results), trained on 73K users and 310K+ ratings
+- **Collaborative filtering** — item-kNN scored live from your seed titles or profile ratings, blended with FunkSVD matrix factorization (the kNN-led blend that wins offline, see Results); trained on 73K users and 310K+ ratings
 - **Multi-modal content signals** — TF-IDF, SVD embeddings, and neural sentence embeddings (all-MiniLM-L6-v2) for synopsis-level semantic matching
 - **Personalization** — import your MyAnimeList profile; blend seed-based and CF-based recommendations 0–100% with a slider
 - **Explainability** — every recommendation shows signal breakdown (CF / Content / Popularity shares), genre overlap, and match confidence
@@ -36,12 +36,12 @@ rows, so scoring them offline measures leakage rather than quality. See
 
 | Model | NDCG@10 | NDCG@10 95% CI | MAP@10 | Coverage@10 | Gini@10 | NDCG vs. popularity |
 |:---|---:|:---:|---:|---:|---:|---:|
-| **Hybrid (weighted, re-tuned)** | **0.0658** | [0.0535, 0.0795] | **0.0521** | 0.1029 | 0.7596 | **+90%** |
+| **Hybrid (weighted, re-tuned; served)** | **0.0658** | [0.0535, 0.0795] | **0.0521** | 0.1029 | 0.7596 | **+90%** |
 | Item-kNN | 0.0628 | [0.0503, 0.0767] | 0.0513 | 0.1160 | 0.7280 | +81% |
 | Hybrid (RRF rank fusion) | 0.0586 | [0.0475, 0.0713] | 0.0456 | 0.0784 | 0.8253 | +69% |
 | Popularity baseline | 0.0347 | [0.0259, 0.0444] | 0.0255 | 0.0056 | 0.7175 | (baseline) |
 | MF (FunkSVD) | 0.0326 | [0.0229, 0.0428] | 0.0266 | 0.0668 | 0.7875 | −6% |
-| Hybrid (weighted, current config weights) | 0.0324 | [0.0237, 0.0424] | 0.0249 | 0.0615 | 0.7993 | −7% |
+| Hybrid (weighted, previous config weights) | 0.0324 | [0.0237, 0.0424] | 0.0249 | 0.0615 | 0.7993 | −7% |
 | Content-only (TF-IDF) | 0.0211 | [0.0138, 0.0288] | 0.0166 | 0.1711 | 0.6334 | −39% |
 | Content-only (embeddings) | 0.0101 | [0.0059, 0.0154] | 0.0069 | 0.0588 | 0.8620 | −71% |
 
@@ -51,16 +51,17 @@ intervals on the NDCG difference, because every model is scored on the same user
 - **Collaborative filtering with item-kNN works; MF on its own does not beat popularity.** The
   re-tuned blend, item-kNN alone and RRF all beat popularity (re-tuned blend +0.031,
   CI [+0.017, +0.045]) and MF. MF and popularity are statistically tied
-  (−0.002, CI [−0.014, +0.010]), as are MF and the blend with the current config weights.
-- **Re-tuning roughly doubled the blend's NDCG** (0.0324 → 0.0658). The config weights
+  (−0.002, CI [−0.014, +0.010]), as are MF and the blend with the previous config weights.
+- **Re-tuning roughly doubled the blend's NDCG** (0.0324 → 0.0658). The previous config weights
   (93% MF / 7% kNN) came from a sweep run while kNN could not score, on users that overlapped the ones the
   report scores. The new sweep tunes on 1,000 users disjoint from this cohort. The weights the
   sweep picked are 95% kNN / 5% MF, and the result is **tied with item-kNN alone**
   (+0.003, CI [−0.003, +0.010]).
-- **The app does not serve the re-tuned blend yet.** Its CF signal today is MF plus a popularity
-  prior; the kNN model is not wired into app scoring, so swapping the weights would not reproduce
-  this ranking. Wiring kNN in is the next model change, and the reason is recorded in
-  [`docs/decisions.md`](docs/decisions.md).
+- **The app serves the re-tuned blend** (the *Balanced* preset); *Diversity* serves item-kNN
+  alone, which ties it on accuracy with higher coverage. Item-kNN is scored per request from the
+  seed titles, or from profile ratings when personalized. The table measures the CF blend on its
+  own; in the app it is one Stage-2 signal next to the content signals, so the end-to-end ranking
+  is not what the table scores. Details in [`docs/decisions.md`](docs/decisions.md).
 
 Reproduce with:
 
@@ -76,7 +77,7 @@ python scripts/generate_phase4_ablation.py
 graph TB
     subgraph Offline["Offline Training"]
         D1[73K users × 13K anime] --> M1[FunkSVD<br/>64 factors]
-        D1 --> M2[Item-kNN<br/>offline eval; app uses its popularity prior]
+        D1 --> M2[Item-kNN<br/>scored per request from seeds or ratings]
         D2[Synopsis text] --> M3[TF-IDF + SVD<br/>512 dims]
         D2 --> M4[Neural Embeddings<br/>all-MiniLM-L6-v2]
     end
@@ -84,15 +85,16 @@ graph TB
     subgraph Pipeline["Three-Stage Scoring Pipeline"]
         S0["Stage 0: Candidate Generation<br/>Neural neighbors + metadata overlap + popularity backfill<br/>→ ~500 candidates"]
         S1["Stage 1: Shortlist<br/>Semantic admission gates, type/episode filters<br/>→ ~600 items (Pool A + Pool B)"]
-        S2["Stage 2: Reranking<br/>MF CF score + popularity prior + genre overlap<br/>+ neural similarity × quality factor − obscurity penalty<br/>→ Final scored list"]
+        S2["Stage 2: Reranking<br/>CF score (95% item-kNN + 5% MF) + genre overlap<br/>+ neural similarity × quality factor − obscurity penalty<br/>→ Final scored list"]
     end
 
     subgraph Post["Post-Processing"]
         PP["Franchise cap → Personalization blend → Display filters → Top-N"]
     end
 
-    M1 --> S0
-    M2 --> S0
+    M1 --> S2
+    M2 --> S2
+    M2 -- popularity backfill --> S0
     M3 --> S0
     M4 --> S0
     S0 --> S1 --> S2 --> PP

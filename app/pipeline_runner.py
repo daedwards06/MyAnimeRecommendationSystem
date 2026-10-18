@@ -8,7 +8,7 @@ rendering returns a ``SidebarResult``.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -16,11 +16,11 @@ import pandas as pd
 import streamlit as st
 
 from src.app.artifacts_loader import ArtifactContractError
-from src.app.constants import SEED_RANKING_MODE
+from src.app.constants import COMMUNITY_BASELINE_WEIGHTS, SEED_RANKING_MODE
 from src.app.diversity import compute_popularity_percentiles
 from src.app.profiling import latency_timer
 from src.app.quality_filters import build_ranked_candidate_hygiene_exclude_ids
-from src.app.recommender import HybridComponents, HybridRecommender
+from src.app.recommender import HybridComponents, HybridRecommender, knn_scores_from_ratings
 from src.app.scoring_pipeline import (
     ScoringContext,
     apply_post_filters,
@@ -45,6 +45,18 @@ class RecommenderEngine:
     components: HybridComponents | None = None
     pop_percentile_by_anime_id: dict[int, float] | None = None
     mf_model: Any = None
+    knn_model: Any = None
+
+    def knn_scores(self, ratings: dict[int, float], *, center: bool) -> np.ndarray | None:
+        """Per-request item-kNN vector in ``components.item_ids`` order, or None."""
+        if self.knn_model is None or self.components is None or not ratings:
+            return None
+        return knn_scores_from_ratings(self.knn_model, self.components.item_ids, ratings, center=center)
+
+    def for_request(self, knn_row: np.ndarray | None) -> tuple[HybridRecommender, HybridComponents]:
+        """Recommender whose kNN component is this request's vector; the shared engine is untouched."""
+        components = replace(self.components, knn=None if knn_row is None else knn_row[None, :])
+        return HybridRecommender(components), components
 
     def pop_pct_for_anime_id(self, anime_id: int) -> float:
         """Return popularity percentile for display; 0.5 when unavailable."""
@@ -119,7 +131,8 @@ def build_recommender_engine(bundle: dict) -> RecommenderEngine:
     """Build a :class:`RecommenderEngine` from an artifact bundle.
 
     Validates the MF model contract, computes demo-user MF scores, wires
-    the kNN popularity prior, and returns the initialised engine.  Calls
+    the kNN popularity prior and keeps the kNN model for per-request
+    scoring (seeds or profile ratings), and returns the engine.  Calls
     :func:`render_artifact_load_failure` (which invokes ``st.stop()``) on
     any fatal contract violation.
     """
@@ -200,11 +213,14 @@ def build_recommender_engine(bundle: dict) -> RecommenderEngine:
             )
         )
 
+    # kNN has no training-user row to precompute; it is scored per request from seeds or ratings.
     components = HybridComponents(mf=mf_scores, knn=None, pop=None, item_ids=item_ids)
+    knn_model = bundle.get("models", {}).get("knn")
+    if getattr(knn_model, "item_user_matrix", None) is not None:
+        engine.knn_model = knn_model
 
     # Wire popularity prior from kNN artifact (optional).
     try:
-        knn_model = bundle.get("models", {}).get("knn")
         if (
             knn_model is not None
             and hasattr(knn_model, "item_pop")
@@ -436,11 +452,22 @@ def _execute_pipeline(
     _mf_model = bundle.get("models", {}).get("mf")
     _mf_stem = bundle.get("models", {}).get("_mf_stem")
 
+    selected_seed_ids = sidebar.selected_seed_ids
+    # Seeds carry no rating, so each counts as one "liked" item; profile ratings are
+    # mean-centred like the training users the kNN model was fit on.
+    seed_knn = engine.knn_scores({int(s): 1.0 for s in selected_seed_ids}, center=False)
+    profile_knn = None
+    if _personalization_enabled and _active_profile:
+        profile_knn = engine.knn_scores(_profile_ratings(_active_profile), center=True)
+    request_recommender, request_components = engine.for_request(
+        seed_knn if selected_seed_ids else profile_knn
+    )
+
     ctx = ScoringContext(
         metadata=metadata,
         bundle=bundle,
-        recommender=engine.recommender,
-        components=engine.components,
+        recommender=request_recommender,
+        components=request_components,
         seed_ids=list(sidebar.selected_seed_ids),
         seed_titles=list(sidebar.selected_seed_titles),
         user_index=0,
@@ -452,6 +479,7 @@ def _execute_pipeline(
         personalization_blocked_reason=st.session_state.get(
             "personalization_blocked_reason"
         ),
+        personal_knn_scores=profile_knn,
         weights=sidebar.weights,
         seed_ranking_mode=_seed_ranking_mode,
         genre_filter=sidebar.genre_filter,
@@ -470,7 +498,6 @@ def _execute_pipeline(
         ranked_hygiene_exclude_ids=ranked_hygiene_exclude_ids,
     )
 
-    selected_seed_ids = sidebar.selected_seed_ids
     recs: list[dict] = []
     personalization_applied = False
 
@@ -484,13 +511,14 @@ def _execute_pipeline(
             seed_result.franchise_cap_diagnostics
         )
     else:
-        # Seedless fallback: community-baseline when personalization is active
+        # Seedless baseline: no seeds and no ratings means no kNN profile, so it ranks by
+        # MF with fixed weights; the preset would zero it out when its MF weight is 0.
         _mf_mean_user_scores = bundle.get("models", {}).get("mf_mean_user_scores")
         if _personalization_enabled and _mf_mean_user_scores is not None:
             recs = engine.recommender.get_top_n_for_user(
                 0,
                 n=n_requested,
-                weights=sidebar.weights,
+                weights=COMMUNITY_BASELINE_WEIGHTS,
                 exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
                 override_mf_scores=_mf_mean_user_scores,
             )
@@ -498,7 +526,7 @@ def _execute_pipeline(
             recs = engine.recommender.get_top_n_for_user(
                 0,
                 n=n_requested,
-                weights=sidebar.weights,
+                weights=COMMUNITY_BASELINE_WEIGHTS,
                 exclude_item_ids=sorted(ranked_hygiene_exclude_ids),
             )
 
@@ -544,6 +572,17 @@ def _execute_pipeline(
     recs = recs[: sidebar.top_n]
 
     return recs, personalization_applied
+
+
+def _profile_ratings(profile: dict) -> dict[int, float]:
+    """Profile ratings with int anime_id keys; unparseable entries are dropped."""
+    out: dict[int, float] = {}
+    for aid, rating in (profile.get("ratings") or {}).items():
+        try:
+            out[int(aid)] = float(rating)
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def _determine_scoring_path(

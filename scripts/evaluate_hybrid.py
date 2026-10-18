@@ -17,7 +17,6 @@ from src.models.constants import (
     OPTUNA_DIR,
     TOP_K_DEFAULT,
     DEFAULT_SAMPLE_USERS,
-    DEFAULT_HYBRID_WEIGHTS,
 )
 from src.eval.splits import build_validation, reporting_and_tuning_users
 from src.eval.eval_artifacts import load_eval_models, run_metadata
@@ -27,8 +26,9 @@ from src.models.baselines import popularity_scores
 from src.eval.metrics_extra import item_coverage, gini_index
 
 
-# The blend served before Task 0.6, tuned while item-kNN could not score. Kept as an ablation
-# row so the effect of the re-tune stays visible.
+# The blend served before Task 0.9, tuned while item-kNN could not score. It stays the default
+# `hybrid_weighted` row so the published labels keep their meaning: `hybrid_weighted` is this
+# legacy blend and `hybrid_weighted_tuned` is the re-tune the app now serves (DEFAULT_HYBRID_WEIGHTS).
 LEGACY_HYBRID_WEIGHTS = {"mf": 0.9307796791956574, "knn": 0.06624663364738044, "pop": 0.0029736871569621902}
 
 
@@ -216,8 +216,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate hybrid blends of MF, KNN, and Popularity")
     parser.add_argument("--k", type=int, default=TOP_K_DEFAULT)
     parser.add_argument("--sample-users", type=int, default=DEFAULT_SAMPLE_USERS)
-    parser.add_argument("--w-mf", type=float, default=DEFAULT_HYBRID_WEIGHTS["mf"])
-    parser.add_argument("--w-knn", type=float, default=DEFAULT_HYBRID_WEIGHTS["knn"])
-    parser.add_argument("--w-pop", type=float, default=DEFAULT_HYBRID_WEIGHTS["pop"])
+    parser.add_argument("--w-mf", type=float, default=LEGACY_HYBRID_WEIGHTS["mf"])
+    parser.add_argument("--w-knn", type=float, default=LEGACY_HYBRID_WEIGHTS["knn"])
+    parser.add_argument("--w-pop", type=float, default=LEGACY_HYBRID_WEIGHTS["pop"])
     args = parser.parse_args()
     main(k=args.k, sample_users=args.sample_users, w_mf=args.w_mf, w_knn=args.w_knn, w_pop=args.w_pop)

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from src.models.constants import KNN_MODEL_STEM, MF_MODEL_STEM
+from src.models.constants import DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, MF_MODEL_STEM
 
 RANDOM_SEED: int = 42
 
@@ -15,9 +15,14 @@ RANDOM_SEED: int = 42
 DEFAULT_TOP_N: int = 10
 MAX_TOP_N: int = 50
 
-# Hybrid weight presets (normalized). Diversified preset illustrative; may be tuned later.
-BALANCED_WEIGHTS = {"mf": 0.93078, "knn": 0.06625, "pop": 0.00297}
-DIVERSITY_EMPHASIZED_WEIGHTS = {"mf": 0.80, "knn": 0.18, "pop": 0.02}
+# Hybrid weight presets (normalized). Balanced is the blend re-tuned on disjoint users (Task 0.6);
+# Diversity is item-kNN alone: tied with it on NDCG@10, higher coverage and lower Gini
+# (reports/phase4_ablation.md). See docs/decisions.md 2026-10-18.
+BALANCED_WEIGHTS = {k: round(v, 4) for k, v in DEFAULT_HYBRID_WEIGHTS.items()}
+DIVERSITY_EMPHASIZED_WEIGHTS = {"mf": 0.0, "knn": 1.0, "pop": 0.0}
+# Seedless runs have no seeds or ratings to build a kNN profile from, so they rank by MF with
+# the popularity prior the app used before kNN was served, whatever preset is selected.
+COMMUNITY_BASELINE_WEIGHTS = {"mf": 0.997, "knn": 0.0, "pop": 0.003}
 
 # Caching & performance targets
 EMBEDDING_TTL_SECONDS: int = 24 * 3600  # 24h
@@ -306,7 +311,10 @@ def force_neural_enable_for_semantic_mode(semantic_mode: str) -> bool:
 # Final score formula weights
 STAGE2_GENRE_OVERLAP_WEIGHT: float = 0.3
 STAGE2_SEED_COVERAGE_WEIGHT: float = 0.1
-STAGE2_HYBRID_CF_WEIGHT: float = 0.15
+# 0.15 was set against an MF-dominated CF score (~6 ± 0.3). With kNN served, CF scores are
+# ~0.5 ± 0.1; 0.42 keeps CF's spread across the shortlist where it was (Task 0.9, median over
+# 12 popular seeds).
+STAGE2_HYBRID_CF_WEIGHT: float = 0.42
 STAGE2_POPULARITY_BOOST_WEIGHT: float = 0.05
 STAGE2_STAGE1_SCORE_WEIGHT: float = 0.10
 STAGE2_NEURAL_SIM_WEIGHT: float = 1.5

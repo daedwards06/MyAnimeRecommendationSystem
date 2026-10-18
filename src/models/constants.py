@@ -6,11 +6,12 @@ DEFAULT_SAMPLE_USERS: int = 300
 # The cohort the ablation and README report on; blend tuning draws its users from outside it.
 REPORTING_COHORT_USERS: int = 1000
 
-# Default weighted hybrid blend (balanced: accuracy + coverage; normalized Optuna diversity-aware weights)
+# Served weighted hybrid blend: the Task 0.6 Optuna re-tune on users disjoint from the
+# reporting cohort (experiments/optuna_studies/hybrid_weights_best.json, weights_normalized).
 DEFAULT_HYBRID_WEIGHTS = {
-    "mf": 0.9307796791956574,
-    "knn": 0.06624663364738044,
-    "pop": 0.0029736871569621902,
+    "mf": 0.047506697349330884,
+    "knn": 0.9521858800432561,
+    "pop": 0.0003074226074129113,
 }
 
 # Single surviving artifact stem per model family (Task 0.3). Scripts and the app must

@@ -716,3 +716,48 @@ class TestResultStructure:
         assert isinstance(result.ranked_items, list)
         assert isinstance(result.timing, dict)
         assert isinstance(result.warnings, list)
+
+
+class TestSeedPipelineServesKnn:
+    """Task 0.9: Stage 2's CF score uses the served weights and the request's kNN vector."""
+
+    @staticmethod
+    def _with_knn(ctx: ScoringContext, knn_row: np.ndarray) -> ScoringContext:
+        components = HybridComponents(
+            mf=ctx.components.mf, knn=knn_row[None, :], pop=ctx.components.pop, item_ids=ctx.components.item_ids
+        )
+        ctx.components = components
+        ctx.recommender = HybridRecommender(components)
+        return ctx
+
+    def test_hybrid_cf_score_uses_served_weights_and_knn(self, mock_scoring_context: ScoringContext):
+        knn_row = np.linspace(0.1, 1.0, 10).astype(np.float32)
+        ctx = self._with_knn(mock_scoring_context, knn_row)
+        ctx.weights = {"mf": 0.05, "knn": 0.95, "pop": 0.0}
+        result = run_seed_based_pipeline(ctx)
+        assert result.ranked_items
+        for item in result.ranked_items:
+            idx = int(item["anime_id"]) - 1
+            expected = 0.05 * float(ctx.components.mf[0, idx]) + 0.95 * float(knn_row[idx])
+            assert item["explanation"]["content_first_hybrid_cf_score"] == pytest.approx(expected, rel=1e-5)
+
+    def test_knn_only_weights_drop_mf_from_cf_score(self, mock_scoring_context: ScoringContext):
+        knn_row = np.linspace(0.1, 1.0, 10).astype(np.float32)
+        ctx = self._with_knn(mock_scoring_context, knn_row)
+        ctx.weights = {"mf": 0.0, "knn": 1.0, "pop": 0.0}
+        for item in run_seed_based_pipeline(ctx).ranked_items:
+            idx = int(item["anime_id"]) - 1
+            assert item["explanation"]["hybrid_val"] == pytest.approx(float(knn_row[idx]), rel=1e-5)
+
+    def test_personal_knn_reranks_seeded_results(self, mock_scoring_context: ScoringContext, mock_mf_model):
+        seed_knn = np.full(10, 0.5, dtype=np.float32)
+        personal_knn = np.linspace(1.0, 0.0, 10).astype(np.float32)
+        ctx = self._with_knn(mock_scoring_context, seed_knn)
+        ctx.weights = {"mf": 0.0, "knn": 1.0, "pop": 0.0}
+        ctx.personalization_enabled = True
+        ctx.personalization_strength = 1.0
+        ctx.user_embedding = np.ones(mock_mf_model.Q.shape[1], dtype=np.float32)
+        ctx.personal_knn_scores = personal_knn
+        for item in run_seed_based_pipeline(ctx).ranked_items:
+            idx = int(item["anime_id"]) - 1
+            assert item["explanation"]["hybrid_val"] == pytest.approx(float(personal_knn[idx]), rel=1e-5)
