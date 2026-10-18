@@ -13,6 +13,7 @@ from src.app.score_semantics import (
     format_match_score,
     format_user_friendly_score,
     has_match_score,
+    match_rank,
 )
 from src.utils import coerce_genres
 
@@ -160,9 +161,11 @@ def render_card_grid(
         if has_match_score(score):
             if all_raw_scores:
                 user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
+                rank = match_rank(float(score), all_raw_scores)
                 score_badge = (
                     f"<span style='background:{color}15; color:{color}; padding:2px 8px; "
                     f"border-radius:16px; font-weight:700; font-size:0.78rem;' title='{tooltip}'>{user_friendly}</span>"
+                    f"<span style='color:#A0AEC0; font-size:0.72rem; margin-left:6px;'>#{rank}</span>"
                 )
             else:
                 score_str = format_match_score(float(score))
@@ -334,11 +337,13 @@ def render_card(
             if has_match_score(score):
                 if all_raw_scores:
                     user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
+                    rank = match_rank(float(score), all_raw_scores)
                     badge_color = color
                     score_html = (
                         f"<span style='background:{badge_color}15; color:{badge_color}; padding:2px 10px; "
                         f"border-radius:20px; font-size:0.82rem; font-weight:700; margin-left:8px;' "
                         f"title='{tooltip}'>{user_friendly}</span>"
+                        f"<span style='color:#A0AEC0; font-size:0.78rem; font-weight:400; margin-left:6px;'>#{rank}</span>"
                     )
                 else:
                     score_str = format_match_score(float(score))

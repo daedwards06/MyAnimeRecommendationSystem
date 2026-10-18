@@ -43,80 +43,54 @@ def format_match_score(value: float | None, *, decimals: int = 3) -> str:
     return fmt.format(v)
 
 
+MATCH_TIERS: tuple[tuple[str, str], ...] = (
+    ("Top match", "#27AE60"),
+    ("Strong match", "#3498DB"),
+    ("Good match", "#E67E22"),
+    ("Worth a look", "#95A5A6"),
+)
+
+
+def match_rank(raw_score: float, all_raw_scores: list[float]) -> int:
+    """1-based rank of ``raw_score`` within the run (ties share the best rank)."""
+    sorted_scores = sorted(all_raw_scores, reverse=True)
+    try:
+        return sorted_scores.index(raw_score) + 1
+    except ValueError:
+        return 1
+
+
 def format_user_friendly_score(
     raw_score: float, all_raw_scores: list[float]
 ) -> tuple[str, str, str]:
-    """Convert raw score to user-friendly display format.
+    """Convert a raw score to a tiered match label for display.
 
-    Computes percentile rank within the current result set and displays
-    as a percentage with color coding. This makes scores more interpretable
-    for end users who don't understand raw, uncalibrated values.
-
-    Args:
-        raw_score: The raw recommendation score for this item
-        all_raw_scores: All raw scores in the current result set (for percentile)
+    The tier is the within-run rank quartile: the first quarter of the run is
+    "Top match", then "Strong match", "Good match", and "Worth a look". Scores are
+    uncalibrated, so no percentage is shown; the tooltip carries the rank and the
+    raw score.
 
     Returns:
-        (display_text, tooltip_text, color):
-            display_text: e.g., "95% Match"
-            tooltip_text: e.g., "Raw score: 0.847 (relative to this result set)"
-            color: CSS color code based on percentile (green/blue/orange/grey)
-
-    Notes:
-    - Top item gets "98% Match" (not 100% — more honest)
-    - Minimum display is "50% Match" (don't show low numbers for recommended items)
-    - Color coding: ≥90% green, ≥75% blue, ≥60% orange, else grey
-    - Scores are relative within the result set, not absolute quality ratings
+        (display_text, tooltip_text, color)
     """
     if not all_raw_scores:
-        # Fallback if no scores available
-        return "—% Match", "No score data", "#95A5A6"
+        return "—", "No score data", "#95A5A6"
 
-    # Sort scores descending to compute percentile rank
-    sorted_scores = sorted(all_raw_scores, reverse=True)
-
-    # Find rank of this score (0-indexed, 0 = best)
-    try:
-        rank = sorted_scores.index(raw_score)
-    except ValueError:
-        # Score not in list (shouldn't happen), use 0
-        rank = 0
-
-    # Compute percentile: top item = 98%, scale linearly
-    # percentile = 1 - (rank / len(sorted_scores))
-    if len(sorted_scores) == 1:
-        percentile = 0.98  # Single item gets 98%
-    else:
-        # Linear interpolation: rank 0 → 98%, last rank → 50%
-        percentile = 0.98 - (rank / (len(sorted_scores) - 1)) * (0.98 - 0.50)
-
-    # Clamp to [50%, 98%]
-    percentile = max(0.50, min(0.98, percentile))
-
-    # Format display text
-    display_text = f"{int(percentile * 100)}% Match"
-
-    # Tooltip with raw score
-    tooltip_text = f"Raw score: {raw_score:.3f} (relative to this result set)"
-
-    # Color coding
-    if percentile >= 0.90:
-        color = "#27AE60"  # Green
-    elif percentile >= 0.75:
-        color = "#3498DB"  # Blue
-    elif percentile >= 0.60:
-        color = "#E67E22"  # Orange
-    else:
-        color = "#95A5A6"  # Grey
-
-    return display_text, tooltip_text, color
+    n = len(all_raw_scores)
+    rank = match_rank(raw_score, all_raw_scores)
+    tier = min(len(MATCH_TIERS) - 1, ((rank - 1) * len(MATCH_TIERS)) // n)
+    label, color = MATCH_TIERS[tier]
+    tooltip = f"Rank {rank} of {n} in this run, raw score {raw_score:.3f} (relative, not a probability)"
+    return label, tooltip, color
 
 
 __all__ = [
+    "MATCH_TIERS",
     "SCORE_HELP_TEXT",
     "SCORE_LABEL_SHORT",
     "SCORE_SEMANTIC_NAME",
     "format_match_score",
     "format_user_friendly_score",
     "has_match_score",
+    "match_rank",
 ]

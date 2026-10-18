@@ -812,13 +812,14 @@ ruff check src/ tests/ app/
 ```
 
 **Checklist:**
-- [ ] Same function, same tuple: text becomes `Top match` / `Strong match` / `Good match` /
+- [x] Same function, same tuple: text becomes `Top match` / `Strong match` / `Good match` /
       `Worth a look` by within-run percentile quartile; tooltip keeps "rank N of M in this
       run, raw score X"; colors unchanged
-- [ ] Card shows the label plus a subtle rank ("#1") so ordering is still readable
-- [ ] Help text (Task 1.1) explains that matches are relative to the current run
-- [ ] Tests: tiers at boundaries; single-item run; tooltip contains rank
-- [ ] Tests + ruff green
+- [x] Card shows the label plus a subtle rank ("#1") so ordering is still readable — *via a new
+      `match_rank` helper; both `render_card` and `render_card_grid`*
+- [x] Help text (Task 1.1) explains that matches are relative to the current run
+- [x] Tests: tiers at boundaries; single-item run; tooltip contains rank
+- [x] Tests + ruff green
 
 ---
 

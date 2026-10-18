@@ -7,6 +7,7 @@ from src.app.score_semantics import (
     SCORE_SEMANTIC_NAME,
     format_match_score,
     format_user_friendly_score,
+    match_rank,
 )
 
 
@@ -23,58 +24,64 @@ def test_format_match_score_is_unitless() -> None:
     assert format_match_score(1.23456) == "1.235"
 
 
-def test_format_user_friendly_score_top_item() -> None:
-    """Test that the top-scoring item gets 98% Match."""
+def test_format_user_friendly_score_tiers_at_boundaries() -> None:
+    scores = [float(x) for x in range(8, 0, -1)]  # 8 items -> 2 per quartile
+    expected = [
+        "Top match", "Top match",
+        "Strong match", "Strong match",
+        "Good match", "Good match",
+        "Worth a look", "Worth a look",
+    ]
+    assert [format_user_friendly_score(s, scores)[0] for s in scores] == expected
+
+
+def test_format_user_friendly_score_uneven_run_length() -> None:
+    scores = [float(x) for x in range(10, 0, -1)]
+    labels = [format_user_friendly_score(s, scores)[0] for s in scores]
+    assert labels[0] == "Top match"
+    assert labels[2] == "Top match"
+    assert labels[3] == "Strong match"
+    assert labels[-1] == "Worth a look"
+
+
+def test_format_user_friendly_score_colors_unchanged() -> None:
+    scores = [4.0, 3.0, 2.0, 1.0]
+    colors = [format_user_friendly_score(s, scores)[2] for s in scores]
+    assert colors == ["#27AE60", "#3498DB", "#E67E22", "#95A5A6"]
+
+
+def test_format_user_friendly_score_has_no_percentage() -> None:
     scores = [1.0, 0.9, 0.8, 0.7, 0.6]
-    display, tooltip, color = format_user_friendly_score(1.0, scores)
-    assert display == "98% Match"
-    assert "1.000" in tooltip
-    assert color == "#27AE60"  # Green for top
+    for s in scores:
+        display, _, _ = format_user_friendly_score(s, scores)
+        assert "%" not in display
 
 
-def test_format_user_friendly_score_bottom_item() -> None:
-    """Test that the bottom-scoring item gets 50% Match."""
+def test_format_user_friendly_score_tooltip_contains_rank_and_raw() -> None:
     scores = [1.0, 0.9, 0.8, 0.7, 0.6]
-    display, tooltip, color = format_user_friendly_score(0.6, scores)
-    assert display == "50% Match"
-    assert "0.600" in tooltip
-
-
-def test_format_user_friendly_score_middle_item() -> None:
-    """Test that middle items get intermediate percentages."""
-    scores = [1.0, 0.9, 0.8, 0.7, 0.6]
-    display, tooltip, color = format_user_friendly_score(0.8, scores)
-    # Middle item (rank 2 of 5): should be around 74%
-    assert "Match" in display
-    assert "%" in display
+    _, tooltip, _ = format_user_friendly_score(0.8, scores)
+    assert "Rank 3 of 5 in this run" in tooltip
     assert "0.800" in tooltip
 
 
-def test_format_user_friendly_score_color_coding() -> None:
-    """Test color coding based on percentile."""
-    scores = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-
-    # Top item: green (≥90%)
-    _, _, color = format_user_friendly_score(1.0, scores)
-    assert color == "#27AE60"
-
-    # Bottom item: grey (<60%)
-    _, _, color = format_user_friendly_score(0.1, scores)
-    assert color == "#95A5A6"
-
-
 def test_format_user_friendly_score_single_item() -> None:
-    """Test behavior with only one item."""
-    scores = [0.75]
-    display, tooltip, color = format_user_friendly_score(0.75, scores)
-    assert display == "98% Match"  # Single item gets top score
+    display, tooltip, color = format_user_friendly_score(0.75, [0.75])
+    assert display == "Top match"
+    assert "Rank 1 of 1" in tooltip
+    assert color == "#27AE60"
 
 
 def test_format_user_friendly_score_empty_scores() -> None:
-    """Test behavior with empty scores list."""
     display, tooltip, color = format_user_friendly_score(0.5, [])
-    assert "Match" in display
+    assert display == "—"
     assert color == "#95A5A6"
+
+
+def test_match_rank_is_one_based_and_ties_share_rank() -> None:
+    scores = [0.5, 0.9, 0.9, 0.1]
+    assert match_rank(0.9, scores) == 1
+    assert match_rank(0.5, scores) == 3
+    assert match_rank(0.1, scores) == 4
 
 
 def test_no_legacy_confidence_strings_in_ui_files() -> None:
@@ -93,19 +100,10 @@ def test_no_legacy_confidence_strings_in_ui_files() -> None:
     assert "/10" not in explanations_py
 
 
-def test_percent_match_is_percentile_based() -> None:
-    """Verify that '% Match' refers to percentile rank, not raw calibration.
-
-    Phase 4 Task 4.2: The '% Match' display is computed from percentile rank
-    within the result set, not from raw uncalibrated scores. This is a valid
-    user-friendly transformation that helps end users understand relative quality.
-    """
+def test_cards_use_tiered_match_label_with_rank() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     cards_py = (repo_root / "src" / "app" / "components" / "cards.py").read_text(encoding="utf-8")
 
-    # Should use format_user_friendly_score for percentile-based display
     assert "format_user_friendly_score" in cards_py
-
-    # Raw scores should still be shown as tooltips/small text for technical users
-    assert "Match score" in cards_py or "Raw score" in cards_py or "SCORE_LABEL_SHORT" in cards_py
-
+    assert "match_rank" in cards_py
+    assert "% Match" not in cards_py

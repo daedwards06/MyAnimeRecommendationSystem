@@ -8,11 +8,11 @@ FAQ_MD_USER = """
 
 **How do I get better picks?** Add 1–5 titles you love in the sidebar; more titles broaden the mix. For picks from your whole watch history, load a rated profile or import your MyAnimeList list and switch to Personalized.
 
-**What does the match score mean?** It ranks titles within the current list only. It is not a rating out of 10 or a probability.
+**What do "Top match" and "Worth a look" mean?** They are relative to the current run: the first quarter of this list is "Top match", then "Strong match", "Good match", and "Worth a look". The "#N" next to the label is the title's rank in this run. Change your titles or filters and the tiers are recomputed. They are not ratings out of 10 or probabilities.
 """
 
 FAQ_MD_RANKED = """
-**Match score (relative):** a unitless, uncalibrated ranking signal (higher = better match). Compare within the current run (not a probability or /10 rating).
+**Match score (relative):** a unitless, uncalibrated ranking signal (higher = better match). Compare within the current run (not a probability or /10 rating). Card labels are within-run rank quartiles; hover a label for the rank and raw score.
 
 **Modes:**
 - **Seed-based:** uses 1–5 seed titles to rank results.
