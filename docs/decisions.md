@@ -5,6 +5,33 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-19 — UI UX Pro Max skill files are not committed; its design-system output is
+
+**Status:** Adopted. Source: Task 0.1 of
+[MARS_UI_REDESIGN_PLAN.md](plans/MARS_UI_REDESIGN_PLAN.md).
+
+**Context.** The redesign takes its design decisions from the UI UX Pro Max Claude Code skill.
+`npx ui-ux-pro-max-cli init --ai claude` installs it project-locally under `.claude/skills/`,
+together with six sibling skills from the same package (`banner-design`, `brand`, `design`,
+`design-system`, `slides`, `ui-styling`). When asked to persist a design system, the skill writes
+`design-system/<project>/MASTER.md` and per-page overrides at the repo root.
+
+**Decision.** `.gitignore` excludes all seven installer-created skill directories. The root
+`design-system/` directory is tracked.
+
+**Why.** The skill directories are third-party code and data, reinstallable with one command;
+committing them would vendor someone else's package into the repo and make its diffs look like
+project work. `design-system/` holds the decisions made *for this project* (palette, type,
+page rules); the tokens module and CSS are derived from them, so they need history and review
+like any other source file. The ignore patterns are anchored (`/.claude/skills/design-system/`)
+so the skill named `design-system` does not hide the project's `design-system/` folder.
+
+**What would change this.** The skill is modified locally (then the modified copy is project code
+and gets tracked), or the CLI stops being installable at a working version (then vendor a pinned
+copy).
+
+---
+
 ## 2026-10-19 — A learned reranker beats the hand-weighted blend; served behind `RERANKER_MODE=learned`
 
 **Status:** Adopted behind a flag (default `hand`). Source: Task 2.3, `reports/learned_reranker.md`

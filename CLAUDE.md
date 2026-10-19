@@ -50,6 +50,7 @@ this protocol exactly:
 | File | Description |
 |------|-------------|
 | `docs/plans/MARS_PORTFOLIO_PRODUCT_PLAN.md` | From the 2026-09-12 product + portfolio review: unblock the demo, repo hygiene, honest evaluation table, UI simplification, data-science credibility (Phases 0–3) |
+| `docs/plans/MARS_UI_REDESIGN_PLAN.md` | 2026-10-19: 90s anime visual redesign of the Streamlit app and first-five-minutes UX, design decisions sourced from the UI UX Pro Max skill (Phases 0–4) |
 
 *(Add new plan files to this table as they are created.)*
 
@@ -125,3 +126,26 @@ ruff check src/ tests/ app/
   present them as probabilities or /10 ratings.
 - The app must not silently fall back between modes; if a mode cannot run, it says why.
 - `ruff.toml` carries a list of pre-existing ignores; do not add to it to make a task pass.
+
+## UI redesign rules
+
+Apply to every task in `docs/plans/MARS_UI_REDESIGN_PLAN.md` and to any UI change made after it.
+
+- **Streamlit only.** No React, Vue, Tailwind, shadcn, or standalone HTML pages. New UI is
+  Streamlit widgets plus `st.markdown(..., unsafe_allow_html=True)` / `st.html` fragments.
+- **The UI UX Pro Max skill (`.claude/skills/ui-ux-pro-max/`) is for design decisions only:**
+  palette, typography, UX rules, anti-patterns, the pre-delivery checklist. Ignore its
+  stack-specific code output (`--stack`, Tailwind classes, component code). Its
+  `--design-system --persist` output goes to `design-system/` at the repo root, which is tracked.
+- **Tokens live in `src/app/theme_tokens.py`** — the single source for colors, fonts, spacing,
+  radii, shadows. `.streamlit/config.toml` and CSS variables are generated from it, never edited
+  by hand to a different value. No hex literals in components.
+- **CSS lives only in `app/styles/`**, injected once from `app/main.py`. No inline `style=`
+  strings in components beyond values read from the tokens module.
+- **No `st-emotion-cache-*` selectors.** Target the app's own classes and Streamlit's
+  `data-testid` attributes; generated class names change between Streamlit releases.
+- **Local Streamlit is 1.38.0** (`requirements.txt`: `>=1.38.0`); check a theming or API option
+  exists in 1.38 before relying on it.
+- **The eight design principles** in the plan's "Design principles for this plan" section are
+  binding (first-card time budget, era not IP, contrast ≥ 4.5:1, contract-preserving, one token
+  source, stable selectors, live check green, green gate). Read them before each task.
