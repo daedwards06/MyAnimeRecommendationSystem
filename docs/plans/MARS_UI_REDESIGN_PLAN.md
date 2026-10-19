@@ -198,7 +198,7 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 - [x] Fill this plan's findings table (evidence column mandatory) and write
       `docs/redesign/UX_PLAN.md`: findings ranked by impact on the first five minutes, each
       marked **fix in Phase 3**, **defer**, or **won't fix** with a reason
-- [ ] **Owner:** approve UX_PLAN.md before Phase 3 starts
+- [x] **Owner:** approve UX_PLAN.md before Phase 3 starts
 - [x] No code changes in this task
 
 ---
@@ -232,12 +232,12 @@ python .claude/skills/ui-ux-pro-max/scripts/search.py "anime recommendation ente
 
 **Checklist:**
 
-- [ ] Shortlist the top style, palette, and typography matches with one line each in
+- [x] Shortlist the top style, palette, and typography matches with one line each in
       `docs/redesign/SKILL_SEARCH.md`; **owner** picks the direction
-- [ ] Generate and persist the design system with the chosen direction in the query
-- [ ] Page overrides for the three modes only if the audit found mode-specific needs:
+- [x] Generate and persist the design system with the chosen direction in the query
+- [x] Page overrides for the three modes only if the audit found mode-specific needs:
       `--page "seed"`, `--page "personalized"`, `--page "browse"`
-- [ ] Note in MASTER.md which skill rules do not apply to Streamlit (e.g. `cursor-pointer` on
+- [x] Note in MASTER.md which skill rules do not apply to Streamlit (e.g. `cursor-pointer` on
       native widgets, SVG icon rules for widgets Streamlit renders) so later audits skip them
       instead of hacking around the framework
 

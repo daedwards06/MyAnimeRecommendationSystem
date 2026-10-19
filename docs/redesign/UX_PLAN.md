@@ -7,7 +7,7 @@
 > focus, touch targets, responsive). Contrast ratios are WCAG 2.x relative-luminance ratios
 > computed from the hex values in the code, measured against the page background `#FAFBFC`.
 >
-> **Status: awaiting owner approval before Phase 3 starts.**
+> **Status: approved by the owner, 2026-10-19.** Phase 3 may start.
 
 ## Steps to the first useful result, per mode
 
