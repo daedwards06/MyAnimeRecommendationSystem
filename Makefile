@@ -68,8 +68,8 @@ EVAL_COHORT ?= 1000
 
 phase4-artifacts:
 	. .venv/Scripts/activate && python scripts/aggregate_phase4_metrics.py --cohort $(EVAL_COHORT)
-	. .venv/Scripts/activate && python scripts/plot_phase4_metrics.py --metrics-path data/processed/phase4/metrics_by_k.parquet || echo "(Skip if metrics_by_k not yet built)"
 	. .venv/Scripts/activate && python scripts/generate_phase4_ablation.py
+	. .venv/Scripts/activate && python scripts/plot_ablation_tradeoff.py
 	. .venv/Scripts/activate && python scripts/explain_hybrid_examples.py --k 10 --sample-users 500 --max-users 3
 	. .venv/Scripts/activate && python scripts/generate_recommendations_sample.py --k 10 --sample-users 500
 	. .venv/Scripts/activate && python scripts/genre_exposure_scan.py --recommendations data/processed/recommendations_sample.parquet --items data/processed/anime_metadata_normalized.parquet --model hybrid

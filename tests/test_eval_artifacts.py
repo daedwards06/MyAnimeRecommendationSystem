@@ -17,6 +17,7 @@ from src.eval.eval_artifacts import (
     build_eval_artifacts,
     knn_eval_recommend,
     knn_eval_scores,
+    load_eval_als,
     load_eval_models,
     train_fingerprint,
 )
@@ -79,6 +80,19 @@ def test_load_fits_without_cache_when_disabled(tmp_path: Path, interactions: pd.
 
     assert knn_model is not None and mf_model is not None
     assert not any(tmp_path.glob("*.joblib"))
+
+
+def test_load_eval_als_reuses_cache_until_split_changes(tmp_path: Path, interactions: pd.DataFrame):
+    load_eval_als(interactions, artifacts_dir=tmp_path)
+    path = next(tmp_path.glob("*.joblib"))
+    mtime = path.stat().st_mtime_ns
+
+    load_eval_als(interactions, artifacts_dir=tmp_path)
+    assert path.stat().st_mtime_ns == mtime
+
+    load_eval_als(interactions.iloc[:100], artifacts_dir=tmp_path)
+    written = json.loads(path.with_suffix(".fingerprint.json").read_text(encoding="utf-8"))
+    assert written["n_rows"] == 100
 
 
 def test_eval_artifacts_live_outside_models_dir():

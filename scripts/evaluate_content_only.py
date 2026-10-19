@@ -58,7 +58,9 @@ def _user_profile_cosine(item_index: pd.Index, item_mat: np.ndarray, user_seen: 
     return [int(item_index[i]) for i in top_idx if np.isfinite(sims[i])]
 
 
-def main(k: int, sample_users: int):
+def main(ks: list[int], sample_users: int):
+    ks = sorted(set(ks))
+    k_max = ks[-1]
     interactions = pd.read_parquet(DATA_PROCESSED_DIR / "interactions.parquet")
     train_df, val_df = _build_validation(interactions)
     users = sample_user_ids(val_df["user_id"].unique().tolist(), sample_users)
@@ -70,13 +72,14 @@ def main(k: int, sample_users: int):
     train_hist = train_df.groupby("user_id")["anime_id"].apply(set).to_dict()
     val_hist = val_df.groupby("user_id")["anime_id"].apply(set).to_dict()
 
+    # Ranked once at the largest K; a cosine top-K is a prefix of it.
     recs_tfidf, recs_emb = {}, {}
     for u in users:
         seen = train_hist.get(u, set())
-        recs_tfidf[u] = _user_profile_cosine(tfidf_index, tfidf_mat, seen, k)
-        recs_emb[u] = _user_profile_cosine(emb_index, emb_mat, seen, k)
+        recs_tfidf[u] = _user_profile_cosine(tfidf_index, tfidf_mat, seen, k_max)
+        recs_emb[u] = _user_profile_cosine(emb_index, emb_mat, seen, k_max)
 
-    def _eval(name: str, recs: dict[int, list[int]]):
+    def _eval(name: str, recs: dict[int, list[int]], k: int):
         ndcgs, maps = [], []
         for u, items in recs.items():
             rel = val_hist.get(u, set())
@@ -92,32 +95,29 @@ def main(k: int, sample_users: int):
         }
 
     total_items = int(interactions["anime_id"].nunique())
-    metrics_tfidf = _eval("content_tfidf", recs_tfidf)
-    metrics_tfidf["item_coverage@k"] = item_coverage(recs_tfidf, total_items)
-    metrics_tfidf["gini_index@k"] = gini_index(recs_tfidf)
-
-    metrics_emb = _eval("content_embeddings", recs_emb)
-    metrics_emb["item_coverage@k"] = item_coverage(recs_emb, total_items)
-    metrics_emb["gini_index@k"] = gini_index(recs_emb)
-
-    meta = run_metadata(k=k, sample_users=sample_users)
-    metrics_tfidf.update(meta)
-    metrics_emb.update(meta)
-
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    (METRICS_DIR / f"content_tfidf_{ts}.json").write_text(json.dumps(metrics_tfidf, indent=2))
-    (METRICS_DIR / f"content_embeddings_{ts}.json").write_text(json.dumps(metrics_emb, indent=2))
+    summary = []
+    for k in ks:
+        meta = run_metadata(k=k, sample_users=sample_users)
+        for name, full in (("content_tfidf", recs_tfidf), ("content_embeddings", recs_emb)):
+            recs = {u: r[:k] for u, r in full.items()}
+            m = _eval(name, recs, k)
+            m["item_coverage@k"] = item_coverage(recs, total_items)
+            m["gini_index@k"] = gini_index(recs)
+            m.update(meta)
+            (METRICS_DIR / f"{name}_k{k}_{ts}.json").write_text(json.dumps(m, indent=2))
+            summary.append({key: v for key, v in m.items() if key != "per_user"})
 
     out_csv = METRICS_DIR / "summary.csv"
-    pd.DataFrame([metrics_tfidf, metrics_emb]).drop(columns="per_user").to_csv(out_csv, mode="a", header=not out_csv.exists(), index=False)
+    pd.DataFrame(summary).to_csv(out_csv, mode="a", header=not out_csv.exists(), index=False)
 
-    print(json.dumps({m["model"]: {k: v for k, v in m.items() if k != "per_user"} for m in (metrics_tfidf, metrics_emb)}, indent=2))
+    print(pd.DataFrame(summary)[["model", "k", "ndcg@k_mean", "map@k_mean", "item_coverage@k", "gini_index@k"]].to_string(index=False))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate content-only recommenders (TF-IDF and embeddings)")
-    parser.add_argument("--k", type=int, default=TOP_K_DEFAULT)
+    parser.add_argument("--k", type=int, nargs="+", default=[TOP_K_DEFAULT], help="One or more K values")
     parser.add_argument("--sample-users", type=int, default=DEFAULT_SAMPLE_USERS)
     args = parser.parse_args()
     main(args.k, args.sample_users)

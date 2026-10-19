@@ -220,3 +220,20 @@ def test_ablation_pairs_against_item_knn_when_present():
     hybrid = ablation[ablation["model"] == "hybrid_weighted"].iloc[0]
     assert hybrid["ndcg_diff_vs_item_knn_sklearn"] == pytest.approx(0.048 - 0.06)
     assert hybrid["ndcg_lift_vs_item_knn_sklearn_pct"] == pytest.approx((0.048 - 0.06) / 0.06 * 100)
+
+
+def test_ablation_by_k_stacks_every_k_with_its_own_intervals():
+    k10 = _ablation_frame()
+    k5 = _ablation_frame(K=5).assign(ndcg=lambda f: f["ndcg"] / 2, map=lambda f: f["map"] / 2)
+    frame = pd.concat([k10, k5], ignore_index=True)
+    per_user = pd.concat([_per_user_frame(k10), _per_user_frame(k5).assign(K=5)], ignore_index=True)
+
+    by_k = generate_phase4_ablation.ablation_by_k(frame, per_user)
+
+    assert sorted(by_k["K"].unique()) == [5, 10]
+    assert {"ndcg", "ndcg_ci_low", "coverage", "gini", "ndcg_diff_vs_popularity_ci_high"} <= set(by_k.columns)
+    mf5 = by_k[(by_k["K"] == 5) & (by_k["model"] == "mf_sgd")].iloc[0]
+    assert mf5["ndcg"] == pytest.approx(0.025)
+    assert mf5["ndcg_ci_low"] <= mf5["ndcg"] <= mf5["ndcg_ci_high"]
+    markdown = generate_phase4_ablation.by_k_markdown(by_k)
+    assert "ndcg@5 [95% CI]" in markdown and "gini@10" in markdown

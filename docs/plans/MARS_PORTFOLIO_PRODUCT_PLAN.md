@@ -1136,19 +1136,28 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] Variants: popularity, item-kNN, MF, MF+kNN (no pop), hybrid balanced (**Task 0.6
+- [x] Variants: popularity, item-kNN, MF, MF+kNN (no pop), hybrid balanced (**Task 0.6
       re-tuned weights**), hybrid with the pre-0.6 weights (labelled as such, so the re-tune is
       visible on the chart), hybrid diversity-emphasized, hybrid RRF, content TF-IDF, content
       embeddings, plus implicit MF if Task 2.1 added it. All at K ∈ {5, 10, 20}, 1,000 users,
-      seed 42, with coverage, Gini and the Task 0.6 bootstrap CIs for every row
-- [ ] The trade-off plot draws the NDCG CI as a horizontal error bar on each point
-- [ ] `scripts/plot_ablation_tradeoff.py`: NDCG@10 (x) vs Coverage@10 (y), one point per
-      variant, labeled, popularity and MF highlighted; also NDCG@K curves now that K varies
-- [ ] `reports/phase4_evaluation.md` §2–§4 embed the new figures and table; §8 narrative
+      seed 42, with coverage, Gini and the Task 0.6 bootstrap CIs for every row — *10 points, not
+      11: the Diversity preset is `{knn: 1.0}`, which ranks exactly like item-kNN offline (its row
+      would trip the metric-collision guard), so it is labelled on the kNN point. MF+kNN =
+      `hybrid_mf_knn`, the re-tuned blend with pop removed (a tie with it at K=10/20, +0.0016
+      [+0.0000, +0.0036] at K=5). Implicit ALS = `implicit_als`, train-split fit via
+      `load_eval_als`, reproduces 0.1890. Every K=10 number reproduces the previous table exactly.
+      `phase4_ablation_by_k.csv` carries every K; `phase4_ablation.csv` stays K=10*
+- [x] The trade-off plot draws the NDCG CI as a horizontal error bar on each point
+- [x] `scripts/plot_ablation_tradeoff.py`: NDCG@10 (x) vs Coverage@10 (y), one point per
+      variant, labeled, popularity and MF highlighted; also NDCG@K curves now that K varies —
+      *served blend highlighted too; coverage on a log axis. `plot_phase4_metrics.py` retired to
+      `scripts/archive/` with its four stale `*_vs_k.png`*
+- [x] `reports/phase4_evaluation.md` §2–§4 embed the new figures and table; §8 narrative
       updated
-- [ ] README hero image = the trade-off plot; caption states the cohort and seed
-- [ ] Tests: plot script runs on a 3-row fixture frame and writes a PNG
-- [ ] Tests + ruff green
+- [x] README hero image = the trade-off plot; caption states the cohort and seed — *it heads
+      § Results; the demo GIF stays at the top of the page*
+- [x] Tests: plot script runs on a 3-row fixture frame and writes a PNG
+- [x] Tests + ruff green
 
 ---
 

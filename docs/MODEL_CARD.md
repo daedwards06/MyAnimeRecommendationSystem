@@ -108,6 +108,8 @@ offline would measure leakage. Full protocol and narrative: `reports/phase4_eval
 
 | Model | NDCG@10 | NDCG@10 95% CI | MAP@10 | Coverage@10 | Gini@10 | ΔNDCG vs. popularity, paired 95% CI | ΔNDCG vs. item-kNN, paired 95% CI |
 |:---|---:|:---:|---:|---:|---:|:---:|:---:|
+| implicit_als | 0.1890 | [0.1691, 0.2106] | 0.1516 | 0.0927 | 0.6542 | [+0.1340, +0.1750] | [+0.1059, +0.1475] |
+| hybrid_mf_knn | 0.0667 | [0.0540, 0.0802] | 0.0529 | 0.1076 | 0.7507 | [+0.0184, +0.0465] | [−0.0027, +0.0096] |
 | hybrid_weighted_tuned | 0.0658 | [0.0535, 0.0795] | 0.0521 | 0.1029 | 0.7601 | [+0.0175, +0.0454] | [−0.0036, +0.0091] |
 | item_knn_sklearn | 0.0632 | [0.0507, 0.0775] | 0.0516 | 0.1168 | 0.7276 | [+0.0140, +0.0441] | — |
 | hybrid_rrf | 0.0547 | [0.0445, 0.0674] | 0.0419 | 0.0782 | 0.8281 | [+0.0099, +0.0308] | [−0.0180, +0.0006] |
@@ -124,10 +126,16 @@ the Δ columns are paired (both models resampled on the same users). `hybrid_wei
 weights the app served before Task 0.9 (mf 0.931 / knn 0.066 / pop 0.003); `hybrid_weighted_tuned`
 uses the weights from the Task 0.6 sweep (mf 0.048 / knn 0.952 / pop 0.0003), tuned on 1,000
 validation users disjoint from this cohort, and is the blend the app now serves.
+`hybrid_mf_knn` is that blend with its popularity term removed and the rest renormalized.
+`implicit_als` is the implicit-feedback MF from `reports/mf_diagnostic.md` (Task 2.1); it is
+evaluated offline only and **not served**. The same variants at K = 5 and 20 are in
+`reports/phase4_ablation.md` ("Across K") and `reports/phase4_ablation_by_k.csv`.
 
-**Reading the table.** Item-kNN carries the accuracy. Item-kNN, the kNN-led re-tuned blend and
+**Reading the table.** Among the served models, item-kNN carries the accuracy; implicit ALS,
+which is not served, beats every one of them by a wide margin. Item-kNN, the kNN-led re-tuned blend and
 RRF all beat popularity and MF, and none of the three can be told apart from the others on this
-cohort. MF is tied with popularity and below the config-weight blend, whose popularity term
+cohort. Dropping the popularity term from the served blend (`hybrid_mf_knn`) changes nothing
+measurable either. MF is tied with popularity and below the config-weight blend, whose popularity term
 ranks the 33 cohort users MF never saw. MF's contribution is coverage (11.9× popularity), not
 ranking accuracy; `reports/mf_diagnostic.md` shows why (see Limitations). Item-kNN's historical near-zero score
 (NDCG 0.0017) was an evaluation defect, not a property of the model: `exclude_seen` masked the

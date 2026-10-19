@@ -78,6 +78,9 @@ class ImplicitALSRecommender:
 
     def recommend(self, user_id: int, top_k: int = 10, exclude: set[int] | None = None) -> list[int]:
         assert self.item_to_index is not None and self.index_to_item is not None
+        # As in FunkSVDRecommender.recommend: all-zero scores would come back in index order.
+        if self.user_to_index is None or user_id not in self.user_to_index:
+            return []
         scores = self.predict_user(user_id)
         for it in exclude or ():
             if it in self.item_to_index:

@@ -45,3 +45,10 @@ def test_unknown_user_scores_zero(two_taste_groups: pd.DataFrame):
     model = ImplicitALSRecommender(n_factors=4, n_iters=2).fit(two_taste_groups)
 
     assert not model.predict_user(999).any()
+
+
+def test_unknown_user_gets_no_recommendations(two_taste_groups: pd.DataFrame):
+    """All-zero scores must not come back in index order as an accidental popularity list."""
+    model = ImplicitALSRecommender(n_factors=4, n_iters=2).fit(two_taste_groups)
+
+    assert model.recommend(999, top_k=5) == []

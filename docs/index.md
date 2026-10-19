@@ -7,7 +7,7 @@ Start with the [README](../README.md) for the pitch and quick start, then the
 
 | Page | What it covers |
 |------|----------------|
-| [Phase 4 ablation](../reports/phase4_ablation.md) ([CSV](../reports/phase4_ablation.csv)) | The evaluation table: every model on one cohort, K=10 |
+| [Phase 4 ablation](../reports/phase4_ablation.md) ([CSV](../reports/phase4_ablation.csv), [by K](../reports/phase4_ablation_by_k.csv)) | The evaluation table: every variant on one cohort, K=10, plus K=5 and 20; [trade-off chart](../reports/figures/ablation_accuracy_vs_coverage.png) |
 | [Phase 4 evaluation](../reports/phase4_evaluation.md) | Protocol, metrics by K, coverage and novelty, open items |
 | [Phase 3 summary](../reports/phase3_summary.md) | Earlier modeling phase, closed 2025-11-21 |
 | [Model card](MODEL_CARD.md) | Intended use, data, metrics, limitations |

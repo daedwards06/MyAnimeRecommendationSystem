@@ -69,7 +69,8 @@ this protocol exactly:
 - **Offline evaluation:** `scripts/evaluate_*.py` write JSON to `experiments/metrics/`
   (git-ignored); `scripts/aggregate_phase4_metrics.py` builds
   `data/processed/phase4/metrics_by_k.parquet`; `scripts/generate_phase4_ablation.py` writes
-  `reports/phase4_ablation.{csv,md}`.
+  `reports/phase4_ablation.{csv,md}` and `phase4_ablation_by_k.csv`;
+  `scripts/plot_ablation_tradeoff.py` draws `reports/figures/ablation_*.png` from them.
 - **Tests:** ~290 tests in `tests/`, run with `APP_IMPORT_LIGHT=1` so the app entrypoint imports
   without loading model artifacts. Must stay green after every task.
 - **Lint:** `ruff check src/ tests/ app/` (the CI scope) must stay at 0 errors. `scripts/` has ~394

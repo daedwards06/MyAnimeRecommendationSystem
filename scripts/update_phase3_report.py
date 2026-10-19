@@ -13,8 +13,9 @@ from src.models.constants import METRICS_DIR
 
 def _latest_json(prefix: str) -> Path | None:
     # The digit anchors the timestamp suffix, so "hybrid_weighted" does not also match "hybrid_weighted_tuned".
-    files = sorted(METRICS_DIR.glob(f"{prefix}_[0-9]*.json"))
-    return files[-1] if files else None
+    # Multi-K runs write "{prefix}_k10_{ts}.json"; this table is K=10, so those count too.
+    files = [*METRICS_DIR.glob(f"{prefix}_[0-9]*.json"), *METRICS_DIR.glob(f"{prefix}_k10_[0-9]*.json")]
+    return max(files, key=lambda p: p.stem.rsplit("_", 1)[-1]) if files else None
 
 
 def _load_metrics(prefix: str):

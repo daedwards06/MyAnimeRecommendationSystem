@@ -21,8 +21,11 @@ from typing import Any
 
 import pandas as pd
 from joblib import dump, load
+from threadpoolctl import threadpool_limits
 
+from src.models.als_implicit import ImplicitALSRecommender
 from src.models.constants import (
+    ALS_EVAL_ARTIFACT,
     EVAL_ARTIFACTS_DIR,
     KNN_EVAL_ARTIFACT,
     KNN_MODEL_STEM,
@@ -46,6 +49,15 @@ KNN_PARAMS: dict[str, Any] = {
     "normalize_items": True,
     "center_ratings": True,
     "popularity_weight": 0.02,
+}
+# Offline-only (not served). alpha=5 was picked by scripts/diagnose_mf.py on validation users
+# outside the reporting cohort (reports/mf_diagnostic.md).
+ALS_PARAMS: dict[str, Any] = {
+    "n_factors": 64,
+    "reg": 0.1,
+    "alpha": 5.0,
+    "n_iters": 10,
+    "random_state": RANDOM_SEED,
 }
 
 
@@ -134,6 +146,28 @@ def load_eval_models(
     return knn_model, mf_model
 
 
+def load_eval_als(
+    train_df: pd.DataFrame,
+    *,
+    artifacts_dir: Path | None = None,
+    cache: bool = True,
+) -> ImplicitALSRecommender:
+    """Implicit ALS fit on the train split, cached like `load_eval_models`."""
+    out_dir = Path(artifacts_dir) if artifacts_dir is not None else EVAL_ARTIFACTS_DIR
+    path = out_dir / f"{ALS_EVAL_ARTIFACT}.joblib"
+    fingerprint = {**train_fingerprint(train_df), "params": ALS_PARAMS}
+    if _is_fresh(path, fingerprint):
+        return load(path)
+    logger.info("Fitting eval implicit ALS on train split (%s)", fingerprint)
+    # ~85K tiny (64 x 64) solves per sweep: a multithreaded BLAS spends far longer coordinating
+    # threads than computing.
+    with threadpool_limits(limits=1):
+        model = ImplicitALSRecommender(**ALS_PARAMS).fit(train_df)
+    if cache:
+        _save(model, path, fingerprint)
+    return model
+
+
 def knn_eval_scores(knn_model: ItemKNNRecommender, user_id: int, seen: set[int]) -> dict[int, float]:
     """kNN scores for every item outside `seen`, the user's train-split history.
 
@@ -164,6 +198,6 @@ def run_metadata(*, k: int, sample_users: int, generated_at: str | None = None) 
         "k": k,
         "sample_users": sample_users,
         "generated_at": generated_at or datetime.now(UTC).isoformat(timespec="seconds"),
-        "artifacts": {"mf": MF_EVAL_ARTIFACT, "knn": KNN_EVAL_ARTIFACT},
+        "artifacts": {"mf": MF_EVAL_ARTIFACT, "knn": KNN_EVAL_ARTIFACT, "als": ALS_EVAL_ARTIFACT},
         "served_stems": {"mf": MF_MODEL_STEM, "knn": KNN_MODEL_STEM},
     }

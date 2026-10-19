@@ -31,6 +31,7 @@ OPTUNA_DIR = EXPERIMENTS_DIR / "optuna_studies"
 EVAL_ARTIFACTS_DIR = EXPERIMENTS_DIR / "artifacts"
 MF_EVAL_ARTIFACT = "mf_sgd_trainsplit"
 KNN_EVAL_ARTIFACT = "item_knn_sklearn_trainsplit"
+ALS_EVAL_ARTIFACT = "implicit_als_trainsplit"
 
 # Ensure directories exist when imported in scripts
 for p in (MODELS_DIR, METRICS_DIR, OPTUNA_DIR):

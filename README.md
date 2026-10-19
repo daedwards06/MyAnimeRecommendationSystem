@@ -17,11 +17,21 @@ the whole catalog in a few seconds.
 
 ## Results
 
+![Accuracy vs. coverage: NDCG@10 against Coverage@10 for ten model variants, with 95% bootstrap intervals on NDCG](reports/figures/ablation_accuracy_vs_coverage.png)
+
+*NDCG@10 (with its 95% bootstrap CI) against the share of the catalog each variant recommends, on
+one cohort: 1,000 validation users, seed 42, full-catalog ranking. Popularity ties MF on accuracy
+but shows everyone the same 0.6% of the catalog; content similarity spreads wide but ranks poorly;
+item-kNN and the blends built on it beat both on both axes; implicit ALS, evaluated offline and not yet
+served, is about three times more accurate than anything else. NDCG@K at K = 5, 10, 20: [ablation_ndcg_at_k.png](reports/figures/ablation_ndcg_at_k.png).*
+
 Offline ranking quality over the **full catalog**, one cohort (1,000 users, seed 42, K=10), with
 collaborative models fit on the train split only. Intervals are bootstrap over users.
 
 | Model | NDCG@10 | NDCG@10 95% CI | MAP@10 | Coverage@10 | Gini@10 | NDCG vs. popularity |
 |:---|---:|:---:|---:|---:|---:|---:|
+| Implicit ALS (offline only, not served) | 0.1890 | [0.1691, 0.2106] | 0.1516 | 0.0927 | 0.6542 | +445% |
+| MF + kNN, no popularity | 0.0667 | [0.0540, 0.0802] | 0.0529 | 0.1076 | 0.7507 | +92% |
 | **Hybrid (weighted, re-tuned; served)** | **0.0658** | [0.0535, 0.0795] | **0.0521** | 0.1029 | 0.7601 | **+90%** |
 | Item-kNN | 0.0632 | [0.0507, 0.0775] | 0.0516 | 0.1168 | 0.7276 | +82% |
 | Hybrid (RRF rank fusion) | 0.0547 | [0.0445, 0.0674] | 0.0419 | 0.0782 | 0.8281 | +58% |
@@ -33,7 +43,8 @@ collaborative models fit on the train split only. Intervals are bootstrap over u
 
 The served blend beats popularity (+0.031, CI [+0.017, +0.045]) but is tied with item-kNN alone
 (+0.003, CI [−0.004, +0.009]), and matrix factorization on its own is tied with popularity
-(−0.006, CI [−0.017, +0.005]); protocol and caveats are in the
+(−0.006, CI [−0.017, +0.005]). Removing the popularity term from the blend changes nothing
+measurable. Protocol and caveats are in the
 [evaluation report](reports/phase4_evaluation.md) and the [model card](docs/MODEL_CARD.md#metrics).
 
 ## How it works

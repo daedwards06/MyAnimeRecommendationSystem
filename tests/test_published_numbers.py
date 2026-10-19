@@ -19,6 +19,8 @@ MODEL_CARD = ROOT / "docs" / "MODEL_CARD.md"
 ABLATION_CSV = ROOT / "reports" / "phase4_ablation.csv"
 
 README_LABELS = {
+    "Implicit ALS (offline only, not served)": "implicit_als",
+    "MF + kNN, no popularity": "hybrid_mf_knn",
     "Hybrid (weighted, re-tuned; served)": "hybrid_weighted_tuned",
     "Item-kNN": "item_knn_sklearn",
     "Hybrid (RRF rank fusion)": "hybrid_rrf",
