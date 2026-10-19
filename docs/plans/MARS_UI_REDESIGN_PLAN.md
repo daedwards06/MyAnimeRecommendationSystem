@@ -129,15 +129,15 @@ ruff check src/ tests/ app/
 
 **Checklist:**
 
-- [ ] `scripts/capture_ui_baseline.py`: reuses the `check_live_app.py` detector (import it, or
+- [x] `scripts/capture_ui_baseline.py`: reuses the `check_live_app.py` detector (import it, or
       factor the detector into a shared helper), drives each mode (Seed-based with the default
       seed, Personalized with a demo profile, Browse) at desktop and phone widths, saves
       full-page screenshots, records local warm time to first card over three runs
-- [ ] If `check_live_app.py` has no `--url` option, add one (default stays the deployed URL)
-- [ ] Commit the baseline images and `timing.json`; keep each PNG under 1 MB
-- [ ] Tests: the shared detector helper has a unit test on a fixture HTML page (fires with header
+- [x] If `check_live_app.py` has no `--url` option, add one (default stays the deployed URL)
+- [x] Commit the baseline images and `timing.json`; keep each PNG under 1 MB
+- [x] Tests: the shared detector helper has a unit test on a fixture HTML page (fires with header
       + poster, times out without)
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

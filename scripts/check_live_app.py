@@ -5,8 +5,7 @@ what a first-time visitor waits for. A plain HTTP request does not count as a vi
 app still answers `curl` with 200, and only a browser session wakes it.
 
 The first card is the "N recommendations" header plus a loaded poster image in the app's main
-area. Both are searched in every frame, so the same detector works on the deployed app (which
-renders inside an iframe) and on a local `streamlit run`.
+area; the detector lives in `first_card.py`, shared with `capture_ui_baseline.py`.
 
 Prints `time_to_first_card_s` and `was_asleep`; exits 1 and saves a screenshot on timeout.
 When `GITHUB_STEP_SUMMARY` is set, the result is also appended to the job summary.
@@ -24,34 +23,12 @@ import sys
 import time
 from pathlib import Path
 
+from first_card import wait_for_first_card
 from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import Frame, Page, sync_playwright
+from playwright.sync_api import Page, sync_playwright
 
 DEFAULT_URL = "https://myanimerecommendationsystem-x6rqm6vqjmbr2ij8i8yk3b.streamlit.app/"
-HEADER_RE = re.compile(r"^\s*\d+ recommendations\s*$")
 WAKE_BUTTON_RE = re.compile(r"get this app back up", re.IGNORECASE)
-POLL_S = 0.5
-
-
-# Outside the sidebar rather than inside `stMain`: older Streamlit releases have no `stMain`
-# test id, and requirements.txt only floors the version.
-_FIRST_CARD_JS = """
-(pattern) => {
-  const re = new RegExp(pattern);
-  const outsideSidebar = (e) => !e.closest('[data-testid=stSidebar]');
-  const header = [...document.querySelectorAll('body *')].some(
-    (e) => e.children.length === 0 && re.test(e.textContent) && outsideSidebar(e)
-  );
-  const poster = [...document.querySelectorAll('[data-testid=stImageContainer] img')].some(
-    (e) => e.complete && e.naturalWidth > 0 && outsideSidebar(e)
-  );
-  return header && poster;
-}
-"""
-
-
-def _frame_has_first_card(frame: Frame) -> bool:
-    return bool(frame.evaluate(_FIRST_CARD_JS, HEADER_RE.pattern))
 
 
 def _click_wake_button(page: Page) -> bool:
@@ -77,24 +54,15 @@ def check(url: str, timeout_s: float, screenshot: Path, channel: str | None) -> 
 
         was_asleep = False
         wake_clicked_at: float | None = None
-        first_card_at: float | None = None
-        while time.monotonic() - start < timeout_s:
+
+        def wake_if_asleep() -> None:
+            nonlocal was_asleep, wake_clicked_at
             if not was_asleep and _click_wake_button(page):
                 was_asleep = True
                 wake_clicked_at = time.monotonic() - start
                 print(f"sleep page found; wake button clicked at {wake_clicked_at:.1f} s", flush=True)
-            found = False
-            for frame in page.frames:
-                try:
-                    if _frame_has_first_card(frame):
-                        found = True
-                        break
-                except PlaywrightError:
-                    continue  # frame detached or navigating mid-check
-            if found:
-                first_card_at = time.monotonic() - start
-                break
-            time.sleep(POLL_S)
+
+        first_card_at = wait_for_first_card(page, timeout_s, start=start, on_poll=wake_if_asleep)
 
         if first_card_at is None:
             screenshot.parent.mkdir(parents=True, exist_ok=True)

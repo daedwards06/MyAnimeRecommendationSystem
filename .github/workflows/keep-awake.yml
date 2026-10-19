@@ -23,11 +23,13 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      # Only the script is needed; no LFS objects (lfs defaults to false).
+      # Only the script and its detector are needed; no LFS objects (lfs defaults to false).
       - name: Checkout script
         uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts/check_live_app.py
+          sparse-checkout: |
+            scripts/check_live_app.py
+            scripts/first_card.py
           sparse-checkout-cone-mode: false
 
       - name: Wait for the redeploy
