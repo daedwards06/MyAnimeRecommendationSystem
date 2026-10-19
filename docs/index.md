@@ -44,3 +44,5 @@ Start with the [README](../README.md) for the pitch and quick start, then the
 
 - [01 — EDA and data quality](../notebooks/01_eda_data_quality.ipynb)
 - [02 — Pipeline walkthrough](../notebooks/02_pipeline_walkthrough.ipynb)
+- [03 — Segment and error analysis](../notebooks/03_segment_and_error_analysis.ipynb): who the
+  recommender works for, where its hits come from, cold-start users, and sampled misses

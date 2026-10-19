@@ -93,6 +93,13 @@ are described in the [scoring pipeline guide](docs/scoring_pipeline_integration_
   beats it when it also gets the content and metadata affinities: 0.0931 over three seeds, every
   paired CI above zero ([learned reranker](reports/learned_reranker.md)). It ships behind
   `RERANKER_MODE=learned`, off by default.
+- **The blend's edge over item-kNN is a fallback.** Broken out by user segment
+  ([segment notebook](notebooks/03_segment_and_error_analysis.ipynb)), the served blend beats
+  item-kNN only for the least active quarter of users (+0.0170 NDCG@10, paired CI above zero) and
+  ties it on every user kNN can score. Offline kNN returns no list for 113 of the 1,000 cohort
+  users (no history, or every rating identical, which leaves a zero profile), and the blend's MF and
+  popularity terms quietly rank for them. That fallback was never designed; making it explicit is
+  one of the next steps the notebook lists.
 - **Coverage and accuracy pull apart.** Popularity's top-10 lists cover 0.0056 of the catalog
   and TF-IDF content similarity's cover 0.1711, yet TF-IDF ranks below popularity on NDCG. The
   *Diversity* preset serves item-kNN alone because it ties the blend on accuracy with higher

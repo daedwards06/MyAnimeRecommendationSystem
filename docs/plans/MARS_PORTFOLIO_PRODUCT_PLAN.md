@@ -1244,15 +1244,15 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `notebooks/03_segment_and_error_analysis.ipynb`: NDCG@10 and hit rate by user-activity
+- [x] `notebooks/03_segment_and_error_analysis.ipynb`: NDCG@10 and hit rate by user-activity
       quartile (train rating count); share of hits by item-popularity decile for popularity,
       MF, hybrid; cold-start users (< 5 train ratings) vs warm; a "misses" table for five
       sampled users with the held-out title and what was recommended instead
-- [ ] Every section ends with a two-sentence takeaway; a final "Implications" cell lists what
+- [x] Every section ends with a two-sentence takeaway; a final "Implications" cell lists what
       changed or should change in the pipeline because of it
 - [ ] Figures saved to `reports/figures/segments/`; the notebook is committed executed
-- [ ] `docs/index.md` links it; README "What I learned" cites one finding
-- [ ] Tests + ruff green
+- [x] `docs/index.md` links it; README "What I learned" cites one finding
+- [x] Tests + ruff green
 
 ---
 

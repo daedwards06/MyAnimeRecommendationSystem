@@ -85,9 +85,16 @@ def _without_pop(weights: dict[str, float]) -> dict[str, float]:
     return {"mf": weights["mf"] / total, "knn": weights["knn"] / total, "pop": 0.0}
 
 
-def main(ks: list[int], sample_users: int, w_mf: float, w_knn: float, w_pop: float, save_examples: int = 2):
-    ks = sorted(set(ks))
-    k_max = ks[-1]
+def cohort_recommendations(
+    sample_users: int, k_max: int, w_mf: float, w_knn: float, w_pop: float
+) -> dict:
+    """Per-user ranked lists (length `k_max`) for every model on the reporting cohort.
+
+    Returns a dict with the cohort `users`, the `train_df` / `val_df` split, the train and
+    held-out histories by user, the blend weights by variant, and `recs`: model label ->
+    {user_id: [anime_id, ...]}. RRF is not included; it fuses each source's top-K, so it is
+    rebuilt per K from the mf, kNN and popularity lists.
+    """
     interactions = pd.read_parquet(DATA_PROCESSED_DIR / "interactions.parquet")
     train_df, val_df = _build_validation(interactions)
     users, _ = reporting_and_tuning_users(val_df["user_id"].unique().tolist(), sample_users, 0)
@@ -116,8 +123,6 @@ def main(ks: list[int], sample_users: int, w_mf: float, w_knn: float, w_pop: flo
     if tuned is not None:
         blend_variants["hybrid_mf_knn"] = _without_pop(tuned)
     recs_blend: dict[str, dict[int, list[int]]] = {name: {} for name in blend_variants}
-
-    examples: dict[str, dict] = {}
 
     for u in users:
         seen = train_hist.get(u, set())
@@ -153,15 +158,41 @@ def main(ks: list[int], sample_users: int, w_mf: float, w_knn: float, w_pop: flo
         for name, weights in blend_variants.items():
             recs_blend[name][u] = weighted_blend(sources, weights, top_k=k_max)
 
-        # Capture a few examples
-        if len(examples) < save_examples:
-            examples[str(u)] = {
-                "knn": recs_knn[u][:5],
-                "mf": recs_mf[u][:5],
-                "pop": recs_pop[u][:5],
-                "blend": recs_blend["hybrid_weighted"][u][:5],
-                "rrf": reciprocal_rank_fusion({"mf": recs_mf[u], "knn": recs_knn[u], "pop": recs_pop[u]}, top_k=5),
-            }
+    return {
+        "users": users,
+        "train_df": train_df,
+        "val_df": val_df,
+        "train_hist": train_hist,
+        "val_hist": val_hist,
+        "blend_variants": blend_variants,
+        "recs": {
+            "item_knn_sklearn": recs_knn,
+            "mf_sgd": recs_mf,
+            "popularity": recs_pop,
+            "implicit_als": recs_als,
+            **recs_blend,
+        },
+    }
+
+
+def main(ks: list[int], sample_users: int, w_mf: float, w_knn: float, w_pop: float, save_examples: int = 2):
+    ks = sorted(set(ks))
+    cohort = cohort_recommendations(sample_users, ks[-1], w_mf, w_knn, w_pop)
+    users, train_df, val_hist = cohort["users"], cohort["train_df"], cohort["val_hist"]
+    blend_variants, recs = cohort["blend_variants"], cohort["recs"]
+    recs_knn, recs_mf, recs_pop, recs_als = (
+        recs["item_knn_sklearn"], recs["mf_sgd"], recs["popularity"], recs["implicit_als"]
+    )
+
+    examples: dict[str, dict] = {}
+    for u in users[:save_examples]:
+        examples[str(u)] = {
+            "knn": recs_knn[u][:5],
+            "mf": recs_mf[u][:5],
+            "pop": recs_pop[u][:5],
+            "blend": recs["hybrid_weighted"][u][:5],
+            "rrf": reciprocal_rank_fusion({"mf": recs_mf[u], "knn": recs_knn[u], "pop": recs_pop[u]}, top_k=5),
+        }
 
     total_items = int(train_df["anime_id"].nunique())
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
@@ -179,7 +210,7 @@ def main(ks: list[int], sample_users: int, w_mf: float, w_knn: float, w_pop: flo
             ("mf_sgd", "mf_sgd", _truncate(recs_mf, k)),
             ("popularity", "popularity_baseline", _truncate(recs_pop, k)),
             ("implicit_als", "implicit_als", _truncate(recs_als, k)),
-            *[(name, name, _truncate(recs_blend[name], k)) for name in blend_variants],
+            *[(name, name, _truncate(recs[name], k)) for name in blend_variants],
             ("hybrid_rrf", "hybrid_rrf", recs_rrf),
         ]
         meta = run_metadata(k=k, sample_users=sample_users)
