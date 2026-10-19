@@ -155,6 +155,29 @@ def test_readme_lessons_numbers_match_ablation(ablation):
     assert ablation.loc["content_tfidf", "ndcg@10"] < ablation.loc["popularity", "ndcg@10"]
 
 
+WRITEUP = ROOT / "docs" / "WRITEUP.md"
+WRITEUP_SOURCES = [
+    ROOT / "reports" / "phase4_ablation.md",
+    ROOT / "reports" / "phase4_evaluation.md",
+    ROOT / "reports" / "mf_diagnostic.md",
+    ROOT / "reports" / "learned_reranker.md",
+    ROOT / "docs" / "decisions.md",
+    ROOT / "docs" / "MODEL_CARD.md",
+    ROOT / "notebooks" / "03_segment_and_error_analysis.ipynb",
+    ROOT / "docs" / "plans" / "MARS_PORTFOLIO_PRODUCT_PLAN.md",
+]
+_DECIMAL = re.compile(r"[+\-]?\d+\.\d+")
+
+
+def test_writeup_numbers_are_copied_from_reports():
+    sources = _normalize(" ".join(p.read_text(encoding="utf-8") for p in WRITEUP_SOURCES))
+    quoted = set(_DECIMAL.findall(sources))
+    numbers = _DECIMAL.findall(_normalize(WRITEUP.read_text(encoding="utf-8")))
+    assert numbers, "no decimal figures found in the write-up"
+    missing = sorted({n for n in numbers if n not in quoted})
+    assert not missing, f"WRITEUP.md numbers not found in any source report: {missing}"
+
+
 def test_model_card_prose_numbers_match_ablation(card_metrics, ablation):
     prose = _normalize(card_metrics)
     coverage_ratio = ablation.loc["mf_sgd", "coverage@10"] / ablation.loc["popularity", "coverage@10"]

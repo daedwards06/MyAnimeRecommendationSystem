@@ -3,7 +3,8 @@
 MARS recommends anime from a 13,000-title catalog by blending collaborative filtering
 (item-kNN + matrix factorization) with synopsis embeddings and metadata, and every card says in
 plain words why it was picked. Pick a title you like, or load a demo taste profile, and it ranks
-the whole catalog in a few seconds.
+the whole catalog in a few seconds. [Read the write-up](docs/WRITEUP.md) for how it was built,
+what went wrong, and how each mistake was caught.
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://myanimerecommendationsystem-x6rqm6vqjmbr2ij8i8yk3b.streamlit.app)
 ![CI](https://github.com/daedwards06/MyAnimeRecommendationSystem/actions/workflows/ci.yml/badge.svg)

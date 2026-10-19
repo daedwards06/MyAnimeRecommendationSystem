@@ -1284,16 +1284,19 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 ```
 
 **Checklist:**
-- [ ] `docs/WRITEUP.md` sections: the problem and data → approach (why three stages, why
+- [x] `docs/WRITEUP.md` sections: the problem and data → approach (why three stages, why
       hybrid) → results (the hero chart, one paragraph) → what went wrong and how it was caught
       (the self-compared headline lift, the exclude-seen masking that hid kNN, weights tuned
       under that protocol and on the reporting cohort) → what did not work (rating-trained MF for
       top-N, embeddings below TF-IDF for cold start, synthetic timestamps) → product decisions
-      (explanations, discovery default, demo profiles) → what I would do next
-- [ ] Written in first person, past tense, no marketing language; numbers copied from the
-      reports, not retyped
-- [ ] README links it from the pitch paragraph ("Read the write-up")
-- [ ] Tests + ruff green
+      (explanations, discovery default, demo profiles) → what I would do next — *1,625 words,
+      every internal link resolves. The short form was never written separately; this is the
+      full version. Also linked from `docs/index.md`*
+- [x] Written in first person, past tense, no marketing language; numbers copied from the
+      reports, not retyped — *enforced by `test_writeup_numbers_are_copied_from_reports`: every
+      decimal in the write-up must appear verbatim in a source report; mutation-checked*
+- [x] README links it from the pitch paragraph ("Read the write-up")
+- [x] Tests + ruff green
 
 ---
 

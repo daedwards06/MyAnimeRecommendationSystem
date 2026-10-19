@@ -1,7 +1,8 @@
 # MARS Documentation
 
 Start with the [README](../README.md) for the pitch and quick start, then the
-[model card](MODEL_CARD.md) for what the recommender does and how well.
+[model card](MODEL_CARD.md) for what the recommender does and how well. The [write-up](WRITEUP.md) is the
+project told as a narrative: approach, results, what went wrong, and what is next.
 
 ## Results
 
