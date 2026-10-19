@@ -9,13 +9,19 @@ from src.app.badges import badge_payload
 from src.app.components.rating import render_quick_rating_buttons
 from src.app.components.tooltips import format_badge_tooltip
 from src.app.score_semantics import (
+    MATCH_TIERS,
     SCORE_LABEL_SHORT,
     format_match_score,
     format_user_friendly_score,
     has_match_score,
     match_rank,
 )
+from src.app.theme_tokens import TIER_TOKENS
 from src.utils import coerce_genres
+
+_TIER_CLASSES: dict[str, str] = {
+    label: "mars-" + token.replace("_", "-") for (label, _), token in zip(MATCH_TIERS, TIER_TOKENS)
+}
 
 
 def _get_user_genre_hist_from_session() -> dict:
@@ -28,10 +34,45 @@ def _get_user_genre_hist_from_session() -> dict:
 # Removed coerce_genres - now using canonical version from src.utils.parsing
 
 def _render_placeholder_box(label: str):
-    st.markdown(
-        f'<div style="width:180px;height:260px;background:#F0F2F6;display:flex;align-items:center;justify-content:center;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;color:#A0AEC0;">{label}</div>',
-        unsafe_allow_html=True,
+    st.markdown(f'<div class="mars-poster-placeholder">{label}</div>', unsafe_allow_html=True)
+
+
+def score_badge_html(score, all_raw_scores: list[float] | None, *, compact: bool = False) -> str:
+    """Match badge (tier label, or the raw score when there is no run to rank in) plus rank."""
+    if not has_match_score(score):
+        return ""
+    size = " mars-badge-compact" if compact else ""
+    if all_raw_scores:
+        label, tooltip, _ = format_user_friendly_score(float(score), all_raw_scores)
+        rank = match_rank(float(score), all_raw_scores)
+        tier = _TIER_CLASSES.get(label, "mars-tier-look")
+        rank_size = " mars-rank-compact" if compact else ""
+        return (
+            f"<span class='mars-badge{size} {tier}' title='{tooltip}'>{label}</span>"
+            f"<span class='mars-rank{rank_size}'>#{rank}</span>"
+        )
+    return (
+        f"<span class='mars-badge{size} mars-tier-none'>"
+        f"{SCORE_LABEL_SHORT}: {format_match_score(float(score))}</span>"
     )
+
+
+def mal_score_tone(mal_score: float) -> str:
+    return "success" if mal_score >= 8.0 else "primary" if mal_score >= 7.0 else "muted"
+
+
+def status_tone(status) -> str:
+    return "success" if status == "Finished Airing" else "warn" if "Airing" in str(status) else "info"
+
+
+def meta_span(text, tone: str, role: str | None = None) -> str:
+    role_class = f" mars-meta-{role}" if role else ""
+    return f'<span class="mars-tone-{tone}{role_class}">{text}</span>'
+
+
+def flag_html(text: str, tone: str, *, strong: bool = True) -> str:
+    weight = " mars-flag-strong" if strong else ""
+    return f"<span class='mars-flag{weight} mars-tone-{tone}'>{text}</span>"
 
 def _clean_url(value) -> str | None:
     """Return a usable http(s) URL string, or None for NaN/empty/non-string values."""
@@ -156,51 +197,34 @@ def render_card_grid(
         # Title + score
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
 
-        score = rec.get("score")
-        score_badge = ""
-        if has_match_score(score):
-            if all_raw_scores:
-                user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
-                rank = match_rank(float(score), all_raw_scores)
-                score_badge = (
-                    f"<span style='background:{color}15; color:{color}; padding:2px 8px; "
-                    f"border-radius:16px; font-weight:700; font-size:0.78rem;' title='{tooltip}'>{user_friendly}</span>"
-                    f"<span style='color:#A0AEC0; font-size:0.72rem; margin-left:6px;'>#{rank}</span>"
-                )
-            else:
-                score_str = format_match_score(float(score))
-                score_badge = (
-                    f"<span style='background:#6C63FF15; color:#6C63FF; padding:2px 8px; "
-                    f"border-radius:16px; font-weight:700; font-size:0.78rem;'>{SCORE_LABEL_SHORT}: {score_str}</span>"
-                )
+        score_badge = score_badge_html(rec.get("score"), all_raw_scores, compact=True)
 
         st.markdown(
-            f"<p style='font-weight:700; font-size:0.95rem; color:#1A1A2E; margin:8px 0 4px 0;'>{truncated_title}</p>",
+            f"<p class='mars-card-title-compact'>{truncated_title}</p>",
             unsafe_allow_html=True,
         )
         if score_badge:
-            st.markdown(f"<p style='margin:2px 0;'>{score_badge}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='mars-badge-row'>{score_badge}</p>", unsafe_allow_html=True)
 
         # Personalized explanation
         explanation = rec.get("explanation")
         if explanation:
-            st.markdown(f"<p style='font-size:0.72rem; color:#4A5568; margin:4px 0; font-style:italic;'>{explanation}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='mars-explanation-compact'>{explanation}</p>", unsafe_allow_html=True)
 
         # Metadata chips
         meta_parts = []
         if mal_score:
-            sc = "#48BB78" if mal_score >= 8.0 else "#6C63FF" if mal_score >= 7.0 else "#A0AEC0"
-            meta_parts.append(f'<span style="color:{sc}; font-weight:700;">★ {mal_score:.1f}</span>')
+            meta_parts.append(meta_span(f"★ {mal_score:.1f}", mal_score_tone(mal_score), "score"))
 
         anime_type = row.get("type")
         if anime_type and pd.notna(anime_type):
-            meta_parts.append(f'<span style="color:#B794F4; font-weight:600;">{anime_type}</span>')
+            meta_parts.append(meta_span(anime_type, "purple", "type"))
 
         if year:
-            meta_parts.append(f'<span style="color:#A0AEC0;">{year}</span>')
+            meta_parts.append(meta_span(year, "muted"))
 
         if meta_parts:
-            st.markdown(f"<p style='font-size:0.82rem; margin:4px 0;'>{' · '.join(meta_parts)}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='mars-meta-compact'>{' · '.join(meta_parts)}</p>", unsafe_allow_html=True)
 
         # Genres (first 3) - clickable
         if genres:
@@ -331,36 +355,15 @@ def render_card(
 
         with col_content:
             # Title + match score on same line
-            score = rec.get("score")
-            score_html = ""
-            badge_color = "#6C63FF"
-            if has_match_score(score):
-                if all_raw_scores:
-                    user_friendly, tooltip, color = format_user_friendly_score(float(score), all_raw_scores)
-                    rank = match_rank(float(score), all_raw_scores)
-                    badge_color = color
-                    score_html = (
-                        f"<span style='background:{badge_color}15; color:{badge_color}; padding:2px 10px; "
-                        f"border-radius:20px; font-size:0.82rem; font-weight:700; margin-left:8px;' "
-                        f"title='{tooltip}'>{user_friendly}</span>"
-                        f"<span style='color:#A0AEC0; font-size:0.78rem; font-weight:400; margin-left:6px;'>#{rank}</span>"
-                    )
-                else:
-                    score_str = format_match_score(float(score))
-                    score_html = (
-                        f"<span style='background:{badge_color}15; color:{badge_color}; padding:2px 10px; "
-                        f"border-radius:20px; font-size:0.82rem; font-weight:700; margin-left:8px;'>"
-                        f"{SCORE_LABEL_SHORT}: {score_str}</span>"
-                    )
+            score_html = score_badge_html(rec.get("score"), all_raw_scores)
 
             st.markdown(
-                f"<h3 style='margin:0; font-size:1.15rem; color:#1A1A2E; font-weight:700;'>"
-                f"{title_display}{score_html}</h3>",
+                f"<h3 class='mars-card-title'>{title_display}{score_html}</h3>",
                 unsafe_allow_html=True,
             )
             if alt_title:
                 st.markdown(
-                    f"<p style='color:#A0AEC0; font-style:italic; font-size:0.85rem; margin:2px 0 0 0;'>{alt_title}</p>",
+                    f"<p class='mars-alt-title'>{alt_title}</p>",
                     unsafe_allow_html=True,
                 )
 
@@ -368,29 +371,25 @@ def render_card(
             explanation = rec.get("explanation")
             if explanation:
                 st.markdown(
-                    f"<div style='background:#F0EFFF; padding:6px 12px; border-radius:6px; margin:6px 0; "
-                    f"border-left:3px solid #6C63FF;'>"
-                    f"<span style='font-size:0.82rem; color:#4A5568;'>{explanation}</span></div>",
+                    f"<div class='mars-explanation'><span>{explanation}</span></div>",
                     unsafe_allow_html=True,
                 )
 
             # Metadata chips
             meta_parts = []
             if mal_score:
-                sc = "#48BB78" if mal_score >= 8.0 else "#6C63FF" if mal_score >= 7.0 else "#A0AEC0"
-                meta_parts.append(f'<span style="color:{sc}; font-weight:700;">★ {mal_score:.2f}</span>')
+                meta_parts.append(meta_span(f"★ {mal_score:.2f}", mal_score_tone(mal_score), "score"))
             if anime_type and pd.notna(anime_type):
-                meta_parts.append(f'<span style="color:#B794F4; font-weight:600;">{anime_type}</span>')
+                meta_parts.append(meta_span(anime_type, "purple", "type"))
             if episodes:
-                meta_parts.append(f'<span style="color:#A0AEC0;">{episodes} eps</span>')
+                meta_parts.append(meta_span(f"{episodes} eps", "muted"))
             if year:
-                meta_parts.append(f'<span style="color:#A0AEC0;">{year}</span>')
+                meta_parts.append(meta_span(year, "muted"))
             if status:
-                sc = "#48BB78" if status == "Finished Airing" else "#ECC94B" if "Airing" in str(status) else "#63B3ED"
-                meta_parts.append(f'<span style="color:{sc}; font-weight:500;">{status}</span>')
+                meta_parts.append(meta_span(status, status_tone(status), "status"))
             if meta_parts:
                 st.markdown(
-                    f"<div style='margin:6px 0; font-size:0.88rem;'>{' &nbsp;·&nbsp; '.join(meta_parts)}</div>",
+                    f"<div class='mars-meta'>{' &nbsp;·&nbsp; '.join(meta_parts)}</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -401,12 +400,12 @@ def render_card(
                     studio_str += f" +{len(studios)-2}"
                 extra = f" · {source}" if source else ""
                 st.markdown(
-                    f"<p style='color:#A0AEC0; font-size:0.82rem; margin:4px 0;'>{studio_str}{extra}</p>",
+                    f"<p class='mars-studio'>{studio_str}{extra}</p>",
                     unsafe_allow_html=True,
                 )
             elif source:
                 st.markdown(
-                    f"<p style='color:#A0AEC0; font-size:0.82rem; margin:4px 0;'>{source}</p>",
+                    f"<p class='mars-studio'>{source}</p>",
                     unsafe_allow_html=True,
                 )
 
@@ -432,7 +431,7 @@ def render_card(
         if display_synopsis:
             truncated = display_synopsis[:280] + "..." if len(display_synopsis) > 280 else display_synopsis
             st.markdown(
-                f"<p style='color:#4A5568; font-size:0.88rem; line-height:1.6; margin:4px 0 8px 0;'>{truncated}</p>",
+                f"<p class='mars-synopsis'>{truncated}</p>",
                 unsafe_allow_html=True,
             )
 
@@ -440,25 +439,25 @@ def render_card(
         badge_cols = st.columns([1, 1, 1, 2])
         with badge_cols[0]:
             lbl = "Cold-start" if badges['cold_start'] else "Trained"
-            color = "#ECC94B" if badges['cold_start'] else "#48BB78"
-            st.markdown(f"<span style='font-size:0.75rem; color:{color}; font-weight:600;'>{lbl}</span>", unsafe_allow_html=True)
+            tone = "warn" if badges['cold_start'] else "success"
+            st.markdown(flag_html(lbl, tone), unsafe_allow_html=True)
         with badge_cols[1]:
-            st.markdown(f"<span style='font-size:0.75rem; color:#63B3ED; font-weight:600;'>{badges['popularity_band']}</span>", unsafe_allow_html=True)
+            st.markdown(flag_html(badges['popularity_band'], "info"), unsafe_allow_html=True)
         with badge_cols[2]:
             nov_val = badges.get('novelty_ratio')
             if nov_val is None:
-                st.markdown("<span style='font-size:0.75rem; color:#A0AEC0;'>Novelty NA</span>", unsafe_allow_html=True)
+                st.markdown(flag_html("Novelty NA", "muted", strong=False), unsafe_allow_html=True)
             else:
-                nc = "#B794F4" if float(nov_val) > 0.6 else "#6C63FF"
-                st.markdown(f"<span style='font-size:0.75rem; color:{nc}; font-weight:600;'>Novelty {float(nov_val):.2f}</span>", unsafe_allow_html=True)
+                tone = "purple" if float(nov_val) > 0.6 else "primary"
+                st.markdown(flag_html(f"Novelty {float(nov_val):.2f}", tone), unsafe_allow_html=True)
         with badge_cols[3]:
             # "Add to Seeds" or "Already in seeds"
             current_ids = st.session_state.get("selected_seed_ids", [])
             current_titles = st.session_state.get("selected_seed_titles", [])
             if anime_id in current_ids:
-                st.markdown("<span style='font-size:0.75rem; color:#48BB78;'>In seeds</span>", unsafe_allow_html=True)
+                st.markdown(flag_html("In seeds", "success", strong=False), unsafe_allow_html=True)
             elif len(current_ids) >= 5:
-                st.markdown("<span style='font-size:0.75rem; color:#A0AEC0;'>Max 5 seeds</span>", unsafe_allow_html=True)
+                st.markdown(flag_html("Max 5 seeds", "muted", strong=False), unsafe_allow_html=True)
             else:
                 if st.button("+ Add to Seeds", key=f"more_like_{anime_id}", use_container_width=True):
                     current_ids.append(anime_id)
@@ -484,7 +483,7 @@ def render_card(
 
             if streaming_list:
                 stream_html = " ".join([
-                    f'<a href="{s["url"]}" target="_blank" style="display:inline-block;background:#6C63FF;color:white;padding:3px 10px;margin:2px;border-radius:16px;text-decoration:none;font-size:0.75rem;font-weight:600;">{s["name"]}</a>'
+                    f'<a href="{s["url"]}" target="_blank" class="mars-stream-link">{s["name"]}</a>'
                     for s in streaming_list if isinstance(s, dict) and s.get("name") and s.get("url")
                 ])
                 if stream_html:

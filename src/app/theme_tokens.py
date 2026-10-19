@@ -88,11 +88,70 @@ LIVE: dict[str, dict[str, str]] = {
         "tier_good": "#E67E22",
         "tier_look": "#95A5A6",
     },
+    # The light palette app/styles/*.css paints with (as --mars-live-*) until Task 2.2.
+    "color": {
+        "text_primary": "#1A1A2E",
+        "text_secondary": "#4A5568",
+        "text_dark": "#2D3748",
+        "text_muted": "#A0AEC0",
+        "text_inverse": "#FFFFFF",
+        "primary": "#6C63FF",
+        "primary_dark": "#5A52D5",
+        "primary_bg": "#F0EFFF",
+        "primary_border": "#D6D3FF",
+        "accent_alt": "#4ECDC4",
+        "bg": "#FAFBFC",
+        "bg_alt": "#F7FAFC",
+        "surface_alt": "#F0F2F6",
+        "border": "#E2E8F0",
+        "border_light": "#EDF2F7",
+        "success": "#48BB78",
+        "warn": "#ECC94B",
+        "error": "#FC8181",
+        "info": "#63B3ED",
+        "purple": "#B794F4",
+        "popular": "#FC8181",
+        "midrange": "#63B3ED",
+        "longtail": "#B794F4",
+        "notice_bg_from": "#FFF3CD",
+        "notice_bg_to": "#FCF8E3",
+        "notice_border": "#F0AD4E",
+        "notice_text": "#8A6D3B",
+        "mmr_lambda": "#B0B0B0",
+        "mmr_note": "#888888",
+        "skeleton": "#2A2F36",
+    },
+    # Taste-profile charts and their legend rows.
+    "chart": {
+        "high": "#27AE60",
+        "mid": "#3498DB",
+        "ok": "#F39C12",
+        "low": "#95A5A6",
+        "bad": "#E74C3C",
+    },
+    "shadow": {
+        "card": "0 1px 3px rgba(0,0,0,0.06)",
+        "card_hover": "0 8px 24px rgba(0,0,0,0.08)",
+        "button_hover": "0 4px 12px rgba(108, 99, 255, 0.18)",
+        "pill_hover": "0 3px 10px rgba(108, 99, 255, 0.25)",
+    },
 }
+
+# Badge backgrounds: the badge color at alpha 0x15.
+_TINT_ALPHA = "15"
 
 
 def css_var(group: str, key: str) -> str:
     return f"--mars-{group}-{key.replace('_', '-')}"
+
+
+def _live_css_values() -> dict[str, str]:
+    values = {**LIVE["color"], **LIVE["tier_colors"]}
+    tinted = {**LIVE["tier_colors"], "primary": LIVE["color"]["primary"]}
+    values.update({f"{k}_tint": v + _TINT_ALPHA for k, v in tinted.items()})
+    values.update({f"chart_{k}": v for k, v in LIVE["chart"].items()})
+    values.update({f"shadow_{k}": v for k, v in LIVE["shadow"].items()})
+    return values
 
 
 def render_tokens_css() -> str:
@@ -103,6 +162,8 @@ def render_tokens_css() -> str:
     for group, values in TOKENS.items():
         for key, value in values.items():
             lines.append(f"  {css_var(group, key)}: {value};")
+    for key, value in _live_css_values().items():
+        lines.append(f"  {css_var('live', key)}: {value};")
     lines.append("}")
     return "\n".join(lines) + "\n"
 

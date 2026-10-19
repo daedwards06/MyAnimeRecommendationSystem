@@ -4,7 +4,8 @@ Thin orchestrator that wires together the focused modules:
 - ``app.state``           — session-state initialisation & query-param helpers
 - ``app.sidebar``         — sidebar rendering (profile, personalization, search, filters)
 - ``app.pipeline_runner`` — recommender engine construction & pipeline execution
-- ``app.display``         — CSS injection, header, card rendering, empty states, footer
+- ``app.display``         — header, card rendering, empty states, footer
+- ``app.styles``          — the stylesheet, injected once per run
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ if root_str not in sys.path:
 
 # ── Project imports ──────────────────────────────────────────────────────────
 from app.display import (
-    inject_css,
     render_artifact_notice,
     render_empty_state,
     render_footer,
@@ -49,9 +49,9 @@ from app.state import (
     init_session_state,
     setup_first_run,
 )
+from app.styles import inject_styles
 from src.app.artifacts_loader import build_artifacts
 from src.app.constants import PERSONAS_JSON
-from src.app.theme import get_theme
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 log_level = logging.DEBUG if os.getenv("DEBUG_LOGGING") else logging.INFO
@@ -111,16 +111,15 @@ personas = load_personas(PERSONAS_JSON)
 
 # ── Page configuration ───────────────────────────────────────────────────────
 st.set_page_config(page_title="MARS", layout="wide", page_icon="🎬")
-theme = get_theme()
 
 # ── State initialisation ─────────────────────────────────────────────────────
 init_mode_state()
 init_session_state()
 
 # ── CSS & header ─────────────────────────────────────────────────────────────
-inject_css(theme)
+inject_styles()
 _ui_mode_for_header = str(st.session_state.get("ui_mode", "Seed-based"))
-render_header(_ui_mode_for_header, theme)
+render_header(_ui_mode_for_header)
 # Filled after the sidebar runs, so it reflects this run's seeds.
 intro_slot = st.empty()
 render_import_light_warning()
@@ -215,7 +214,6 @@ if pipeline_result.recs:
         pipeline_result,
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
-        theme=theme,
     )
 elif sidebar_state.browse_mode and sidebar_state.genre_filter:
     # Browse returned zero results

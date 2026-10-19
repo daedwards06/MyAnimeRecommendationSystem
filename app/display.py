@@ -1,6 +1,6 @@
 """Display rendering for the MARS Streamlit app.
 
-Handles CSS injection, header rendering, result card orchestration,
+Handles header rendering, result card orchestration,
 diversity mix bar, empty states, and the footer (diversity panel, help,
 scoring details).
 """
@@ -27,164 +27,6 @@ if TYPE_CHECKING:
     from app.sidebar import SidebarResult
 
 
-# ── CSS injection ────────────────────────────────────────────────────────────
-
-
-def inject_css(theme: dict) -> None:
-    """Inject custom CSS using design tokens from theme.
-
-    Args:
-        theme: Theme dictionary from get_theme() containing colors, spacing, etc.
-    """
-    colors = theme["colors"]
-    spacing = theme["spacing"]
-
-    st.markdown(
-        f"""
-<style>
-    /* ===== Global Layout ===== */
-    .main .block-container {{
-        padding-top: {spacing['xl']}px;
-        padding-bottom: {spacing['xxl']}px;
-        max-width: 1100px;
-    }}
-
-    /* ===== Typography ===== */
-    h1 {{
-        color: {colors['text_primary']};
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 0.25rem;
-    }}
-    h2 {{
-        color: {colors['text_primary']};
-        font-weight: 700;
-        letter-spacing: -0.01em;
-    }}
-    h3 {{
-        color: {colors['text_dark']};
-        font-weight: 600;
-    }}
-    .stMarkdown {{ line-height: 1.65; }}
-
-    /* ===== Sidebar ===== */
-    [data-testid="stSidebar"] {{
-        background: {colors['bg']};
-        border-right: 1px solid {colors['border']};
-    }}
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 {{
-        font-size: 0.95rem;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: {colors['text_secondary']};
-    }}
-
-    /* ===== Buttons ===== */
-    .stButton > button {{
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        border: 1px solid {colors['border']};
-    }}
-    .stButton > button:hover {{
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(108, 99, 255, 0.18);
-    }}
-    .stButton > button[kind="primary"] {{
-        background: linear-gradient(135deg, {colors['primary']} 0%, {colors['primary_dark']} 100%);
-        border: none;
-    }}
-
-    /* ===== Genre pill buttons ===== */
-    button[kind="secondary"] {{
-        background-color: {colors['primary_bg']} !important;
-        color: {colors['primary']} !important;
-        border: 1px solid {colors['primary_border']} !important;
-        padding: {spacing['xs']}px {spacing['md']}px !important;
-        font-size: 0.78rem !important;
-        border-radius: 20px !important;
-        font-weight: 600 !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        letter-spacing: 0.02em !important;
-    }}
-    button[kind="secondary"]:hover {{
-        background-color: {colors['primary']} !important;
-        color: {colors['text_inverse']} !important;
-        border-color: {colors['primary']} !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 3px 10px rgba(108, 99, 255, 0.25) !important;
-    }}
-
-    /* ===== Containers / Cards ===== */
-    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {{
-        border-radius: {spacing['md']}px !important;
-        border: 1px solid {colors['border']} !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
-    }}
-    [data-testid="stVerticalBlock"] > div[data-testid="stContainer"]:hover {{
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-        transform: translateY(-2px);
-    }}
-
-    /* ===== Expander ===== */
-    .streamlit-expanderHeader {{
-        font-weight: 600;
-        color: {colors['text_dark']};
-        font-size: 0.9rem;
-    }}
-
-    /* ===== Metrics ===== */
-    [data-testid="stMetric"] {{
-        background: {colors['bg_alt']};
-        border: 1px solid {colors['border']};
-        border-radius: 10px;
-        padding: {spacing['md']}px {spacing['lg']}px;
-    }}
-    [data-testid="stMetricLabel"] {{
-        color: {colors['text_secondary']};
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }}
-
-    /* ===== Dividers ===== */
-    hr {{
-        border: none;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, {colors['border']}, transparent);
-        margin: {spacing['xl']}px 0;
-    }}
-
-    /* ===== Captions ===== */
-    [data-testid="stCaptionContainer"] {{
-        color: {colors['text_muted']};
-        font-size: 0.82rem;
-    }}
-
-    /* ===== Radio group horizontal ===== */
-    .stRadio > div[role="radiogroup"] {{
-        gap: {spacing['sm']}px;
-    }}
-
-    /* ===== Selectbox / Multiselect ===== */
-    .stSelectbox, .stMultiSelect {{
-        border-radius: 8px;
-    }}
-
-    /* ===== Hide default Streamlit branding ===== */
-    #MainMenu {{visibility: hidden;}}
-    footer {{visibility: hidden;}}
-    header {{visibility: hidden;}}
-</style>
-""",
-        unsafe_allow_html=True,
-    )
-
-
 # ── Header ───────────────────────────────────────────────────────────────────
 
 
@@ -202,24 +44,17 @@ def header_text(ui_mode: str) -> tuple[str, str]:
     return HEADER_TITLE, _MODE_SUBTITLES.get(ui_mode, _MODE_SUBTITLES["Seed-based"])
 
 
-def render_header(ui_mode: str, theme: dict | None = None) -> None:
-    """Render the page header: MARS plus a one-line subtitle for the current mode.
-
-    Args:
-        ui_mode: Current UI mode (Browse, Personalized, or Seed-based)
-        theme: Optional theme dictionary for color tokens
-    """
-    if theme is None:
-        from src.app.theme import get_theme
-        theme = get_theme()
-
+def header_html(ui_mode: str) -> str:
     title, subtitle = header_text(ui_mode)
-    st.markdown(
-        f"<h1 style='margin-bottom:0; font-weight:800;'>{title}</h1>"
-        f"<p style='color:{theme['colors']['text_muted']}; font-size:1.05rem; "
-        f"margin-top:0; margin-bottom:1rem;'>{subtitle}</p>",
-        unsafe_allow_html=True,
+    return (
+        f"<h1 class='mars-header-title'>{title}</h1>"
+        f"<p class='mars-header-subtitle'>{subtitle}</p>"
     )
+
+
+def render_header(ui_mode: str) -> None:
+    """Render the page header: MARS plus a one-line subtitle for the current mode."""
+    st.markdown(header_html(ui_mode), unsafe_allow_html=True)
 
 
 def render_import_light_warning() -> None:
@@ -284,19 +119,8 @@ def render_results(
     *,
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
-    theme: dict | None = None,
 ) -> None:
-    """Render recommendation results: count, mix bar, cards.
-
-    Args:
-        theme: Optional theme dictionary for color tokens
-    """
-    if theme is None:
-        from src.app.theme import get_theme
-        theme = get_theme()
-
-    colors = theme["colors"]
-
+    """Render recommendation results: count, mix bar, cards."""
     # Result count
     total_anime = len(metadata)
     filter_parts: list[str] = []
@@ -311,12 +135,7 @@ def render_results(
 
     item_type = "titles" if sidebar.browse_mode else "recommendations"
     st.markdown(
-        f"<div style='display:flex; align-items:baseline; gap:10px; margin-bottom:6px;'>"
-        f"<span style='font-size:1.15rem; font-weight:700; color:{colors['text_primary']};'>"
-        f"{len(recs)} {item_type}</span>"
-        f"<span style='font-size:0.82rem; color:{colors['text_muted']};'>"
-        f"of {total_anime:,}{filters_text}</span>"
-        f"</div>",
+        result_count_html(len(recs), item_type, total_anime, filters_text),
         unsafe_allow_html=True,
     )
 
@@ -329,12 +148,56 @@ def render_results(
 
     # Diversity mix bar
     _render_mix_bar(
-        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn,
-        is_in_training_fn=is_in_training_fn, theme=theme
+        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn, is_in_training_fn=is_in_training_fn
     )
 
     # Cards
     _render_cards(recs, metadata, pop_pct_fn=pop_pct_fn, is_in_training_fn=is_in_training_fn)
+
+
+def result_count_html(count: int, item_type: str, total: int, filters_text: str = "") -> str:
+    return (
+        "<div class='mars-result-count'>"
+        f"<span class='mars-result-count-main'>{count} {item_type}</span>"
+        f"<span class='mars-result-count-sub'>of {total:,}{filters_text}</span>"
+        "</div>"
+    )
+
+
+def mix_bar_html(mix_label: str, pop_count: int, mid_count: int, long_tail_count: int) -> str:
+    """Mix bar markup. Segments are SVG rects sized by attribute, so no inline style is needed."""
+    segments = [
+        ("popular", pop_count, "Popular"),
+        ("midrange", mid_count, "Mid-range"),
+        ("longtail", long_tail_count, "Hidden gems"),
+    ]
+    total = pop_count + mid_count + long_tail_count
+    rects: list[str] = []
+    x = 0.0
+    for key, count, label in segments:
+        if count <= 0:
+            continue
+        width = 100.0 * count / total
+        rects.append(
+            f'<rect class="mars-mix-{key}" x="{x:.4f}%" y="0" width="{width:.4f}%" height="100%">'
+            f"<title>{label}: {count}</title></rect>"
+        )
+        x += width
+    if not rects:
+        rects.append('<rect class="mars-mix-empty" x="0" y="0" width="100%" height="100%"></rect>')
+    return (
+        '<div class="mars-mix">'
+        '<div class="mars-mix-head">'
+        f'<span class="mars-mix-label">{mix_label}</span>'
+        '<span class="mars-mix-legend">'
+        f'<span class="mars-mix-dot-popular">●</span> Popular {pop_count}'
+        f' &nbsp;<span class="mars-mix-dot-midrange">●</span> Mid {mid_count}'
+        f' &nbsp;<span class="mars-mix-dot-longtail">●</span> Hidden gems {long_tail_count}'
+        "</span>"
+        "</div>"
+        f'<svg class="mars-mix-track" width="100%" height="6" aria-hidden="true">{"".join(rects)}</svg>'
+        "</div>"
+    )
 
 
 def _render_mix_bar(
@@ -343,18 +206,8 @@ def _render_mix_bar(
     *,
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
-    theme: dict | None = None,
 ) -> None:
-    """Render the compact horizontal diversity mix bar.
-
-    Args:
-        theme: Optional theme dictionary for color tokens
-    """
-    if theme is None:
-        from src.app.theme import get_theme
-        theme = get_theme()
-
-    colors = theme["colors"]
+    """Render the compact horizontal diversity mix bar."""
     pop_count = sum(
         1
         for r in recs
@@ -381,44 +234,9 @@ def _render_mix_bar(
     )
     mid_count = len(recs) - pop_count - long_tail_count
 
-    bar_segments: list[str] = []
-    if pop_count > 0:
-        bar_segments.append(
-            f'<div style="background:{colors["popular"]}; flex:{pop_count}; height:6px;" '
-            f'title="Popular: {pop_count}"></div>'
-        )
-    if mid_count > 0:
-        bar_segments.append(
-            f'<div style="background:{colors["midrange"]}; flex:{mid_count}; height:6px;" '
-            f'title="Mid-range: {mid_count}"></div>'
-        )
-    if long_tail_count > 0:
-        bar_segments.append(
-            f'<div style="background:{colors["longtail"]}; flex:{long_tail_count}; height:6px;" '
-            f'title="Hidden gems: {long_tail_count}"></div>'
-        )
-    if not bar_segments:
-        bar_segments.append(f'<div style="background:{colors["text_muted"]}; flex:1; height:6px;"></div>')
-    bar_html = "".join(bar_segments)
-
     mix_label = "Catalog mix" if browse_mode else "Recommendation mix"
     st.markdown(
-        f"""
-    <div style="margin: 8px 0 20px 0;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-            <span style="font-size:0.75rem; color:{colors['text_muted']}; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">{mix_label}</span>
-            <span style="font-size:0.72rem; color:{colors['text_muted']};">
-                <span style="color:{colors['popular']};">●</span> Popular {pop_count}
-                &nbsp;<span style="color:{colors['midrange']};">●</span> Mid {mid_count}
-                &nbsp;<span style="color:{colors['longtail']};">●</span> Hidden gems {long_tail_count}
-            </span>
-        </div>
-        <div style="display:flex; height:6px; border-radius:3px; overflow:hidden; background:{colors['border_light']};">
-            {bar_html}
-        </div>
-    </div>
-    """,
-        unsafe_allow_html=True,
+        mix_bar_html(mix_label, pop_count, mid_count, long_tail_count), unsafe_allow_html=True
     )
 
 
@@ -524,11 +342,10 @@ def _render_personalized_empty_state() -> None:
 
     if personalized_unavailable_reason:
         st.markdown(
-            "<div style='background: linear-gradient(135deg, #FFF3CD 0%, #FCF8E3 100%); "
-            "border-left: 4px solid #F0AD4E; border-radius: 8px; padding: 20px; margin: 20px 0;'>"
-            "<p style='color: #8A6D3B; font-weight: 600; margin: 0;'>"
+            "<div class='mars-panel-notice'>"
+            "<p class='mars-panel-notice-title'>"
             "Personalized mode is selected, but it isn't running yet.</p>"
-            "<p style='color: #8A6D3B; margin: 8px 0 0 0;'>What next: "
+            "<p class='mars-panel-notice-body'>What next: "
             "<b>Select a rated profile</b>, <b>add at least one rating</b>, and "
             "<b>enable personalization</b> in the sidebar.</p>"
             "</div>",
@@ -566,10 +383,9 @@ def _render_seed_empty_state() -> None:
 
 def _render_cold_start_state(metadata: pd.DataFrame, title_to_id: dict[str, int]) -> None:
     st.markdown(
-        "<div style='background:#F0EFFF; border-radius:12px; padding:32px; "
-        "margin:24px 0; text-align:center;'>"
-        "<h3 style='color:#1A1A2E; margin:0 0 8px 0; font-weight:800;'>Get Started</h3>"
-        "<p style='color:#4A5568; font-size:1.0rem; margin:0 0 24px 0;'>"
+        "<div class='mars-panel-start'>"
+        "<h3 class='mars-panel-start-title'>Get Started</h3>"
+        "<p class='mars-panel-start-body'>"
         "Pick a seed title to discover similar anime</p>"
         "</div>",
         unsafe_allow_html=True,

@@ -9,7 +9,25 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from src.app.theme_tokens import LIVE
 from src.models.user_embedding import get_user_taste_profile
+
+_CHART = LIVE["chart"]
+
+
+def _rgba(hex_color: str, alpha: float) -> str:
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def stat_row_html(label: str, value: str, chart_key: str) -> str:
+    return (
+        "<div class='mars-stat-row'>"
+        f"<span>{label}</span>"
+        f"<span class='mars-stat-row-value mars-chart-{chart_key}'>{value}</span>"
+        "</div>"
+    )
 
 
 def render_taste_profile_panel(profile: dict, metadata: pd.DataFrame) -> None:
@@ -70,8 +88,8 @@ def _render_genre_radar(top_genres: list[tuple[str, float]]) -> None:
         theta=genres,
         fill='toself',
         name='Your Ratings',
-        line=dict(color='#3498DB', width=2),
-        fillcolor='rgba(52, 152, 219, 0.3)'
+        line=dict(color=_CHART["mid"], width=2),
+        fillcolor=_rgba(_CHART["mid"], 0.3)
     ))
 
     fig.update_layout(
@@ -96,21 +114,15 @@ def _render_genre_radar(top_genres: list[tuple[str, float]]) -> None:
     for genre, rating in top_genres[:15]:
         # Color-code by rating
         if rating >= 8.0:
-            color = "#27AE60"
+            chart_key = "high"
         elif rating >= 7.0:
-            color = "#3498DB"
+            chart_key = "mid"
         elif rating >= 6.0:
-            color = "#F39C12"
+            chart_key = "ok"
         else:
-            color = "#95A5A6"
+            chart_key = "low"
 
-        st.markdown(
-            f"<div style='display: flex; justify-content: space-between; padding: 4px 0;'>"
-            f"<span>{genre}</span>"
-            f"<span style='color: {color}; font-weight: 600;'>{rating:.1f}/10</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
+        st.markdown(stat_row_html(genre, f"{rating:.1f}/10", chart_key), unsafe_allow_html=True)
 
 
 def _render_rating_distribution(rating_distribution: dict[str, int]) -> None:
@@ -129,7 +141,8 @@ def _render_rating_distribution(rating_distribution: dict[str, int]) -> None:
 
     fig = go.Figure()
 
-    colors = ['#27AE60', '#3498DB', '#F39C12', '#E74C3C']
+    chart_keys = ["high", "mid", "ok", "bad"]
+    colors = [_CHART[k] for k in chart_keys]
 
     fig.add_trace(go.Bar(
         x=buckets,
@@ -154,15 +167,12 @@ def _render_rating_distribution(rating_distribution: dict[str, int]) -> None:
     total = sum(counts)
     if total > 0:
         st.markdown("**Breakdown:**")
-        for bucket, count, color in zip(buckets, counts, colors):
+        for bucket, count, chart_key in zip(buckets, counts, chart_keys):
             if count > 0:
                 pct = (count / total) * 100
                 st.markdown(
-                    f"<div style='display: flex; justify-content: space-between; padding: 4px 0;'>"
-                    f"<span>{bucket} stars</span>"
-                    f"<span style='color: {color}; font-weight: 600;'>{count} ({pct:.1f}%)</span>"
-                    f"</div>",
-                    unsafe_allow_html=True
+                    stat_row_html(f"{bucket} stars", f"{count} ({pct:.1f}%)", chart_key),
+                    unsafe_allow_html=True,
                 )
 
 

@@ -1,0 +1,78 @@
+{
+  "metric": "time_to_first_card_s",
+  "load": "local warm",
+  "viewport": [
+    1440,
+    900
+  ],
+  "mode": "Seed-based (default seed)",
+  "warmup_discarded_s": 7.02,
+  "runs_s": [
+    6.89,
+    3.89,
+    8.62
+  ],
+  "median_s": 6.89,
+  "range_s": [
+    3.89,
+    8.62
+  ],
+  "url": "http://localhost:8501",
+  "date": "2026-10-19",
+  "screenshots": [
+    {
+      "file": "seed_1440x900.png",
+      "mode": "seed",
+      "viewport": [
+        1440,
+        900
+      ],
+      "bytes": 518804
+    },
+    {
+      "file": "personalized_1440x900.png",
+      "mode": "personalized",
+      "viewport": [
+        1440,
+        900
+      ],
+      "bytes": 537854
+    },
+    {
+      "file": "browse_1440x900.png",
+      "mode": "browse",
+      "viewport": [
+        1440,
+        900
+      ],
+      "bytes": 501049
+    },
+    {
+      "file": "seed_390x844.png",
+      "mode": "seed",
+      "viewport": [
+        390,
+        844
+      ],
+      "bytes": 467149
+    },
+    {
+      "file": "personalized_390x844.png",
+      "mode": "personalized",
+      "viewport": [
+        390,
+        844
+      ],
+      "bytes": 475253
+    },
+    {
+      "file": "browse_390x844.png",
+      "mode": "browse",
+      "viewport": [
+        390,
+        844
+      ],
+      "bytes": 449161
+    }
+  ]
+}

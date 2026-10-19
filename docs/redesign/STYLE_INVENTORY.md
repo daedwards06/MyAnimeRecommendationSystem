@@ -139,3 +139,29 @@ which match a token value without referencing it.
   (`skeletons.py`).
 - `button[kind="secondary"]` (`display.py:101-119`) styles **every** non-primary button as a
   30 px genre pill, not just genre chips. See finding F6 in `UX_PLAN.md`.
+
+## After Task 2.1
+
+All styling now lives in `app/styles/`: `tokens.css` (generated), `base.css` (the former
+`inject_css` stylesheet) and `components.css` (one `mars-*` class per former inline style),
+injected once per run by `app.styles.inject_styles()` from `app/main.py`. The light palette the
+app still paints with is `LIVE["color"]`, `LIVE["chart"]` and `LIVE["shadow"]` in
+`src/app/theme_tokens.py`, generated as `--mars-live-*` variables; Task 2.2 points the
+stylesheets at the night tokens instead. `tests/test_styles.py` fails on any `style=` or
+`<style` outside the loader and on any hex literal in the CSS.
+
+- The mix bar segments are SVG `<rect>`s sized by `x`/`width` attributes, so per-run widths need
+  no inline style.
+- `.streamlit-expanderHeader` was dropped: the class does not exist in Streamlit 1.38, so the rule
+  matched nothing. No `st-emotion-cache-*` selectors existed to replace.
+- `skeletons.py`'s `<style>` block moved to `components.css`; the module is still unused.
+- `src/app/theme.py` is no longer read by the app (only `tests/test_theme.py` imports it).
+
+Screenshot comparison (`docs/redesign/after_2_1` against `docs/redesign/baseline`, pixel diff at
+a per-channel threshold of 24): Seed, Personalized and Browse at 1440×900 and Personalized and
+Seed at 390×844 are identical; Browse at 390×844 differs in 32 isolated pixels (anti-aliasing).
+States the baseline does not cover were captured on the old and new code side by side: grid
+view, Personalized-without-profile notice and the taste profile are identical; an expanded card
+("Watch on" links), the MMR banner, the Quick Guide and the inference tile differ only in the
+timing numbers. Not compared: the "Get Started" panel (clearing seeds shows default results, so
+the UI does not reach it) and the unused skeleton. No intended or unintended visual change found.

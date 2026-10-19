@@ -111,12 +111,11 @@ def render_sidebar(
 
 
 def _section_label(text: str, *, container=None) -> None:
-    (container or st.sidebar).markdown(
-        "<p style='font-weight:700; font-size:0.8rem; color:#4A5568; "
-        "letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>"
-        f"{text}</p>",
-        unsafe_allow_html=True,
-    )
+    (container or st.sidebar).markdown(section_label_html(text), unsafe_allow_html=True)
+
+
+def section_label_html(text: str) -> str:
+    return f"<p class='mars-section-label'>{text}</p>"
 
 
 # ── Find: mode selector ─────────────────────────────────────────────────────
@@ -925,7 +924,7 @@ def _render_help_section() -> None:
     with st.sidebar.expander("Quick Guide", expanded=False):
         st.markdown(
             """
-    <div style='font-size: 0.88rem; line-height: 1.9; color: #4A5568;'>
+    <div class='mars-quick-guide'>
     <b>1.</b> Choose what you want &mdash; Similar to a title / For me / Browse<br>
     <b>2.</b> Similar to a title &mdash; pick 1&ndash;5 titles or try the sample buttons<br>
     <b>3.</b> Browse &mdash; select genres to explore the catalog<br>
@@ -971,12 +970,12 @@ def _render_performance_fragment() -> None:
         last_timing = get_last_timing()
         if last_timing:
             latency_ms = last_timing.get("recommendations", 0) * 1000
-            status_color = "#48BB78" if latency_ms < 250 else "#ECC94B" if latency_ms < 500 else "#FC8181"
+            tone = "success" if latency_ms < 250 else "warn" if latency_ms < 500 else "error"
             st.markdown(
                 f"""
-        <div style='background:#F7FAFC; border-radius:8px; padding:12px; margin-bottom:8px; border:1px solid #E2E8F0;'>
-            <p style='margin:0; font-size:0.78rem; color:#A0AEC0; text-transform:uppercase; letter-spacing:0.05em;'>Inference</p>
-            <p style='margin:0; font-size:1.2rem; font-weight:700; color:{status_color};'>{latency_ms:.0f}ms</p>
+        <div class='mars-stat-tile'>
+            <p class='mars-stat-tile-label'>Inference</p>
+            <p class='mars-stat-tile-value mars-tone-{tone}'>{latency_ms:.0f}ms</p>
         </div>
         """,
                 unsafe_allow_html=True,

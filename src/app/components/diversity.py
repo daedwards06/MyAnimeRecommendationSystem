@@ -32,11 +32,10 @@ def render_diversity_panel(recs: list[dict], metadata: pd.DataFrame, *, is_brows
         # Show MMR status badge if enabled
         if mmr_enabled:
             st.markdown(
-                f"<div style='background-color: #1A1A2E; padding: 8px 12px; "
-                f"border-radius: 4px; margin-bottom: 12px; border-left: 3px solid #4ECDC4;'>"
-                f"<span style='font-weight: 600; color: #4ECDC4;'>🎯 MMR Diversification Active</span> "
-                f"<span style='color: #B0B0B0;'>• λ = {mmr_lambda:.1f}</span> "
-                f"<span style='color: #888; font-size: 0.85em;'>"
+                f"<div class='mars-mmr-banner'>"
+                f"<span class='mars-mmr-title'>🎯 MMR Diversification Active</span> "
+                f"<span class='mars-mmr-lambda'>• λ = {mmr_lambda:.1f}</span> "
+                f"<span class='mars-mmr-note'>"
                 f"({'High diversity' if mmr_lambda < 0.4 else 'Balanced' if mmr_lambda < 0.7 else 'Relevance-focused'})"
                 f"</span>"
                 f"</div>",

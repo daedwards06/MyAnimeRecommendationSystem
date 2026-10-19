@@ -349,16 +349,16 @@ ruff check src/ tests/ app/
 
 **Checklist:**
 
-- [ ] `app/styles/`: `tokens.css` (generated), `base.css`, `components.css`; `app/styles/__init__.py`
+- [x] `app/styles/`: `tokens.css` (generated), `base.css`, `components.css`; `app/styles/__init__.py`
       or a helper in `app/display.py` with `inject_styles()` that reads and injects them once
       per run
-- [ ] Inline `style=` attributes in component HTML become classes (`mars-card`, `mars-badge`,
+- [x] Inline `style=` attributes in component HTML become classes (`mars-card`, `mars-badge`,
       `mars-title-card`, ...) defined in `components.css`
-- [ ] Any selector on `st-emotion-cache-*` is replaced with a `data-testid` hook or an own class
-- [ ] Screenshot comparison shows no intended change; any unintended one is fixed or listed
-- [ ] Tests: `inject_styles()` is idempotent within a run; component HTML helpers emit classes,
+- [x] Any selector on `st-emotion-cache-*` is replaced with a `data-testid` hook or an own class
+- [x] Screenshot comparison shows no intended change; any unintended one is fixed or listed
+- [x] Tests: `inject_styles()` is idempotent within a run; component HTML helpers emit classes,
       not inline styles
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 
