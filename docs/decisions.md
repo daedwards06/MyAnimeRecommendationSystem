@@ -5,6 +5,54 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-19 — A learned reranker beats the hand-weighted blend; served behind `RERANKER_MODE=learned`
+
+**Status:** Adopted behind a flag (default `hand`). Source: Task 2.3, `reports/learned_reranker.md`
+(`scripts/train_learned_reranker.py --sample-users 1000 --k 10`).
+
+**Context.** Stage 2 blends hand-set signals; the CF part is the Task 0.6 Optuna re-tune
+(mf 0.048 / knn 0.952 / pop 0.0003), NDCG@10 0.0658 on the reporting cohort. The question was
+whether learning the combination beats it.
+
+**Experiment.** LightGBM LambdaRank reorders each user's top 200 blend candidates, so both
+rankings see identical candidates (the hand-weighted row reproduces the ablation's 0.0658 exactly).
+Training users are 4,000 validation users outside the reporting cohort, split 80 / 20 for early
+stopping; three seeds vary that split and LightGBM's bagging. All features come from the train
+split: the CF scores, plus content and metadata affinities to the user's train history.
+
+**Result.**
+- *CF signals alone:* 0.0683 mean, a tie (every seed's paired CI spans 0). The Optuna weights
+  already get what three CF scores can give.
+- *All signals:* **0.0931** mean (0.0963 / 0.0926 / 0.0904), +0.0273 over the blend, against a
+  seed spread of 0.0059. Every seed's paired CI clears zero; the narrowest is
+  [+0.0147, +0.0366]. Coverage@10 is unchanged (0.099–0.103 vs. 0.103). The gain comes from
+  the content signals the CF blend never sees: synopsis TF-IDF affinity has the largest gain
+  share (0.17), then blend rank and kNN rank.
+- *Ceiling:* the held-out item is among the 200 candidates for only 37% of users. Reordering
+  cannot reach the rest, and the implicit ALS (0.1890 alone, previous entry) is the larger
+  lever.
+
+**Decision.** The plan's rule (gain > seed spread *and* paired CI excludes 0) is met, so the
+seed-42 model is served in the personalized pipeline only, behind `RERANKER_MODE=learned`.
+The default stays `hand`, so the deployed demo is unchanged until the owner flips it. Seed
+mode, Browse and the seedless baseline are untouched. `lightgbm` moves into `requirements.txt`
+because the loader unpickles every `models/*.joblib`.
+
+**Train / serve differences, accepted.** The ranker was trained on train-split artifacts; the app
+scores with the full-fit artifacts and a profile's folded-in MF embedding, not a trained user row.
+`ServedReranker` carries the train-split popularity table, and MF gets `global_mean` back, so
+both features stay on their training scales. A test pins serve-time scores to training-frame
+predictions. The MF embedding's distribution is the one difference no artifact can remove. MF
+features have 7% of the gain between them, so the offline number is the best estimate there is
+but not a measurement of the served path.
+
+**What would change this.** Swapping the first stage to implicit ALS (the previous entry) changes
+the candidates and the features, so the ranker would have to be retrained and re-measured; the
+flag stays until then. A drop in the live path's quality on the golden-query or demo profiles
+would argue for leaving the default at `hand`.
+
+---
+
 ## 2026-10-18 — Implicit ALS is a candidate to replace FunkSVD; two eval exclusion faults fixed
 
 **Status:** Candidate (not served). Source: Task 2.1, `reports/mf_diagnostic.md`

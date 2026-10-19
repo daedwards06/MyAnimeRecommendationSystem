@@ -511,6 +511,84 @@ class TestPersonalizedPipeline:
         assert 4 not in result_ids
 
 
+class _FakeReranker:
+    """Stands in for ``ServedReranker``: ranks by anime_id descending, records what it was given."""
+
+    n_candidates = 6
+
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def item_side(self, item_ids, metadata, *, tfidf_artifact, neural_artifact):
+        return {"n_items": len(item_ids)}
+
+    def score(self, items, mf, knn, watched_ids, candidate_ids):
+        self.calls.append({"mf": mf, "watched": list(watched_ids), "candidates": list(candidate_ids)})
+        return np.asarray(candidate_ids, dtype=float)
+
+
+class TestLearnedRerankerMode:
+    """RERANKER_MODE=learned in the personalized pipeline (Task 2.3)."""
+
+    @pytest.fixture
+    def personalized_ctx(self, mock_scoring_context: ScoringContext, mock_mf_model: MockMFModel) -> ScoringContext:
+        mock_scoring_context.seed_ids = []
+        mock_scoring_context.user_embedding = mock_mf_model.P[0].copy()
+        mock_scoring_context.personalization_enabled = True
+        mock_scoring_context.user_embedding_meta = {"mf_stem": "mock_v1.0"}
+        mock_scoring_context.n_requested = 3
+        mock_scoring_context.watched_ids = {2}
+        return mock_scoring_context
+
+    def test_hand_mode_does_not_touch_the_reranker(self, personalized_ctx, monkeypatch):
+        monkeypatch.setattr("src.app.scoring_pipeline.RERANKER_MODE", "hand")
+        fake = _FakeReranker()
+        personalized_ctx.bundle["models"]["learned_reranker"] = fake
+
+        result = run_personalized_pipeline(personalized_ctx)
+
+        assert result.personalization_applied
+        assert fake.calls == []
+        assert all("_reranker" not in r for r in result.ranked_items)
+
+    def test_learned_mode_reorders_the_blend_candidates(self, personalized_ctx, monkeypatch):
+        monkeypatch.setattr("src.app.scoring_pipeline.RERANKER_MODE", "learned")
+        fake = _FakeReranker()
+        models = personalized_ctx.bundle["models"]
+        models.update({"learned_reranker": fake, "synopsis_tfidf": object(), "synopsis_neural_embeddings": object()})
+
+        result = run_personalized_pipeline(personalized_ctx)
+
+        assert result.personalization_blocked_reason is None
+        (call,) = fake.calls
+        # It reranks the blend's top n_candidates, not just the n the user asked for.
+        assert len(call["candidates"]) == _FakeReranker.n_candidates
+        assert 2 not in call["candidates"] and call["watched"] == [2]
+        # MF features carry global_mean, as in training.
+        assert float(np.min(call["mf"])) > 6.0
+        ids = [r["anime_id"] for r in result.ranked_items]
+        assert ids == sorted(call["candidates"], reverse=True)[:3]
+        assert all(r["_reranker"] == "learned" and 0.0 <= r["score"] <= 1.0 for r in result.ranked_items)
+
+    def test_learned_mode_without_the_artifact_says_why(self, personalized_ctx, monkeypatch):
+        monkeypatch.setattr("src.app.scoring_pipeline.RERANKER_MODE", "learned")
+        personalized_ctx.bundle["load_report"] = {"learned_reranker": {"reason": "missing dependency: lightgbm"}}
+
+        result = run_personalized_pipeline(personalized_ctx)
+
+        assert not result.personalization_applied
+        assert "RERANKER_MODE=learned" in result.personalization_blocked_reason
+        assert "lightgbm" in result.personalization_blocked_reason
+
+    def test_unknown_mode_is_refused_not_ignored(self, personalized_ctx, monkeypatch):
+        monkeypatch.setattr("src.app.scoring_pipeline.RERANKER_MODE", "lambdamart")
+
+        result = run_personalized_pipeline(personalized_ctx)
+
+        assert not result.personalization_applied
+        assert "Unknown RERANKER_MODE" in result.personalization_blocked_reason
+
+
 # ---------------------------------------------------------------------------
 # Tests: Browse Pipeline
 # ---------------------------------------------------------------------------

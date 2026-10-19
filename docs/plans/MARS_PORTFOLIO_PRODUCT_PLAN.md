@@ -1191,19 +1191,32 @@ ruff check src/ tests/
 ```
 
 **Checklist:**
-- [ ] `src/models/learned_reranker.py`: build a per-(user, candidate) feature frame from the
+- [x] `src/models/learned_reranker.py`: build a per-(user, candidate) feature frame from the
       top-200 blended candidates per user (train split), label = held-out interaction, group
-      by user; LightGBM `lambdarank`; save with the versioned-stem convention
-- [ ] `scripts/train_learned_reranker.py`: user-level train/val split disjoint from the eval
+      by user; LightGBM `lambdarank`; save with the versioned-stem convention — *18 features: the
+      blend's CF scores and ranks plus synopsis TF-IDF / neural, genre / theme affinity to the
+      train history, MAL score, members, year, episodes, type. Saved as a `ServedReranker`
+      (`learned_reranker_vYYYY.MM.DD_HHMMSS.joblib`) carrying the train-split popularity so serve-time
+      features are built by the same code on the same scales*
+- [x] `scripts/train_learned_reranker.py`: user-level train/val split disjoint from the eval
       cohort; reports metrics for hand-weighted vs learned on identical candidates; writes
-      `reports/learned_reranker.md` with feature importance and a one-paragraph conclusion
-- [ ] If learned NDCG@10 beats the re-tuned hand-weighted blend by more than the seed-to-seed
+      `reports/learned_reranker.md` with feature importance and a one-paragraph conclusion —
+      *4,000 users outside the cohort (overlap 0), 80 / 20 train / early-stopping per seed. The
+      hand-weighted row reproduces the ablation's 0.0658 exactly; RRF row 0.0547. A CF-only
+      ranker is also reported (0.0683, a tie), so the gain can be attributed*
+- [x] If learned NDCG@10 beats the re-tuned hand-weighted blend by more than the seed-to-seed
       spread (run 3 seeds) and the paired bootstrap CI on the difference excludes 0: wire it behind `RERANKER_MODE=learned` in `constants.py` and the personalized
-      pipeline only; otherwise the app is untouched and the report says why
-- [ ] README "What I learned" gets the one-line result either way
-- [ ] Tests: feature frame shape and no label leakage (val items absent from features);
-      ranker trains on a tiny fixture
-- [ ] Tests + ruff green
+      pipeline only; otherwise the app is untouched and the report says why — *it wins: 0.0931
+      mean (0.0963 / 0.0926 / 0.0904), +0.0273 vs. a 0.0059 spread, every paired CI above zero.
+      Wired in the personalized pipeline only, default `hand`; seed 42 promoted to
+      `models/learned_reranker_v2026.10.19_013031.joblib`; an unknown mode or a missing artifact
+      blocks personalization with a reason. `lightgbm` added to `requirements.txt`. Decision and
+      the accepted train / serve differences in `docs/decisions.md` 2026-10-19*
+- [x] README "What I learned" gets the one-line result either way
+- [x] Tests: feature frame shape and no label leakage (val items absent from features);
+      ranker trains on a tiny fixture — *plus serve-time scores equal training-frame predictions,
+      and the pipeline's learned / hand / missing-artifact / unknown-mode paths*
+- [x] Tests + ruff green
 
 ---
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from src.models.constants import DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, MF_MODEL_STEM
+from src.models.constants import DEFAULT_HYBRID_WEIGHTS, KNN_MODEL_STEM, LEARNED_RERANKER_STEM, MF_MODEL_STEM
 
 RANDOM_SEED: int = 42
 
@@ -47,6 +47,7 @@ MIN_METADATA_COLUMNS = [
     "poster_url",  # remote CDN fallback when local thumbnail isn't shipped
     "streaming",
     "mal_score",
+    "members_count",  # learned reranker feature
     "episodes",
     "status",
     "aired_from",
@@ -64,6 +65,7 @@ PERSONAS_JSON = "data/samples/personas.json"
 # APP_KNN_MODEL_STEM.
 DEFAULT_MF_MODEL_STEM = MF_MODEL_STEM
 DEFAULT_KNN_MODEL_STEM = KNN_MODEL_STEM
+DEFAULT_LEARNED_RERANKER_STEM = LEARNED_RERANKER_STEM
 
 # Model families the deployed app is expected to load (keys of bundle["load_report"]). The app
 # keeps running when one is missing but shows a notice; scripts/smoke_artifacts.py exits non-zero.
@@ -225,6 +227,12 @@ QUALITY_PRIOR_COEF: float = min(0.20, max(0.0, _env_float("QUALITY_PRIOR_COEF", 
 # ---------------------------------------------------------------------------
 
 SEED_RANKING_MODE: str = _normalize_seed_ranking_mode(_env_str("SEED_RANKING_MODE", "discovery"))
+
+# Personalized-mode ordering. "hand": the weighted blend. "learned": LightGBM LambdaRank over the
+# blend's top candidates (Task 2.3: NDCG@10 0.0931 vs. 0.0658 offline, reports/learned_reranker.md).
+# Any other value blocks personalization with a reason instead of falling back.
+RERANKER_MODES: tuple[str, ...] = ("hand", "learned")
+RERANKER_MODE: str = _env_str("RERANKER_MODE", "hand").strip().lower()
 
 # Define "franchise-like" based on existing title overlap heuristic.
 FRANCHISE_TITLE_OVERLAP_THRESHOLD: float = _env_float("FRANCHISE_TITLE_OVERLAP_THRESHOLD", 0.50)

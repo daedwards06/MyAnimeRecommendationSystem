@@ -18,6 +18,8 @@ DEFAULT_HYBRID_WEIGHTS = {
 # reference these instead of literals so offline evaluation scores the model the app serves.
 MF_MODEL_STEM = "mf_sgd_v2025.11.21_202756"
 KNN_MODEL_STEM = "item_knn_sklearn_v2025.11.21_202756"
+# Served only when RERANKER_MODE=learned (Task 2.3, reports/learned_reranker.md).
+LEARNED_RERANKER_STEM = "learned_reranker_v2026.10.19_013031"
 
 DATA_PROCESSED_DIR = Path("data/processed")
 MODELS_DIR = Path("models")

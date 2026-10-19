@@ -88,6 +88,11 @@ are described in the [scoring pipeline guide](docs/scoring_pipeline_integration_
   smaller evaluation faults, both fixed: MF scored users it had never seen with an accidental
   popularity fallback, and kNN's seen-mask let 0-rated titles through. It also showed that an
   earlier small-slice test which found the train/test leak harmless was wrong at full scale.
+- **Learning the weights only paid off with new signals.** A LightGBM LambdaRank reranker over the
+  blend's top 200 ties the tuned blend when it sees only the three CF scores (0.0683 vs. 0.0658). It
+  beats it when it also gets the content and metadata affinities: 0.0931 over three seeds, every
+  paired CI above zero ([learned reranker](reports/learned_reranker.md)). It ships behind
+  `RERANKER_MODE=learned`, off by default.
 - **Coverage and accuracy pull apart.** Popularity's top-10 lists cover 0.0056 of the catalog
   and TF-IDF content similarity's cover 0.1711, yet TF-IDF ranks below popularity on NDCG. The
   *Diversity* preset serves item-kNN alone because it ties the blend on accuracy with higher

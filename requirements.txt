@@ -20,6 +20,8 @@ pyarrow>=16.1.0
 # Machine Learning
 scikit-learn>=1.5.2
 joblib>=1.4.2
+# Unpickles models/learned_reranker_v*.joblib (served when RERANKER_MODE=learned)
+lightgbm>=4.3.0
 
 # Visualization (used in taste profile panel)
 plotly>=5.24.1

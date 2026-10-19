@@ -61,6 +61,8 @@ from src.app.constants import (
     OBSCURITY_MEMBERS_THRESHOLD,
     OBSCURITY_MISSING_MAL_PENALTY,
     QUALITY_FACTOR_MODE,
+    RERANKER_MODE,
+    RERANKER_MODES,
     SEED_RANKING_MODE,
     STAGE0_ENFORCEMENT_BUFFER,
     STAGE0_META_MIN_GENRE_OVERLAP,
@@ -1662,6 +1664,61 @@ def run_seed_based_pipeline(ctx: ScoringContext) -> PipelineResult:
 # ---------------------------------------------------------------------------
 
 
+_RERANKER_ITEMS_CACHE: dict[tuple[int, ...], Any] = {}
+
+
+def _learned_reranker_or_reason(ctx: ScoringContext) -> tuple[Any, str | None]:
+    """The served learned reranker, or why ``RERANKER_MODE`` cannot run as configured."""
+    if RERANKER_MODE not in RERANKER_MODES:
+        return None, f"Unknown RERANKER_MODE={RERANKER_MODE!r}; expected one of {', '.join(RERANKER_MODES)}."
+    models = ctx.bundle.get("models", {})
+    reranker = models.get("learned_reranker")
+    if reranker is None:
+        report = (ctx.bundle.get("load_report", {}) or {}).get("learned_reranker") or {}
+        why = report.get("reason") or "no learned_reranker artifact in models/"
+        return None, f"RERANKER_MODE=learned, but the learned reranker is not loaded ({why})."
+    for family, label in (("synopsis_tfidf", "synopsis TF-IDF"), ("synopsis_neural_embeddings", "synopsis neural")):
+        if models.get(family) is None:
+            return None, f"RERANKER_MODE=learned needs the {label} artifact for its features, and it is not loaded."
+    return reranker, None
+
+
+def _apply_learned_reranker(ctx: ScoringContext, reranker: Any, recs: list[dict]) -> list[dict]:
+    """Reorder the blend's candidates by the learned ranker (Task 2.3).
+
+    Features are rebuilt by ``ServedReranker.score`` from the same code used in training. MF gets
+    ``global_mean`` back because the model was trained on full MF predictions, not the bare
+    ``embedding @ Q.T`` the blend uses (a constant shift, irrelevant to the blend's order).
+    Scores are min-max scaled per request: they order this list and mean nothing across lists.
+    """
+    models = ctx.bundle.get("models", {})
+    components = ctx.components
+    tfidf, neural = models["synopsis_tfidf"], models["synopsis_neural_embeddings"]
+    key = (id(reranker), id(ctx.metadata), id(tfidf), id(neural), len(components.item_ids))
+    items = _RERANKER_ITEMS_CACHE.get(key)
+    if items is None:
+        items = reranker.item_side(components.item_ids, ctx.metadata, tfidf_artifact=tfidf, neural_artifact=neural)
+        _RERANKER_ITEMS_CACHE.clear()
+        _RERANKER_ITEMS_CACHE[key] = items
+
+    mf = float(getattr(ctx.mf_model, "global_mean", 0.0)) + np.asarray(ctx.user_embedding @ ctx.mf_model.Q.T, dtype=np.float64)
+    if ctx.personal_knn_scores is not None:
+        knn = np.asarray(ctx.personal_knn_scores, dtype=np.float64)
+    elif components.knn is not None:
+        knn = np.asarray(components.knn[0], dtype=np.float64)
+    else:
+        knn = np.full(len(components.item_ids), np.nan)
+
+    raw = reranker.score(items, mf, knn, sorted(ctx.watched_ids), [int(r["anime_id"]) for r in recs])
+    span = float(raw.max() - raw.min()) if raw.size else 0.0
+    scaled = (raw - raw.min()) / span if span > 0 else np.ones_like(raw)
+    for rec, s, r in zip(recs, scaled, raw):
+        rec["score"] = float(s)
+        rec["_learned_score"] = float(r)
+        rec["_reranker"] = "learned"
+    return sorted(recs, key=lambda x: -float(x["score"]))
+
+
 def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
     """Personalized recommendation path using user embedding.
 
@@ -1701,10 +1758,16 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
     elif ctx.personalization_blocked_reason:
         result.personalization_blocked_reason = ctx.personalization_blocked_reason
 
+    learned_reranker = None
+    if result.personalization_blocked_reason is None and RERANKER_MODE != "hand":
+        learned_reranker, result.personalization_blocked_reason = _learned_reranker_or_reason(ctx)
+
     if result.personalization_blocked_reason is not None:
         # Fall through — personalization cannot run, return seed-based results unchanged.
         result.timing["total"] = time.monotonic() - t0
         return result
+
+    n_fetch = n_requested if learned_reranker is None else max(n_requested, int(learned_reranker.n_candidates))
 
     # Get watched anime IDs for exclusion
     watched_ids_list = list(ctx.watched_ids)
@@ -1719,7 +1782,7 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
             personalized_recs = recommender.get_personalized_recommendations(
                 user_embedding=user_embedding,
                 mf_model=mf_model,
-                n=n_requested,
+                n=n_fetch,
                 weights=weights,
                 exclude_item_ids=exclude_ranked_ids,
             )
@@ -1728,6 +1791,8 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
                     "MF personalization returned no results (likely no overlap with MF items)."
                 )
             else:
+                if learned_reranker is not None:
+                    personalized_recs = _apply_learned_reranker(ctx, learned_reranker, personalized_recs)
                 # Metadata affinity nudge when seeds are selected
                 if selected_seed_ids:
                     seed_meta_profile = build_seed_metadata_profile(metadata, seed_ids=selected_seed_ids)
@@ -1804,7 +1869,7 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
             personalized_recs = recommender.get_personalized_recommendations(
                 user_embedding=user_embedding,
                 mf_model=mf_model,
-                n=n_requested,
+                n=n_fetch,
                 weights=weights,
                 exclude_item_ids=exclude_ranked_ids,
             )
@@ -1813,7 +1878,9 @@ def run_personalized_pipeline(ctx: ScoringContext) -> PipelineResult:
                     "MF personalization returned no results (likely no overlap with MF items)."
                 )
             else:
-                result.ranked_items = personalized_recs
+                if learned_reranker is not None:
+                    personalized_recs = _apply_learned_reranker(ctx, learned_reranker, personalized_recs)
+                result.ranked_items = personalized_recs[:n_requested]
                 personalization_applied = True
     except Exception as e:
         result.personalization_blocked_reason = f"Personalization failed at scoring time: {e}"

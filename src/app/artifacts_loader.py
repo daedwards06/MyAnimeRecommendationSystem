@@ -28,6 +28,7 @@ import pandas as pd
 
 from .constants import (
     DEFAULT_KNN_MODEL_STEM,
+    DEFAULT_LEARNED_RERANKER_STEM,
     DEFAULT_MF_MODEL_STEM,
     EXPECTED_MODEL_FAMILIES,
     METADATA_PARQUET,
@@ -276,6 +277,13 @@ _OPTIONAL_FAMILIES: list[tuple[str, tuple[str, ...], str, str, str | None]] = [
         "APP_SYNOPSIS_NEURAL_EMBEDDINGS_STEM",
         "Synopsis neural embeddings",
         None,
+    ),
+    (
+        "learned_reranker",
+        ("learned_reranker",),
+        "APP_LEARNED_RERANKER_STEM",
+        "Learned reranker",
+        DEFAULT_LEARNED_RERANKER_STEM,
     ),
 ]
 
