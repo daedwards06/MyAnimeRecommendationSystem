@@ -269,21 +269,21 @@ ruff check src/ tests/ app/
 
 **Checklist:**
 
-- [ ] MASTER.md § "90s Anime Overrides": palette (starting point, owner adjusts: night navy
+- [x] MASTER.md § "90s Anime Overrides": palette (starting point, owner adjusts: night navy
       `#1B1F3B` background, deep panel `#262B52`, sunset orange `#FF7A45`, magenta `#E8417A`,
       sakura `#FFC2D4`, cel cream `#FFF4E0` text, VHS teal `#3FB8AF`), display face Dela Gothic
       One (outlined, hard offset shadow), body face M PLUS Rounded 1c, both with Japanese glyph
       coverage for katakana accents; card rules (3 px border, hard shadow, no blur); texture
       rules (scanlines ≤ 6% opacity, background only)
-- [ ] `src/app/theme_tokens.py`: one `TOKENS` dict (colors, font stacks with fallbacks, radii,
+- [x] `src/app/theme_tokens.py`: one `TOKENS` dict (colors, font stacks with fallbacks, radii,
       border widths, shadow offsets) and a `TEXT_PAIRS` list of (foreground, background) pairs
       actually used for text, including badge tiers
-- [ ] `scripts/build_theme.py`: writes the `[theme]` section of `.streamlit/config.toml`
+- [x] `scripts/build_theme.py`: writes the `[theme]` section of `.streamlit/config.toml`
       (leaving other sections untouched) and `app/styles/tokens.css` as CSS custom properties
-- [ ] `tests/test_theme_tokens.py`: every `TEXT_PAIRS` entry ≥ 4.5:1 (WCAG relative luminance);
+- [x] `tests/test_theme_tokens.py`: every `TEXT_PAIRS` entry ≥ 4.5:1 (WCAG relative luminance);
       generated `config.toml` theme and `tokens.css` match `TOKENS` (fails if someone edits a
       generated file by hand); badge tier colors come from tokens
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

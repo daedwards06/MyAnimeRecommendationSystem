@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import math
 
+from src.app.theme_tokens import LIVE, TIER_TOKENS
+
 SCORE_SEMANTIC_NAME: str = "Match score (relative)"
 SCORE_LABEL_SHORT: str = "Match score"
 SCORE_HELP_TEXT: str = (
@@ -43,11 +45,10 @@ def format_match_score(value: float | None, *, decimals: int = 3) -> str:
     return fmt.format(v)
 
 
-MATCH_TIERS: tuple[tuple[str, str], ...] = (
-    ("Top match", "#27AE60"),
-    ("Strong match", "#3498DB"),
-    ("Good match", "#E67E22"),
-    ("Worth a look", "#95A5A6"),
+_TIER_COLORS = LIVE["tier_colors"]
+
+MATCH_TIERS: tuple[tuple[str, str], ...] = tuple(
+    zip(("Top match", "Strong match", "Good match", "Worth a look"), (_TIER_COLORS[t] for t in TIER_TOKENS))
 )
 
 
@@ -74,7 +75,7 @@ def format_user_friendly_score(
         (display_text, tooltip_text, color)
     """
     if not all_raw_scores:
-        return "—", "No score data", "#95A5A6"
+        return "—", "No score data", MATCH_TIERS[-1][1]
 
     n = len(all_raw_scores)
     rank = match_rank(raw_score, all_raw_scores)

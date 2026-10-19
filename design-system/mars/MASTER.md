@@ -32,6 +32,72 @@ Phase 3. So `pages/` stays empty until a mode needs a visual deviation.
 
 ---
 
+## 90s Anime Overrides
+
+These win over every generated section below. Values live in `src/app/theme_tokens.py`
+(`TOKENS`), which generates `app/styles/tokens.css` (`--mars-<group>-<key>`) and the
+`[theme]` section of `.streamlit/config.toml` with `python scripts/build_theme.py`. Never edit
+the generated files or put a hex literal in a component. `tests/test_theme_tokens.py` enforces both.
+
+### Palette
+
+| Token | Hex | Role | Contrast (text on bg / panel) |
+| ----- | --- | ---- | ----------------------------- |
+| `bg` | `#1B1F3B` | Night navy page background | — |
+| `panel` | `#262B52` | Deep panel: cards, sidebar | — |
+| `ink` | `#0D0F22` | Cel outlines and hard shadows | — |
+| `text` | `#FFF4E0` | Cel cream body and title text | 14.8 / 12.4 |
+| `text_muted` | `#B8B3D1` | Secondary text, meta lines | 8.0 / 6.7 |
+| `sunset` | `#FF7A45` | Primary action, highlights | 6.2 / 5.2 |
+| `on_sunset` | `#1B1F3B` | Text on sunset buttons (cream on sunset is 2.4, fails) | 6.2 on sunset |
+| `magenta` | `#E8417A` | **Accent only**: borders, offset shadows, decoration | 4.2 / 3.5, never text |
+| `sakura` | `#FFC2D4` | Soft highlight text, focus ring | 10.7 / 9.0 |
+| `teal` | `#3FB8AF` | VHS teal, links and secondary accent | 6.7 / 5.6 |
+| `focus` | `#FFC2D4` | Focus ring (sakura) | — |
+
+Match-tier badge colors (text on panel, tuple contract in `score_semantics.py` unchanged):
+Top match `tier_top` teal 5.6, Strong match `tier_strong` sakura 9.0, Good match `tier_good`
+sunset 5.2, Worth a look `tier_look` `#A9A6CC` 5.8.
+
+Every pair used for text is listed in `TEXT_PAIRS` and tested at ≥ 4.5:1. A new text color, or
+an existing color on a new surface, goes into `TEXT_PAIRS` in the same change.
+
+**Rollout:** the app still renders the pre-redesign light theme and tier colors. They are held in
+`LIVE` in the same module, so the generated files already come from it. Task 2.2 points the
+Streamlit theme at these tokens (with `base = "dark"`), and Task 2.4 does the same for the tier
+colors. `LIVE` is deleted once both are done.
+
+### Typography
+
+- **Display:** Dela Gothic One, used for the wordmark and section title cards only. It is outlined
+  (a `-webkit-text-stroke` / `paint-order` outline in `ink`) with a hard offset shadow. It is too
+  heavy at card size, so card titles use the body face in bold.
+- **Body:** M PLUS Rounded 1c, 400 and 700.
+- Both faces cover Japanese, so katakana accents (decorative, `aria-hidden="true"`) render
+  in the same face.
+- Load from Google Fonts with `display=swap`. Every stack ends in a system fallback
+  (`--mars-font-display`, `--mars-font-body`). Code and the Scoring details panels keep
+  `--mars-font-mono`.
+
+### Cards and shape
+
+- 3 px `ink` border (`--mars-border-cel`), flat `panel` fill, no gradients.
+- Hard offset shadow, no blur: `var(--mars-shadow-offset-md) var(--mars-shadow-offset-md) 0 0`
+  in `ink` (or `magenta` for emphasis). The generated soft `--shadow-*` scale and glow below are
+  not used.
+- Radii are small (`sm` 4 px, `md` 8 px; `pill` for tags only), replacing the 8–12 px radii below.
+- Press feedback may be an instant shadow-offset change. Any transition sits behind
+  `prefers-reduced-motion`.
+
+### Texture
+
+- Scanlines are CSS only, never an image, at no more than 6% opacity
+  (`--mars-texture-scanline-opacity`).
+- Background only: never behind body text, cards, or the sidebar's controls.
+- No noise or VHS motion under `prefers-reduced-motion`.
+
+---
+
 ## Global Rules
 
 ### Color Palette
