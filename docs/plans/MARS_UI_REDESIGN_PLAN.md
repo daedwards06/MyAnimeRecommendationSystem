@@ -23,9 +23,29 @@ put under test.
 The findings table is filled by Task 0.3 rather than written from memory, so every row has
 evidence the same way the portfolio plan's review did.
 
+Ranked by impact on the first five minutes. Full rows, with decisions, are in
+`docs/redesign/UX_PLAN.md`; where styling lives is in `docs/redesign/STYLE_INVENTORY.md`.
+
 | Finding | Evidence |
 | ------- | -------- |
-| *(filled by Task 0.3)* | *(screenshot path, file and line, or measured value)* |
+| F1 Mix bar above the first card miscounts (Top-10% counted as Mid, Hidden gems always 0); badge explanations fall back to generic text for the same reason | `src/app/badges.py:14-20` vs `app/display.py:361, 373`, `src/app/components/tooltips.py:47-60`; `baseline/seed_1440x900.png` "Popular 1 · Mid 9 · Hidden gems 0" over mostly "Top 10%" cards |
+| F2 For me mode header says "Similar to Fullmetal Alchemist: Brotherhood" and the intro says "Load a rated profile…" with a demo profile loaded | `baseline/personalized_1440x900.png`; `app/main.py:175-207`; `src/app/components/instructions.py:9-31` |
+| F3 Secondary text fails 4.5:1: muted `#A0AEC0` 2.18, tier badges 2.47–3.04, card meta colors 1.56–2.37, primary 4.17 | `src/app/theme.py:31, 35-50`; `src/app/score_semantics.py:47-50`; ratios computed vs `#FAFBFC` |
+| F4 Warm first card at a median of 8.9 s (5.3–14.0 s), with one spinner line as feedback; cold load shows none; skeleton component unused | `baseline/timing.json`; `app/pipeline_runner.py:377`; `app/main.py:69`; `src/app/components/skeletons.py` (no importers) |
+| F5 Phone: sidebar collapsed, so the mode switch is hidden; first card title at y ≈ 875 on an 844 px screen; cards ≈ 1,200 px tall; page 12,120 px | `baseline/seed_390x844.png`; `src/app/components/cards.py:85, 327, 416, 440` |
+| F6 Every non-primary button gets the 30 px genre-pill style; sample-seed labels wrap mid-word ("Steins;G / ate") | `app/display.py:101-119`; `baseline/seed_1440x900.png` sidebar |
+| F7 Card title announced twice (poster caption + h3); tier badge inside the heading; "Trained / Novelty NA" jargon on every card | `src/app/components/cards.py:85, 97, 356-359, 440-453` |
+| F8 Popularity band has four names: Long Tail, Hidden gems, a hidden gem, Long-tail | `src/app/badges.py:20`; `app/display.py:398, 413`; `src/app/explanations.py:135`; `src/app/components/tooltips.py:55` |
+| F9 Empty states print one generic "Try:" list instead of naming the active filter; two panels use hard-coded colors | `app/main.py:220-233`; `app/display.py:527-576` |
+| F10 Personalized gate shown in both sidebar and main area; visitor error mentions `APP_IMPORT_LIGHT` | `app/sidebar.py:483-494`; `app/main.py:175-188, 234-238` |
+| F11 No focus styles; `!important` button overrides may hide the focus ring; hover transforms without a reduced-motion guard | `app/display.py:85-131` |
+| F12 Grid-view add-seed button is icon only ("🔄") | `src/app/components/cards.py:237-242` |
+| F13 Three palettes in use plus dark one-offs on a light page | `docs/redesign/STYLE_INVENTORY.md` §§4–5 |
+| F14 Browse starts empty: three interactions before any title | `app/main.py:171-173` |
+| F15 Explanation repeats the seed title twice | `baseline/seed_1440x900.png`; `src/app/explanations.py` |
+| F16 Six Refine controls always shown before Personalize | `app/sidebar.py:717-853` |
+| F17 Last pipeline time appears in two panels | `app/sidebar.py:990-992`; `app/display.py:662-663` |
+| Styling sites: 96 lines match `unsafe_allow_html\|<style\|style=` across 6 files | Task 0.3 validation command; per-file table in `STYLE_INVENTORY.md` |
 
 **Decisions taken up front:**
 
@@ -168,18 +188,18 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 
 **Checklist:**
 
-- [ ] `docs/redesign/STYLE_INVENTORY.md`: every place styling is set (config.toml keys, `<style>`
+- [x] `docs/redesign/STYLE_INVENTORY.md`: every place styling is set (config.toml keys, `<style>`
       blocks, inline `style=` attributes, HTML built in f-strings), with file and line
-- [ ] Audit using the skill's UX domain (`search.py "<topic>" --domain ux` for loading states,
+- [x] Audit using the skill's UX domain (`search.py "<topic>" --domain ux` for loading states,
       empty states, error messages, forms, focus, touch targets, responsive) against the
       baseline screenshots; cover: steps to first useful result per mode, loading feedback while
       the pipeline runs, empty state when filters remove everything, error and gate messages,
       phone width, keyboard focus, reading order of a card
-- [ ] Fill this plan's findings table (evidence column mandatory) and write
+- [x] Fill this plan's findings table (evidence column mandatory) and write
       `docs/redesign/UX_PLAN.md`: findings ranked by impact on the first five minutes, each
       marked **fix in Phase 3**, **defer**, or **won't fix** with a reason
 - [ ] **Owner:** approve UX_PLAN.md before Phase 3 starts
-- [ ] No code changes in this task
+- [x] No code changes in this task
 
 ---
 
