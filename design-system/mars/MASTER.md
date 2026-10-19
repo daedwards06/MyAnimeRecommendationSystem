@@ -14,17 +14,21 @@
 
 ## Direction (owner pick, 2026-10-19)
 
-**A: Cel title card at night.** Flat cel fills, 3 px outlines, hard offset shadows, outlined
-display type, light scanlines on the background only. The shortlist and the other options are in
+**Subtle, Signal OVA palette, Shippori Mincho titles, subtitle-style explanation line.**
+Picked from the Task 1.3 mockups (`docs/redesign/mockups/index.html`, URL
+`#palette=ova&font=mincho&explain=subtitle`). The era comes from palette, type, and one
+signature detail, the explanation sentence styled like a fansub subtitle. There are no hard
+shadows, outlined display type, scanlines, or VHS motion. The reasons, and what was ruled out,
+are in `docs/decisions.md` (2026-10-19, "Redesign direction"). The earlier shortlist is in
 `docs/redesign/SKILL_SEARCH.md`.
 
 Generated with
 `search.py "anime video streaming personalized recommendation retro" --design-system --persist -p "MARS"`.
 The plan's query (`"anime recommendation entertainment retro"`) matches the Gaming row and
 returns 3D & Hyperrealism, which breaks the plan's first-card budget. The generator can't reach
-the cel look from any query. So this file is the dark base, and the era lives in the
-**90s Anime Overrides** section (Task 1.2). Where the two disagree, the overrides win. That
-covers the palette, Inter, the soft `--shadow-*` scale, glow, and the 8–12 px radii below.
+the 90s look from any query. So this file is the dark base, and the era lives in the
+**90s Anime Overrides** section. Where the two disagree, the overrides win. That covers the
+palette, Inter, the soft `--shadow-*` scale, glow, and the 8–12 px radii below.
 
 **Page overrides:** none. The Task 0.3 audit found no mode-specific visual needs. The mode
 findings (F2 header copy, F10 gate messages, F14 empty Browse) are copy and flow, handled in
@@ -39,25 +43,25 @@ These win over every generated section below. Values live in `src/app/theme_toke
 `[theme]` section of `.streamlit/config.toml` with `python scripts/build_theme.py`. Never edit
 the generated files or put a hex literal in a component. `tests/test_theme_tokens.py` enforces both.
 
-### Palette
+### Palette: Signal OVA
 
 | Token | Hex | Role | Contrast (text on bg / panel) |
 | ----- | --- | ---- | ----------------------------- |
-| `bg` | `#1B1F3B` | Night navy page background | — |
-| `panel` | `#262B52` | Deep panel: cards, sidebar | — |
-| `ink` | `#0D0F22` | Cel outlines and hard shadows | — |
-| `text` | `#FFF4E0` | Cel cream body and title text | 14.8 / 12.4 |
-| `text_muted` | `#B8B3D1` | Secondary text, meta lines | 8.0 / 6.7 |
-| `sunset` | `#FF7A45` | Primary action, highlights | 6.2 / 5.2 |
-| `on_sunset` | `#1B1F3B` | Text on sunset buttons (cream on sunset is 2.4, fails) | 6.2 on sunset |
-| `magenta` | `#E8417A` | **Accent only**: borders, offset shadows, decoration | 4.2 / 3.5, never text |
-| `sakura` | `#FFC2D4` | Soft highlight text, focus ring | 10.7 / 9.0 |
-| `teal` | `#3FB8AF` | VHS teal, links and secondary accent | 6.7 / 5.6 |
-| `focus` | `#FFC2D4` | Focus ring (sakura) | — |
+| `bg` | `#110D14` | Plum-black page background | — |
+| `panel` | `#1E1823` | Panels: cards, sidebar | — |
+| `ink` | `#050307` | Thin outlines, subtitle text outline | — |
+| `text` | `#F4ECE2` | Warm off-white body and title text | 16.4 / 14.8 |
+| `text_muted` | `#B0A6B8` | Secondary text, meta lines | 8.2 / 7.4 |
+| `signal` | `#FF4A4A` | Signal red: primary action, selected state | 5.8 / 5.2 |
+| `on_signal` | `#110D14` | Text on signal buttons (white on signal fails at 3.3) | 5.8 on signal |
+| `subtitle` | `#FFD84A` | Fansub yellow: the explanation line, highlighted names | 13.9 / 12.5 |
+| `cyan` | `#4FD3E6` | Links, genre tags, secondary accent | 10.8 / 9.7 |
+| `focus` | `#FFD84A` | Focus ring | — |
 
 Match-tier badge colors (text on panel, tuple contract in `score_semantics.py` unchanged):
-Top match `tier_top` teal 5.6, Strong match `tier_strong` sakura 9.0, Good match `tier_good`
-sunset 5.2, Worth a look `tier_look` `#A9A6CC` 5.8.
+Top match `tier_top` cyan 9.7, Strong match `tier_strong` yellow 12.5, Good match `tier_good`
+`#FF8F5A` 7.7, Worth a look `tier_look` `#A9A0B4` 6.9. Signal red is kept off the tiers so a
+"Good match" never reads as an error.
 
 Every pair used for text is listed in `TEXT_PAIRS` and tested at ≥ 4.5:1. A new text color, or
 an existing color on a new surface, goes into `TEXT_PAIRS` in the same change.
@@ -69,32 +73,35 @@ colors. `LIVE` is deleted once both are done.
 
 ### Typography
 
-- **Display:** Dela Gothic One, used for the wordmark and section title cards only. It is outlined
-  (a `-webkit-text-stroke` / `paint-order` outline in `ink`) with a hard offset shadow. It is too
-  heavy at card size, so card titles use the body face in bold.
+- **Display:** Shippori Mincho B1 at weight 800, the heavy Japanese serif of 90s title cards.
+  Used for the wordmark and section headings only, plain: no outline and no offset shadow.
+  Card titles use the body face in bold.
 - **Body:** M PLUS Rounded 1c, 400 and 700.
-- Both faces cover Japanese, so katakana accents (decorative, `aria-hidden="true"`) render
-  in the same face.
+- Both faces cover Japanese, so the alternate titles (`シリアルエクスペリメンツレイン`) render in
+  the same family as the rest of the card.
 - Load from Google Fonts with `display=swap`. Every stack ends in a system fallback
-  (`--mars-font-display`, `--mars-font-body`). Code and the Scoring details panels keep
-  `--mars-font-mono`.
+  (`--mars-font-display` ends in `serif`, `--mars-font-body` in `sans-serif`). Code and the
+  Scoring details panels keep `--mars-font-mono`.
+
+### The subtitle line (signature detail)
+
+The card's explanation sentence is set like a 90s VHS fansub subtitle: `subtitle` yellow, body
+face bold at 1rem, with a 1 px `ink` outline built from `text-shadow` (four 1 px offsets plus
+`0 2px 0`). It sits directly under the title and is the most prominent text on the card after
+the title. Nothing else uses this treatment, so it stays a signature, not a texture.
 
 ### Cards and shape
 
-- 3 px `ink` border (`--mars-border-cel`), flat `panel` fill, no gradients.
-- Hard offset shadow, no blur: `var(--mars-shadow-offset-md) var(--mars-shadow-offset-md) 0 0`
-  in `ink` (or `magenta` for emphasis). The generated soft `--shadow-*` scale and glow below are
-  not used.
-- Radii are small (`sm` 4 px, `md` 8 px; `pill` for tags only), replacing the 8–12 px radii below.
-- Press feedback may be an instant shadow-offset change. Any transition sits behind
+- 1 px `ink` border (`--mars-border-thin`), flat `panel` fill, no gradients, no shadow.
+- Radii are small (`sm` 4 px, `md` 8 px for cards; `pill` for tags only), replacing the 8–12 px
+  radii below.
+- Hover and press feedback is a border or background color change. Any transition sits behind
   `prefers-reduced-motion`.
 
-### Texture
+### Texture and decoration
 
-- Scanlines are CSS only, never an image, at no more than 6% opacity
-  (`--mars-texture-scanline-opacity`).
-- Background only: never behind body text, cards, or the sidebar's controls.
-- No noise or VHS motion under `prefers-reduced-motion`.
+- None. No scanlines, noise, VHS hover, or decorative katakana. Japanese text appears only where
+  it is real content (alternate titles).
 
 ---
 
@@ -316,7 +323,7 @@ the cases below. Don't hack around the framework to satisfy them.
 | Hero-Centric pattern, sticky nav CTA, full-bleed hero, "Static layout", "Slow video player" | Not applicable | Landing-page and video-player guidance. The layout (sidebar Find → Refine → Personalize → Advanced, results in main) was set by the portfolio plan and is out of scope. |
 | Modals (`backdrop-filter: blur`) | Not applicable | The app has no modals. Details open in `st.expander`. |
 | Breakpoints 375 / 768 / 1024 / 1440 | Check at the baseline widths, 390 × 844 and 1440 × 900 | Streamlit decides when columns stack and the sidebar collapses. App CSS can only add media queries for its own classes (Task 3.2). |
-| "Instant state changes": always transition 150–300 ms | App classes only, behind `prefers-reduced-motion` | Native widget transitions belong to Streamlit. Hard-shadow press feedback may be instant, as the cel style intends. |
+| "Instant state changes": always transition 150–300 ms | App classes only, behind `prefers-reduced-motion` | Native widget transitions belong to Streamlit. |
 | "No content hidden behind fixed navbars" | Not applicable | Streamlit's header is hidden by the app's CSS. There is no fixed bar of the app's own. |
 | Viewport meta, `touch-action`, skip links, focus on route change, deep links | Not applicable | Streamlit owns the document shell and has no routes, only reruns. |
-| "Light mode: text contrast 4.5:1" | Applies to the **dark** pairs | Direction A is dark-only. Every text pair in `TEXT_PAIRS` is tested at ≥ 4.5:1 (Task 1.2). |
+| "Light mode: text contrast 4.5:1" | Applies to the **dark** pairs | The chosen direction is dark-only. Every text pair in `TEXT_PAIRS` is tested at ≥ 4.5:1 (Task 1.2). |

@@ -9,26 +9,24 @@ from __future__ import annotations
 
 TOKENS: dict[str, dict[str, str]] = {
     "color": {
-        "bg": "#1B1F3B",  # night navy
-        "panel": "#262B52",  # deep panel
-        "ink": "#0D0F22",  # cel outlines and hard shadows
-        "text": "#FFF4E0",  # cel cream
-        "text_muted": "#B8B3D1",
-        "sunset": "#FF7A45",
-        "magenta": "#E8417A",  # accent only: 3.5:1 on panel, never text
-        "sakura": "#FFC2D4",
-        "teal": "#3FB8AF",  # VHS teal
-        "on_sunset": "#1B1F3B",
-        "focus": "#FFC2D4",
-        "tier_top": "#3FB8AF",
-        "tier_strong": "#FFC2D4",
-        "tier_good": "#FF7A45",
-        "tier_look": "#A9A6CC",
+        "bg": "#110D14",  # plum black
+        "panel": "#1E1823",
+        "ink": "#050307",  # outlines, and the subtitle text outline
+        "text": "#F4ECE2",  # warm off-white
+        "text_muted": "#B0A6B8",
+        "signal": "#FF4A4A",  # signal red: primary action
+        "on_signal": "#110D14",  # white on signal is 3.3:1, fails
+        "subtitle": "#FFD84A",  # fansub yellow: explanation line, highlights
+        "cyan": "#4FD3E6",  # links and secondary accent
+        "focus": "#FFD84A",
+        "tier_top": "#4FD3E6",
+        "tier_strong": "#FFD84A",
+        "tier_good": "#FF8F5A",
+        "tier_look": "#A9A0B4",
     },
     "font": {
         "display": (
-            "'Dela Gothic One', 'Hiragino Kaku Gothic StdN', 'Yu Gothic', 'Arial Black', "
-            "Impact, sans-serif"
+            "'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', 'Times New Roman', serif"
         ),
         "body": (
             "'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', Meiryo, 'Segoe UI', "
@@ -43,12 +41,6 @@ TOKENS: dict[str, dict[str, str]] = {
     },
     "border": {
         "thin": "1px",
-        "cel": "3px",
-    },
-    "shadow": {
-        "offset_sm": "2px",
-        "offset_md": "4px",
-        "offset_lg": "6px",
     },
     "space": {
         "xs": "4px",
@@ -56,9 +48,6 @@ TOKENS: dict[str, dict[str, str]] = {
         "md": "16px",
         "lg": "24px",
         "xl": "32px",
-    },
-    "texture": {
-        "scanline_opacity": "0.06",
     },
 }
 
@@ -71,13 +60,13 @@ TEXT_PAIRS: list[tuple[str, str]] = [
     (_C["text"], _C["panel"]),
     (_C["text_muted"], _C["bg"]),
     (_C["text_muted"], _C["panel"]),
-    (_C["sunset"], _C["bg"]),
-    (_C["sunset"], _C["panel"]),
-    (_C["sakura"], _C["bg"]),
-    (_C["sakura"], _C["panel"]),
-    (_C["teal"], _C["bg"]),
-    (_C["teal"], _C["panel"]),
-    (_C["on_sunset"], _C["sunset"]),
+    (_C["signal"], _C["bg"]),
+    (_C["signal"], _C["panel"]),
+    (_C["subtitle"], _C["bg"]),
+    (_C["subtitle"], _C["panel"]),
+    (_C["cyan"], _C["bg"]),
+    (_C["cyan"], _C["panel"]),
+    (_C["on_signal"], _C["signal"]),
     *((_C[t], _C["panel"]) for t in TIER_TOKENS),
     *((_C[t], _C["bg"]) for t in TIER_TOKENS),
 ]

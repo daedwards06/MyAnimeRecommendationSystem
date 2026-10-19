@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MARS Mockups</title>
+<!--
+  Task 1.3 static mockups. Reference only: nothing in docs/redesign/mockups/ is loaded by the app.
+  Every color, font, radius, border, shadow offset and spacing value comes from tokens_snapshot.css,
+  a frozen copy of the Task 1.2 tokens.css; the live tokens changed with the Task 1.3 decision.
+  Content is real app output (local run, 2026-10-19): seed Steins;Gate alone, first card.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@400;700&family=Shippori+Mincho+B1:wght@800&display=swap">
+<link rel="stylesheet" href="tokens_snapshot.css">
+<style>
+/* ---------- Page chrome (the mockup page itself, not the app) ---------- */
+* { box-sizing: border-box; }
+html { background: var(--mars-color-ink); }
+body {
+  margin: 0;
+  padding: var(--mars-space-lg) var(--mars-space-md);
+  background: var(--mars-color-bg);
+  color: var(--mars-color-text);
+  font-family: var(--mars-font-body);
+  line-height: 1.5;
+}
+.page-head { max-width: 1440px; margin: 0 auto var(--mars-space-xl); }
+.page-head h1 { font-family: var(--mars-font-display); font-weight: 400; margin: 0 0 var(--mars-space-sm); }
+.page-head p { color: var(--mars-color-text-muted); margin: 0 0 var(--mars-space-sm); max-width: 80ch; }
+.page-head nav { display: flex; gap: var(--mars-space-sm); flex-wrap: wrap; margin-top: var(--mars-space-md); }
+.page-head nav a {
+  color: var(--mars-color-teal);
+  border: var(--mars-border-thin) solid var(--mars-color-teal);
+  border-radius: var(--mars-radius-pill);
+  padding: var(--mars-space-xs) var(--mars-space-md);
+  text-decoration: none;
+}
+.page-head nav a:focus-visible, button:focus-visible, .chip:focus-visible, .tag:focus-visible {
+  outline: 3px solid var(--mars-color-focus);
+  outline-offset: 2px;
+}
+.direction { max-width: 1440px; margin: 0 auto var(--mars-space-xl); padding-top: var(--mars-space-md); border-top: var(--mars-border-cel) solid var(--mars-color-ink); }
+.direction > h2 { font-family: var(--mars-font-display); font-weight: 400; margin: 0 0 var(--mars-space-xs); }
+.direction > p { color: var(--mars-color-text-muted); margin: 0 0 var(--mars-space-md); max-width: 90ch; }
+.frames { display: flex; gap: var(--mars-space-lg); align-items: flex-start; flex-wrap: wrap; }
+.frame-wrap { flex: 1 1 860px; min-width: 0; }
+.frame-wrap.phone { flex: 0 0 390px; max-width: 100%; }
+.frame-label { font-size: 0.8rem; color: var(--mars-color-text-muted); margin-bottom: var(--mars-space-xs); }
+.frame {
+  container-type: inline-size;
+  border: var(--mars-border-cel) solid var(--mars-color-ink);
+  border-radius: var(--mars-radius-md);
+  overflow: hidden;
+  background: var(--mars-color-bg);
+}
+
+/* ---------- App mock: shared structure ---------- */
+.app { display: grid; grid-template-columns: 250px 1fr; min-height: 640px; }
+.sidebar { background: var(--mars-color-panel); padding: var(--mars-space-md); border-right: var(--mars-border-thin) solid var(--mars-color-ink); }
+.main { position: relative; padding: var(--mars-space-lg); }
+.collapsed-bar { display: none; }
+
+.group-label { display: flex; align-items: baseline; gap: var(--mars-space-sm); margin: 0 0 var(--mars-space-sm); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mars-color-text-muted); }
+.group-label .ep, .kana { display: none; }
+.field-label { font-size: 0.82rem; margin: var(--mars-space-sm) 0 var(--mars-space-xs); }
+.radio { display: flex; align-items: center; gap: var(--mars-space-sm); font-size: 0.85rem; margin: var(--mars-space-xs) 0; }
+.radio .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--mars-color-text-muted); }
+.radio.on .dot { border-color: var(--mars-color-sunset); background: radial-gradient(circle, var(--mars-color-sunset) 40%, transparent 45%); }
+.select { display: flex; align-items: center; justify-content: space-between; gap: var(--mars-space-xs); background: var(--mars-color-bg); border: var(--mars-border-thin) solid var(--mars-color-text-muted); border-radius: var(--mars-radius-sm); padding: var(--mars-space-xs); }
+.chip { display: inline-flex; align-items: center; gap: var(--mars-space-xs); background: var(--mars-color-sunset); color: var(--mars-color-on-sunset); font-size: 0.8rem; font-weight: 700; border-radius: var(--mars-radius-sm); padding: 2px var(--mars-space-sm); }
+.select .caret { color: var(--mars-color-text-muted); font-size: 0.8rem; padding-right: var(--mars-space-xs); }
+.try { display: flex; flex-wrap: wrap; gap: var(--mars-space-xs); align-items: center; margin-top: var(--mars-space-sm); font-size: 0.8rem; color: var(--mars-color-text-muted); }
+.tag { font: inherit; font-size: 0.78rem; cursor: pointer; background: transparent; color: var(--mars-color-teal); border: var(--mars-border-thin) solid var(--mars-color-teal); border-radius: var(--mars-radius-pill); padding: 2px var(--mars-space-sm); white-space: nowrap; }
+
+.header { margin-bottom: var(--mars-space-lg); position: relative; }
+.wordmark { font-family: var(--mars-font-display); font-weight: 400; font-size: 2.6rem; line-height: 1.1; margin: 0; color: var(--mars-color-text); }
+.tagline { color: var(--mars-color-text-muted); margin: var(--mars-space-xs) 0 var(--mars-space-sm); }
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: var(--mars-space-sm); flex-wrap: wrap; font-size: 0.88rem; }
+.header-row strong { color: var(--mars-color-sakura); }
+.btn { font: inherit; font-size: 0.82rem; cursor: pointer; background: transparent; color: var(--mars-color-text); border: var(--mars-border-thin) solid var(--mars-color-text-muted); border-radius: var(--mars-radius-sm); padding: var(--mars-space-xs) var(--mars-space-md); }
+.btn-row { display: flex; gap: var(--mars-space-xs); }
+
+.section-head { margin: 0 0 var(--mars-space-md); position: relative; }
+.section-head h2 { margin: 0; font-size: 1.4rem; font-weight: 700; }
+.section-head .ep-tag { display: none; }
+.count { font-size: 0.9rem; margin: var(--mars-space-xs) 0 0; }
+.count span { color: var(--mars-color-text-muted); font-size: 0.8rem; }
+.mix { margin: var(--mars-space-sm) 0 var(--mars-space-md); font-size: 0.75rem; color: var(--mars-color-text-muted); }
+.mix-bar { display: flex; height: 8px; border-radius: var(--mars-radius-sm); overflow: hidden; margin-top: var(--mars-space-xs); }
+.mix-bar i:nth-child(1) { flex: 1; background: var(--mars-color-sunset); }
+.mix-bar i:nth-child(2) { flex: 9; background: var(--mars-color-teal); }
+
+.card { background: var(--mars-color-panel); border: var(--mars-border-thin) solid var(--mars-color-ink); border-radius: var(--mars-radius-md); padding: var(--mars-space-md); }
+.card-top { display: grid; grid-template-columns: 150px 1fr; gap: var(--mars-space-md); }
+.poster { width: 150px; aspect-ratio: 150 / 212; border-radius: var(--mars-radius-sm); background: var(--mars-color-bg); border: var(--mars-border-thin) solid var(--mars-color-ink); display: flex; align-items: center; justify-content: center; text-align: center; padding: var(--mars-space-sm); font-size: 0.75rem; color: var(--mars-color-text-muted); }
+.card-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--mars-space-sm); margin: 0; font-size: 1.15rem; font-weight: 700; }
+.badge { font-size: 0.78rem; font-weight: 700; color: var(--mars-color-tier-top); border: var(--mars-border-thin) solid var(--mars-color-tier-top); border-radius: var(--mars-radius-pill); padding: 1px var(--mars-space-sm); }
+.rank { font-size: 0.78rem; color: var(--mars-color-text-muted); font-weight: 400; }
+.explain { margin: var(--mars-space-sm) 0; font-size: 0.95rem; color: var(--mars-color-text); }
+.alt { font-size: 0.82rem; color: var(--mars-color-text-muted); margin: 0; }
+.meta { font-size: 0.85rem; color: var(--mars-color-text-muted); margin: var(--mars-space-xs) 0; }
+.meta .score { color: var(--mars-color-sunset); font-weight: 700; }
+.genres { display: flex; flex-wrap: wrap; gap: var(--mars-space-xs); margin-top: var(--mars-space-sm); }
+.synopsis { color: var(--mars-color-text-muted); font-size: 0.88rem; margin: var(--mars-space-md) 0 var(--mars-space-sm); }
+.card-foot { display: flex; align-items: center; gap: var(--mars-space-md); flex-wrap: wrap; font-size: 0.75rem; font-weight: 700; }
+.card-foot .t { color: var(--mars-color-teal); }
+.card-foot .p { color: var(--mars-color-sakura); }
+.card-foot .n { color: var(--mars-color-text-muted); font-weight: 400; }
+.card-foot .btn { margin-left: auto; }
+.details { margin-top: var(--mars-space-sm); border: var(--mars-border-thin) solid var(--mars-color-text-muted); border-radius: var(--mars-radius-sm); padding: var(--mars-space-sm) var(--mars-space-md); font-size: 0.85rem; display: flex; justify-content: space-between; }
+
+/* Phone width: Streamlit collapses the sidebar and stacks columns below 640 px. */
+@container (max-width: 640px) {
+  .app { grid-template-columns: 1fr; min-height: 0; }
+  .sidebar { display: none; }
+  .collapsed-bar { display: block; padding: var(--mars-space-sm) var(--mars-space-md); color: var(--mars-color-text-muted); font-size: 0.8rem; }
+  .main { padding: var(--mars-space-md); }
+  .wordmark { font-size: 2rem; }
+  .card-top { grid-template-columns: 1fr; }
+  .poster { width: 180px; }
+  .card-foot .btn { margin-left: 0; }
+}
+
+/* ---------- Direction 1: Subtle (palette + type only) ---------- */
+/* The shared rules above are the Subtle direction. */
+
+/* ---------- Direction 2: Title card (outlined display type, episode headers, hard shadows) ---------- */
+.d-title .wordmark, .d-broadcast .wordmark {
+  -webkit-text-stroke: 6px var(--mars-color-ink);
+  paint-order: stroke fill;
+  text-shadow: var(--mars-shadow-offset-md) var(--mars-shadow-offset-md) 0 var(--mars-color-magenta);
+  letter-spacing: 0.04em;
+}
+.d-title .group-label, .d-broadcast .group-label {
+  font-family: var(--mars-font-display); font-weight: 400; font-size: 0.9rem; letter-spacing: 0.06em;
+  color: var(--mars-color-text);
+  border-bottom: var(--mars-border-cel) solid var(--mars-color-ink);
+  padding-bottom: var(--mars-space-xs);
+}
+.d-title .group-label .ep, .d-broadcast .group-label .ep { display: inline; font-family: var(--mars-font-body); font-weight: 700; font-size: 0.7rem; color: var(--mars-color-sunset); }
+.d-title .section-head, .d-broadcast .section-head {
+  display: inline-block; background: var(--mars-color-panel);
+  border: var(--mars-border-cel) solid var(--mars-color-ink); border-radius: var(--mars-radius-sm);
+  box-shadow: var(--mars-shadow-offset-md) var(--mars-shadow-offset-md) 0 0 var(--mars-color-ink);
+  padding: var(--mars-space-sm) var(--mars-space-md);
+}
+.d-title .section-head .ep-tag, .d-broadcast .section-head .ep-tag { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: var(--mars-color-sunset); }
+.d-title .section-head h2, .d-broadcast .section-head h2 { font-family: var(--mars-font-display); font-weight: 400; }
+.d-title .card, .d-broadcast .card {
+  border: var(--mars-border-cel) solid var(--mars-color-ink); border-radius: var(--mars-radius-sm);
+  box-shadow: var(--mars-shadow-offset-lg) var(--mars-shadow-offset-lg) 0 0 var(--mars-color-magenta);
+}
+.d-title .poster, .d-broadcast .poster { border: 2px solid var(--mars-color-ink); }
+.d-title .badge, .d-broadcast .badge { border-radius: var(--mars-radius-sm); border-width: 2px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.7rem; }
+.d-title .btn, .d-broadcast .btn, .d-title .tag, .d-broadcast .tag {
+  border: 2px solid var(--mars-color-ink); background: var(--mars-color-bg);
+  box-shadow: var(--mars-shadow-offset-sm) var(--mars-shadow-offset-sm) 0 0 var(--mars-color-ink);
+}
+.d-title .btn:active, .d-broadcast .btn:active, .d-title .tag:active, .d-broadcast .tag:active {
+  transform: translate(var(--mars-shadow-offset-sm), var(--mars-shadow-offset-sm)); box-shadow: none;
+}
+.d-title .card-foot .btn, .d-broadcast .card-foot .btn { background: var(--mars-color-sunset); color: var(--mars-color-on-sunset); font-weight: 700; }
+.d-title .details, .d-broadcast .details { border: 2px solid var(--mars-color-ink); background: var(--mars-color-bg); }
+
+/* ---------- Direction 3: Full broadcast (adds scanlines, VHS hover, katakana) ---------- */
+/* Scanlines sit on the main background only; every text block above them has an opaque fill. */
+.d-broadcast .main::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, var(--mars-color-text) 0 1px, transparent 1px 4px);
+  opacity: var(--mars-texture-scanline-opacity);
+}
+.d-broadcast .header, .d-broadcast .mix, .d-broadcast .count { position: relative; background: var(--mars-color-bg); }
+.d-broadcast .header { padding: var(--mars-space-sm); margin-left: calc(-1 * var(--mars-space-sm)); }
+.d-broadcast .card { position: relative; }
+.d-broadcast .kana { display: inline; font-family: var(--mars-font-display); color: var(--mars-color-sakura); }
+.d-broadcast .wordmark .kana { font-size: 0.9rem; vertical-align: top; margin-left: var(--mars-space-sm); -webkit-text-stroke: 0; text-shadow: none; letter-spacing: 0.2em; }
+.d-broadcast .group-label .kana { margin-left: auto; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--mars-color-text-muted); }
+.d-broadcast .section-head .kana { position: absolute; right: calc(-1 * var(--mars-space-xl)); top: calc(-1 * var(--mars-space-sm)); font-size: 0.75rem; writing-mode: vertical-rl; }
+.d-broadcast .bug {
+  display: block; position: absolute; top: var(--mars-space-sm); right: 0;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; color: var(--mars-color-teal);
+  border: 2px solid var(--mars-color-teal); border-radius: var(--mars-radius-sm); padding: 0 var(--mars-space-xs);
+}
+.bug { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .d-broadcast .card:hover { animation: vhs 360ms steps(3, end) 1; }
+  .d-broadcast .card:hover .card-title { animation: vhs-title 360ms steps(3, end) 1; }
+}
+.d-broadcast .card:hover {
+  box-shadow: calc(-1 * var(--mars-shadow-offset-sm)) 0 0 0 var(--mars-color-teal),
+              var(--mars-shadow-offset-lg) var(--mars-shadow-offset-lg) 0 0 var(--mars-color-magenta);
+}
+@keyframes vhs {
+  0% { transform: translateX(0); }
+  33% { transform: translateX(-2px); }
+  66% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+@keyframes vhs-title {
+  0%, 100% { text-shadow: none; }
+  33% { text-shadow: -2px 0 0 var(--mars-color-teal), 2px 0 0 var(--mars-color-magenta); }
+  66% { text-shadow: 2px 0 0 var(--mars-color-teal), -2px 0 0 var(--mars-color-magenta); }
+}
+
+/* ---------- Comparison toggles (page controls below the intro) ---------- */
+/* Candidate palettes, mockup only. Same token roles as theme_tokens.py; every text pair checked
+   at >= 4.5:1 (weakest: Wired text_muted on panel 6.8, Signal OVA signal red on panel 5.2).
+   A chosen palette moves into theme_tokens.py and TEXT_PAIRS; these literals never ship. */
+:root { --mock-subtitle: #FFE45C; }
+:root[data-palette="wired"] {
+  --mars-color-bg: #0E1311; --mars-color-panel: #18211D; --mars-color-ink: #050807;
+  --mars-color-text: #E6EFD9; --mars-color-text-muted: #9BAA9F;
+  --mars-color-sunset: #FFB547; --mars-color-on-sunset: #0E1311; --mars-color-magenta: #FF5C5C;
+  --mars-color-sakura: #F2E3B3; --mars-color-teal: #7CF0A0; --mars-color-focus: #F2E3B3;
+  --mars-color-tier-top: #7CF0A0; --mars-color-tier-strong: #F2E3B3;
+  --mars-color-tier-good: #FFB547; --mars-color-tier-look: #A3B0A6;
+  --mock-subtitle: #FFE45C;
+}
+:root[data-palette="ova"] {
+  --mars-color-bg: #110D14; --mars-color-panel: #1E1823; --mars-color-ink: #050307;
+  --mars-color-text: #F4ECE2; --mars-color-text-muted: #B0A6B8;
+  --mars-color-sunset: #FF4A4A; --mars-color-on-sunset: #110D14; --mars-color-magenta: #FF4A4A;
+  --mars-color-sakura: #FFD84A; --mars-color-teal: #4FD3E6; --mars-color-focus: #FFD84A;
+  --mars-color-tier-top: #4FD3E6; --mars-color-tier-strong: #FFD84A;
+  --mars-color-tier-good: #FF8F5A; --mars-color-tier-look: #A9A0B4;
+  --mock-subtitle: #FFD84A;
+}
+:root[data-font="mincho"] {
+  --mars-font-display: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', 'Times New Roman', serif;
+}
+[data-font="mincho"] :is(.wordmark, .section-head h2, .group-label, .kana, .page-head h1, .direction > h2) {
+  font-weight: 800;
+}
+/* Fansub-style subtitle: yellow text with a hard ink outline, as on 90s VHS releases. */
+[data-explain="subtitle"] .explain {
+  color: var(--mock-subtitle);
+  font-weight: 700;
+  font-size: 1rem;
+  text-shadow: -1px -1px 0 var(--mars-color-ink), 1px -1px 0 var(--mars-color-ink),
+               -1px 1px 0 var(--mars-color-ink), 1px 1px 0 var(--mars-color-ink),
+               0 2px 0 var(--mars-color-ink);
+}
+
+.controls {
+  display: flex; flex-wrap: wrap; gap: var(--mars-space-md); max-width: 1440px; margin: 0 auto var(--mars-space-lg);
+  position: sticky; top: 0; z-index: 2;
+  background: var(--mars-color-bg); padding: var(--mars-space-sm) 0;
+  border-bottom: var(--mars-border-thin) solid var(--mars-color-ink);
+}
+.controls fieldset {
+  border: var(--mars-border-thin) solid var(--mars-color-text-muted); border-radius: var(--mars-radius-sm);
+  margin: 0; padding: var(--mars-space-xs) var(--mars-space-sm) var(--mars-space-sm);
+  display: flex; flex-wrap: wrap; gap: var(--mars-space-xs);
+}
+.controls legend { font-size: 0.75rem; color: var(--mars-color-text-muted); padding: 0 var(--mars-space-xs); }
+.controls label { cursor: pointer; }
+.controls input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.controls label span {
+  display: inline-block; font-size: 0.85rem; color: var(--mars-color-text);
+  border: var(--mars-border-thin) solid var(--mars-color-text-muted); border-radius: var(--mars-radius-pill);
+  padding: 2px var(--mars-space-md);
+}
+.controls label .swatches { display: inline-flex; gap: 2px; margin-left: var(--mars-space-xs); vertical-align: middle; border: 0; padding: 0; }
+.controls input:checked + span { background: var(--mars-color-sunset); color: var(--mars-color-on-sunset); border-color: var(--mars-color-sunset); font-weight: 700; }
+.controls input:focus-visible + span { outline: 3px solid var(--mars-color-focus); outline-offset: 2px; }
+.swatches i { width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--mars-color-ink); }
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <h1>MARS redesign mockups</h1>
+  <p>Task 1.3: three intensities of Direction A (cel title card at night), each at desktop and
+  phone (390 px) width. Same content in all six frames. The content is real app output for the
+  seed Steins;Gate (first card, local run 2026-10-19). The poster is a placeholder block.</p>
+  <p>Pick one direction, or a mix (for example the Title card base plus katakana accents), and
+  record it in <code>docs/decisions.md</code>. In the Full broadcast frames, hover the card to
+  see the VHS hover, which turns into a static offset under reduced motion.</p>
+  <p>The toggles below change every frame at once: three dark palettes (all text pairs at
+  4.5:1 or better), the display face, and a fansub-style subtitle for the explanation line. The
+  combination is kept in the URL, so a link brings back the same view.</p>
+  <nav aria-label="Directions">
+    <a href="#subtle">1 · Subtle</a>
+    <a href="#title-card">2 · Title card</a>
+    <a href="#broadcast">3 · Full broadcast</a>
+  </nav>
+</header>
+  <form class="controls" aria-label="Compare options">
+    <fieldset>
+      <legend>Palette</legend>
+      <label><input type="radio" name="palette" value="sunset" checked><span>Sunset night <span class="swatches" aria-hidden="true"><i style="background:#1B1F3B"></i><i style="background:#FF7A45"></i><i style="background:#E8417A"></i><i style="background:#3FB8AF"></i></span></span></label>
+      <label><input type="radio" name="palette" value="wired"><span>Wired <span class="swatches" aria-hidden="true"><i style="background:#0E1311"></i><i style="background:#FFB547"></i><i style="background:#7CF0A0"></i><i style="background:#FF5C5C"></i></span></span></label>
+      <label><input type="radio" name="palette" value="ova"><span>Signal OVA <span class="swatches" aria-hidden="true"><i style="background:#110D14"></i><i style="background:#FF4A4A"></i><i style="background:#4FD3E6"></i><i style="background:#FFD84A"></i></span></span></label>
+    </fieldset>
+    <fieldset>
+      <legend>Display font</legend>
+      <label><input type="radio" name="font" value="gothic" checked><span>Dela Gothic One</span></label>
+      <label><input type="radio" name="font" value="mincho"><span>Shippori Mincho</span></label>
+    </fieldset>
+    <fieldset>
+      <legend>Explanation line</legend>
+      <label><input type="radio" name="explain" value="plain" checked><span>Plain</span></label>
+      <label><input type="radio" name="explain" value="subtitle"><span>Subtitle</span></label>
+    </fieldset>
+  </form>
+
+<section class="direction" id="subtle" data-dir="d-subtle">
+  <h2>1 · Subtle</h2>
+  <p>Palette and type only. Night navy, cel cream text, Dela Gothic One wordmark, M PLUS Rounded
+  body. Thin borders, no hard shadows, no texture. Closest to today's layout.</p>
+  <div class="frames"></div>
+</section>
+
+<section class="direction" id="title-card" data-dir="d-title">
+  <h2>2 · Title card</h2>
+  <p>Adds an outlined display wordmark with a magenta offset, episode-style section headers
+  ("EP.01 Find", "EPISODE 01" title card), 3 px ink outlines and hard offset shadows on cards,
+  buttons and tags, and press-to-translate feedback.</p>
+  <div class="frames"></div>
+</section>
+
+<section class="direction" id="broadcast" data-dir="d-broadcast">
+  <h2>3 · Full broadcast</h2>
+  <p>Title card plus scanlines (CSS only, 6% opacity, on the main background and never behind
+  text), a VHS chroma-split hover on the card, katakana accents (decorative,
+  <code>aria-hidden</code>) and a channel bug in the header corner.</p>
+  <div class="frames"></div>
+</section>
+
+<template id="app">
+  <div class="app">
+    <aside class="sidebar" aria-label="Sidebar (top)">
+      <p class="group-label"><span class="ep">EP.01</span> Find <span class="kana" aria-hidden="true">サーチ</span></p>
+      <p class="field-label">What do you want?</p>
+      <div class="radio on"><span class="dot"></span>Similar to a title</div>
+      <div class="radio"><span class="dot"></span>For me</div>
+      <div class="radio"><span class="dot"></span>Browse</div>
+      <p class="field-label">Pick 1–5 titles you like</p>
+      <div class="select"><span class="chip" tabindex="0">Steins;Gate ✕</span><span class="caret">▾</span></div>
+      <div class="try">Try:
+        <button class="tag" type="button">Steins;Gate</button>
+        <button class="tag" type="button">Your Name</button>
+        <button class="tag" type="button">Cowboy Bebop</button>
+      </div>
+    </aside>
+    <div class="collapsed-bar">› Sidebar (collapsed at phone width)</div>
+    <div class="main">
+      <div class="header">
+        <span class="bug" aria-hidden="true">CH 01</span>
+        <p class="wordmark">MARS<span class="kana" aria-hidden="true">マーズ</span></p>
+        <p class="tagline">Find anime like the ones you love</p>
+        <div class="header-row">
+          <span>Showing picks for <strong>Steins;Gate</strong> — pick your own titles in the sidebar</span>
+          <span class="btn-row"><button class="btn" type="button">How it works</button><button class="btn" type="button" aria-label="Dismiss">✕</button></span>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <span class="ep-tag">EPISODE 01</span>
+        <h2>Similar to Steins;Gate</h2>
+        <span class="kana" aria-hidden="true">オススメ</span>
+      </div>
+      <p class="count"><strong>10 recommendations</strong> <span>of 13,062</span></p>
+      <div class="mix">RECOMMENDATION MIX · Popular 1 · Mid 9 · Hidden gems 0
+        <div class="mix-bar" aria-hidden="true"><i></i><i></i></div>
+      </div>
+
+      <article class="card">
+        <div class="card-top">
+          <div class="poster" role="img" aria-label="Serial Experiments Lain (poster placeholder)">Serial Experiments Lain<br>poster</div>
+          <div>
+            <h3 class="card-title">Serial Experiments Lain <span class="badge" title="Top match: ranked in the top tier of this result set">Top match</span><span class="rank">#1</span></h3>
+            <p class="explain">Shares Drama and Sci-Fi with Steins;Gate · fans of Steins;Gate also rate it highly · a well-known pick</p>
+            <p class="alt">シリアルエクスペリメンツレイン</p>
+            <p class="meta"><span class="score">★ 8.10</span> · TV · 13 eps · 1998 · Finished Airing · Original</p>
+            <div class="genres">
+              <button class="tag" type="button">Avant Garde</button>
+              <button class="tag" type="button">Award Winning</button>
+              <button class="tag" type="button">Drama</button>
+              <button class="tag" type="button">Mystery</button>
+              <button class="tag" type="button">Sci-Fi</button>
+            </div>
+          </div>
+        </div>
+        <p class="synopsis">Lain Iwakura, an awkward and introverted fourteen-year-old, is one of the many girls from her school to receive a disturbing email from her classmate Chisa Yomoda—the very same Chisa who recently committed suicide. Lain has neither the desire nor the experience to handle even bas...</p>
+        <div class="card-foot">
+          <span class="t">Trained</span><span class="p">Top 10%</span><span class="n">Novelty NA</span>
+          <button class="btn" type="button">+ Add to Seeds</button>
+        </div>
+        <div class="details"><span>More details</span><span aria-hidden="true">▾</span></div>
+      </article>
+    </div>
+  </div>
+</template>
+
+<script>
+  // Toggle state lives in the URL hash so a combination can be shared or bookmarked.
+  const root = document.documentElement;
+  const form = document.querySelector(".controls");
+  const apply = () => {
+    const state = new FormData(form);
+    ["palette", "font", "explain"].forEach((k) => { root.dataset[k] = state.get(k); });
+    history.replaceState(null, "", "#" + new URLSearchParams(state).toString());
+  };
+  new URLSearchParams(location.hash.slice(1)).forEach((v, k) => {
+    const input = form.querySelector(`input[name="${k}"][value="${CSS.escape(v)}"]`);
+    if (input) input.checked = true;
+  });
+  form.addEventListener("change", apply);
+  apply();
+
+  const tpl = document.getElementById("app");
+  document.querySelectorAll(".direction").forEach((section) => {
+    const frames = section.querySelector(".frames");
+    [["desktop", "Desktop (main area at 1440 × 900)"], ["phone", "Phone (390 px)"]].forEach(([kind, label]) => {
+      const wrap = document.createElement("div");
+      wrap.className = `frame-wrap ${kind}`;
+      wrap.innerHTML = `<div class="frame-label">${label}</div>`;
+      const frame = document.createElement("div");
+      frame.className = `frame ${section.dataset.dir}`;
+      frame.appendChild(tpl.content.cloneNode(true));
+      wrap.appendChild(frame);
+      frames.appendChild(wrap);
+    });
+  });
+</script>
+</body>
+</html>

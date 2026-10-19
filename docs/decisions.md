@@ -5,6 +5,54 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-19 — Redesign direction: Subtle, Signal OVA palette, Mincho titles, subtitle line
+
+**Status:** Adopted (owner pick). Source: Task 1.3 of
+[MARS_UI_REDESIGN_PLAN.md](plans/MARS_UI_REDESIGN_PLAN.md); mockups in
+[redesign/mockups/index.html](redesign/mockups/index.html), view
+`#palette=ova&font=mincho&explain=subtitle`, Subtle frames.
+
+**Context.** Task 1.1 had settled on direction A (cel title card at night). Task 1.3 drew the
+header, a real card (Serial Experiments Lain, the first result for the Steins;Gate seed) and
+the top of the sidebar at three intensities. Subtle has palette and type only. Title card adds
+an outlined wordmark, episode-style headers and hard offset shadows. Full broadcast adds
+scanlines, a VHS hover and katakana. A second round added toggles for three dark palettes,
+two display faces and two explanation-line styles.
+
+**Decision.**
+- **Intensity: Subtle.** No hard shadows, outlined display type, episode headers, scanlines,
+  VHS motion or decorative katakana.
+- **Palette: Signal OVA.** Plum-black background `#110D14`, panel `#1E1823`, signal red
+  `#FF4A4A`, cyan `#4FD3E6`, fansub yellow `#FFD84A`. It replaces Sunset night (navy, sunset,
+  magenta, sakura, teal).
+- **Display face: Shippori Mincho B1 (800)** in place of Dela Gothic One.
+- **Explanation line: subtitle style.** Yellow, bold, with a 1 px ink outline, like a 90s VHS
+  fansub. It's the only stylized text on the card.
+
+Tokens (`src/app/theme_tokens.py`), the generated `app/styles/tokens.css` and
+`design-system/mars/MASTER.md` were updated in the same change. The color roles were renamed
+to fit the palette: `sunset` → `signal`, `sakura` → `subtitle`, `teal` → `cyan`. `magenta` is
+gone. The shape and texture tokens for hard shadows, the 3 px border and scanlines were removed.
+
+**Why.** The era comes through palette, the serif title face and one signature detail. Texture
+and heavy framing don't add much on top of that. Subtle is also the cheapest and safest of the
+three: no texture or motion to fit within the first-card budget or reduced-motion rules, and
+nothing to break when Streamlit reflows columns at phone width. The subtitle line makes the
+plain-language explanation the second thing a visitor reads on each card, which is what Task 2.4
+asks for. Signal OVA is the darkest of the three palettes and the most specific to late-90s
+OVAs. Its yellow doubles as the subtitle color. All its text pairs pass 4.5:1 (weakest: signal
+red on panel, 5.2). The tiers avoid red, so "Good match" doesn't read as an error. Mincho reads
+as a title card; Dela Gothic One reads as more playful and more recent.
+
+**Ruled out for later tasks.** Task 2.3: the outlined wordmark with an offset shadow, and the
+episode-style title cards. Task 2.4: the 3 px border and hard-shadow card. All of Task 2.6
+(scanlines, VHS hover). The plan's checklists were amended to match.
+
+**What would change this.** At real size the app reads as a generic dark theme rather than 90s
+anime. Then add back the episode-style section headers first, since they're the cheapest piece
+of Title card with no motion or texture. Or the subtitle line tests poorly for readability over
+a long result list; then fall back to a plain `text` sentence with a yellow left rule.
+
 ## 2026-10-19 — UI UX Pro Max skill files are not committed; its design-system output is
 
 **Status:** Adopted. Source: Task 0.1 of

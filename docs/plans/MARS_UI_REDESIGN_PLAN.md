@@ -308,15 +308,15 @@ start docs/redesign/mockups/index.html    # visual: three directions side by sid
 
 **Checklist:**
 
-- [ ] `docs/redesign/mockups/index.html`: one static page using `tokens.css`, showing the header,
+- [x] `docs/redesign/mockups/index.html`: one static page using `tokens.css`, showing the header,
       one result card, and the sidebar top in three intensities: **Subtle** (palette + type
       only), **Title card** (adds outlined display type, episode-style section headers, hard
       shadows), **Full broadcast** (adds scanlines, a VHS-style hover, katakana accents)
-- [ ] Real content from the app (Steins;Gate seed, one real explanation sentence) with a
+- [x] Real content from the app (Steins;Gate seed, one real explanation sentence) with a
       placeholder poster block, not a real poster file
-- [ ] **Owner:** pick one direction (or a mix) and record it in `docs/decisions.md`; MASTER.md
+- [x] **Owner:** pick one direction (or a mix) and record it in `docs/decisions.md`; MASTER.md
       updated to match
-- [ ] Mockups are reference only; nothing under `docs/redesign/mockups/` is loaded by the app
+- [x] Mockups are reference only; nothing under `docs/redesign/mockups/` is loaded by the app
 
 ---
 
@@ -379,7 +379,7 @@ load through the stylesheet.
 
 ```
 python scripts/build_theme.py
-streamlit run app/main.py   # visual: dark night-navy theme, rounded body font, display font on headings, katakana renders
+streamlit run app/main.py   # visual: dark plum-black theme, rounded body font, Mincho display font on headings, Japanese alt titles render
 $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 ruff check src/ tests/ app/
 ```
@@ -388,7 +388,7 @@ ruff check src/ tests/ app/
 
 - [ ] `config.toml` `[theme]`: `base = "dark"`, primary, background, secondary background, text
       from tokens (generated, not hand-edited)
-- [ ] `base.css`: Google Fonts `@import` for Dela Gothic One and M PLUS Rounded 1c (400, 700)
+- [ ] `base.css`: Google Fonts `@import` for Shippori Mincho B1 (800) and M PLUS Rounded 1c (400, 700)
       with `display=swap`; body and widget text use the body stack; headings use the display
       stack; every stack ends in a system fallback
 - [ ] Code blocks and the reviewer panels (Scoring details) keep a monospace stack
@@ -419,11 +419,11 @@ python scripts/check_live_app.py --url http://localhost:8501   # exit 0
 
 **Checklist:**
 
-- [ ] MARS wordmark in the display face with outline and hard offset shadow; subtitle per mode
-      unchanged in wording; an optional katakana sub-line is decorative (`aria-hidden="true"`)
+- [ ] MARS wordmark in the display face, plain (no outline, no offset shadow, no katakana:
+      Task 1.3 decision); subtitle per mode unchanged in wording
 - [ ] `title_card(label, text)` helper in `app/display.py` (pure, returns HTML) used for result
-      section headers; the "N recommendations" string stays present and readable as text, not
-      baked into decoration
+      section headers, set in the display face without episode-style framing (Task 1.3); the
+      "N recommendations" string stays present and readable as text, not baked into decoration
 - [ ] The dismissible intro line from portfolio Task 1.1 restyled, behavior unchanged
 - [ ] Tests: `title_card` output contains the plain text and no inline styles; header helper
       tests updated only where markup (not wording) changed
@@ -458,13 +458,14 @@ python scripts/check_live_app.py --url http://localhost:8501   # exit 0
 
 **Checklist:**
 
-- [ ] Card: 3 px border, hard offset shadow, flat panel color, poster with a thin cel outline;
-      title in the body face bold (display face is for headers only, it is too heavy at card
-      size)
+- [ ] Card: 1 px ink border, no shadow, flat panel color (Task 1.3 chose Subtle), poster with a
+      thin ink outline; title in the body face bold (display face is for headers only, it is
+      too heavy at card size)
 - [ ] Match badge restyled as a small "broadcast tag"; tier colors from tokens; rank ("#1") kept;
       tooltip text unchanged
-- [ ] Explanation sentence directly under the title, body size, cream on panel (in
-      `TEXT_PAIRS`); "More details" and the signal breakdown keep their current content
+- [ ] Explanation sentence directly under the title in the subtitle style from MASTER.md
+      (`subtitle` yellow on panel, in `TEXT_PAIRS`, bold, 1 px ink outline); "More details" and
+      the signal breakdown keep their current content
 - [ ] Poster `<img>` keeps a meaningful `alt` (the title) and stays a real `img` element (the
       live check depends on it)
 - [ ] Rating buttons for demo profiles stay visibly disabled (portfolio Task 1.6)
@@ -477,7 +478,7 @@ python scripts/check_live_app.py --url http://localhost:8501   # exit 0
 ## Task 2.5: Sidebar Styling
 
 **Why:** The sidebar order from portfolio Task 1.2 (Find → Refine → Personalize → Advanced) is
-right; it just looks like default Streamlit. Group labels styled as small title cards make the
+right; it just looks like default Streamlit. Group labels styled from tokens make the
 structure scannable.
 
 **Preflight Files:**
@@ -507,6 +508,9 @@ streamlit run app/main.py   # visual: four labelled groups; Advanced collapsed; 
 ---
 
 ## Task 2.6: Texture and Motion
+
+**Status:** Ruled out by the Task 1.3 decision (Subtle intensity; `docs/decisions.md`,
+2026-10-19). Skip unless that decision is revisited.
 
 **Why:** Scanlines and a VHS-style hover are what make it feel like a broadcast rather than a
 dark theme. They are also the part most likely to hurt readability and accessibility, so they
