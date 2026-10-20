@@ -176,3 +176,16 @@ def test_genre_buttons_follow_the_genre_row_marker():
         at = _run(view)
         assert GENRE_ROW_MARKER_HTML in _markdown(at), view
         assert {b.label for b in at.button} >= {"Drama", "Sci-Fi"}, view
+
+
+def test_card_flags_hide_routine_states_and_use_plain_words():
+    # Audit F7: "Trained" and "Novelty NA" sat on every card in seed mode.
+    from src.app.components.cards import card_flags
+
+    routine = card_flags({"cold_start": False, "popularity_band": "Top 10%", "novelty_ratio": None})
+    assert routine == [("Popular", "info")]
+    flags = card_flags({"cold_start": True, "popularity_band": "Long Tail", "novelty_ratio": 0.8})
+    assert [label for label, _ in flags] == ["Few ratings", "Hidden gem", "New genres for you"]
+    assert card_flags({"cold_start": False, "popularity_band": "Mid", "novelty_ratio": 0.2})[-1][0] == "Familiar genres"
+    for label, _ in routine + flags:
+        assert not any(word in label for word in ("Trained", "Cold-start", "Novelty", "NA"))

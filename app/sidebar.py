@@ -480,7 +480,7 @@ def _render_personalization_section(bundle: dict, metadata) -> bool:
 
     if ui_mode != "Personalized":
         st.caption("Switch to **For me** to rank by your rated history.")
-        st.caption("Novelty remains **NA** without rated profile history.")
+        st.caption("Genre novelty is shown only with a rated profile.")
         st.session_state["personalization_enabled"] = False
         st.session_state["personalization_blocked_reason"] = None
     else:

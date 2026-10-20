@@ -21,11 +21,11 @@ FAQ_MD_RANKED = """
 
 **Seeds (1–5):** selecting multiple seeds blends their signals to broaden discovery.
 
-**Personalization:** requires rated history in your active profile. If you have no ratings (or no MF overlap), personalization is unavailable and novelty is **NA**. The app does not silently switch modes.
+**Personalization:** requires rated history in your active profile. If you have no ratings (or no MF overlap), personalization is unavailable and the genre-novelty flag is hidden. The app does not silently switch modes.
 
 **Component shares:** when shown, MF / Pop (etc.) reflect the components actually used for that item.
 
-**Cold-start badge:** means the title is not in the MF model’s training set; some scoring/explanations may be limited.
+**Few ratings badge:** the title is not in the MF model’s training set (cold-start), so it is matched on content and popularity; some explanations may be limited.
 
 **Performance:** see the sidebar panel or Scoring details for the most recent ranking timing.
 """

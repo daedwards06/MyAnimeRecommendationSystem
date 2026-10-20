@@ -21,12 +21,12 @@ def explain_cold_start(is_cold_start: bool) -> str:
     """
     if is_cold_start:
         return (
-            "**Cold-Start Item**: This anime was not present in the training dataset interactions. "
-            "Recommendation is based purely on content features (genres, synopsis) and popularity priors."
+            "**Few ratings**: Too few viewers have rated this title for the rating-based models, "
+            "so it is matched on its genres, synopsis and popularity."
         )
     return (
-        "**Not Cold-Start**: This anime has historical user ratings/interactions in the training set, "
-        "enabling collaborative filtering signals."
+        "**Rated by viewers**: Enough viewers have rated this title for the rating-based models "
+        "to score it."
     )
 
 
@@ -79,20 +79,17 @@ def explain_novelty_ratio(ratio: float) -> str:
     str
         Explanation text suitable for tooltip/expander display.
     """
-    if ratio >= 0.7:
-        level = "High"
-        desc = "introduces many genres outside your typical preferences—great for exploration!"
-    elif ratio >= 0.4:
-        level = "Moderate"
-        desc = "balances familiar genres with some new ones."
-    else:
-        level = "Low"
-        desc = "stays close to genres you've already enjoyed—comfort zone pick."
-
+    label, _ = novelty_flag(ratio)
     return (
-        f"**Genre Novelty: {level} ({ratio:.2f})**: This recommendation {desc} "
-        f"Novelty is measured as the proportion of item genres not heavily represented in your profile."
+        f"**{label}**: {ratio:.0%} of its genres are outside the genres in your ratings."
     )
+
+
+def novelty_flag(ratio: float) -> tuple[str, str]:
+    """Card flag (label, tone) for a genre novelty ratio."""
+    if ratio > 0.6:
+        return "New genres for you", "purple"
+    return "Familiar genres", "primary"
 
 
 def format_badge_tooltip(badge_key: str, badge_value) -> str:
@@ -117,8 +114,8 @@ def format_badge_tooltip(badge_key: str, badge_value) -> str:
     elif badge_key == "novelty_ratio":
         if badge_value is None:
             return (
-                "**Genre Novelty: NA**: Novelty is only computed when a rated profile is active. "
-                "Load a profile and rate a few anime to enable novelty vs your history."
+                "**Genre novelty**: Only shown with a rated profile, measured against the genres "
+                "you have rated."
             )
         return explain_novelty_ratio(float(badge_value))
     return f"Badge: {badge_key} = {badge_value}"
@@ -129,4 +126,5 @@ __all__ = [
     "explain_novelty_ratio",
     "explain_popularity_band",
     "format_badge_tooltip",
+    "novelty_flag",
 ]

@@ -10,7 +10,7 @@ import streamlit as st
 
 from src.app.badges import badge_payload, band_label
 from src.app.components.rating import render_quick_rating_buttons
-from src.app.components.tooltips import format_badge_tooltip
+from src.app.components.tooltips import format_badge_tooltip, novelty_flag
 from src.app.score_semantics import (
     MATCH_TIERS,
     SCORE_LABEL_SHORT,
@@ -106,6 +106,18 @@ def _clean_url(value) -> str | None:
     if not value.startswith(("http://", "https://")):
         return None
     return value
+
+
+def card_flags(badges: dict) -> list[tuple[str, str]]:
+    """(label, tone) per card flag, in plain words; "rated by viewers" and "no profile" show nothing."""
+    flags: list[tuple[str, str]] = []
+    if badges.get("cold_start"):
+        flags.append(("Few ratings", "warn"))
+    flags.append((band_label(badges["popularity_band"]), "info"))
+    novelty = badges.get("novelty_ratio")
+    if novelty is not None:
+        flags.append(novelty_flag(float(novelty)))
+    return flags
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -422,21 +434,12 @@ def render_card(
                 unsafe_allow_html=True,
             )
 
-        # Badges row - compact
+        # Badges row - compact. Routine flags (rated, no profile) are left off (audit F7).
+        flags = card_flags(badges)
         badge_cols = st.columns([1, 1, 1, 2])
-        with badge_cols[0]:
-            lbl = "Cold-start" if badges['cold_start'] else "Trained"
-            tone = "warn" if badges['cold_start'] else "success"
-            st.markdown(flag_html(lbl, tone), unsafe_allow_html=True)
-        with badge_cols[1]:
-            st.markdown(flag_html(band_label(badges['popularity_band']), "info"), unsafe_allow_html=True)
-        with badge_cols[2]:
-            nov_val = badges.get('novelty_ratio')
-            if nov_val is None:
-                st.markdown(flag_html("Novelty NA", "muted", strong=False), unsafe_allow_html=True)
-            else:
-                tone = "purple" if float(nov_val) > 0.6 else "primary"
-                st.markdown(flag_html(f"Novelty {float(nov_val):.2f}", tone), unsafe_allow_html=True)
+        for col, (label, tone) in zip(badge_cols[:3], flags, strict=False):
+            with col:
+                st.markdown(flag_html(label, tone), unsafe_allow_html=True)
         with badge_cols[3]:
             # "Add to Seeds" or "Already in seeds"
             current_ids = st.session_state.get("selected_seed_ids", [])
@@ -477,12 +480,11 @@ def render_card(
                     st.markdown(f"**Watch on:** {stream_html}", unsafe_allow_html=True)
 
             # Badge tooltips
-            cs_tooltip = format_badge_tooltip("cold_start", badges['cold_start'])
-            pop_tooltip = format_badge_tooltip("popularity_band", badges['popularity_band'])
-            nov_tooltip = format_badge_tooltip("novelty_ratio", badges.get('novelty_ratio'))
-            st.caption(cs_tooltip)
-            st.caption(pop_tooltip)
-            st.caption(nov_tooltip)
+            if badges['cold_start']:
+                st.caption(format_badge_tooltip("cold_start", True))
+            st.caption(format_badge_tooltip("popularity_band", badges['popularity_band']))
+            if badges.get('novelty_ratio') is not None:
+                st.caption(format_badge_tooltip("novelty_ratio", badges['novelty_ratio']))
 
             signal_breakdown = rec.get("signal_breakdown")
             if signal_breakdown:
