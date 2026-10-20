@@ -107,9 +107,41 @@ def render_intro_section(
     seed_titles: list[str],
     *,
     default_seed_title: str | None = None,
+    profile_name: str | None = None,
 ) -> None:
     """Render the dismissible one-line intro under the header."""
-    render_intro_line(ui_mode, seed_titles, default_seed_title=default_seed_title)
+    render_intro_line(
+        ui_mode, seed_titles, default_seed_title=default_seed_title, profile_name=profile_name
+    )
+
+
+def profile_display_name(profile: dict | None) -> str | None:
+    """A demo profile's label, else the username; None without a profile."""
+    if not profile:
+        return None
+    return profile.get("label") or profile.get("username") or None
+
+
+def ranked_section_title(
+    ui_mode: str, seed_titles: list[str], *, profile_name: str | None = None
+) -> str:
+    """Results title for the ranked modes; For me names both the profile and the seeds."""
+    if seed_titles:
+        if len(seed_titles) == 1:
+            seed_display = seed_titles[0]
+        else:
+            seed_display = ", ".join(seed_titles[:3])
+            if len(seed_titles) > 3:
+                seed_display += f" +{len(seed_titles) - 3} more"
+    else:
+        seed_display = ""
+    if ui_mode == "Personalized" and profile_name:
+        if seed_display:
+            return f"For {profile_name} · anchored on {seed_display}"
+        return f"For {profile_name}"
+    if seed_display:
+        return f"Similar to {seed_display}" if len(seed_titles) == 1 else f"Blended from {seed_display}"
+    return "Your Recommendations" if ui_mode == "Personalized" else "Recommendations"
 
 
 # ── Results rendering ────────────────────────────────────────────────────────

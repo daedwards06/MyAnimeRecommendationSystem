@@ -29,6 +29,8 @@ if root_str not in sys.path:
 # ── Project imports ──────────────────────────────────────────────────────────
 from app.display import (
     ENGINE_UNAVAILABLE_TEXT,
+    profile_display_name,
+    ranked_section_title,
     render_artifact_notice,
     render_empty_results,
     render_empty_state,
@@ -142,6 +144,8 @@ sidebar_state = render_sidebar(
     clear_cache_fn=getattr(init_bundle, "clear", None),
 )
 
+_profile_name = profile_display_name(st.session_state.get("active_profile"))
+
 with intro_slot.container():
     render_intro_section(
         sidebar_state.ui_mode,
@@ -149,6 +153,7 @@ with intro_slot.container():
         default_seed_title=(
             DEFAULT_SEED_TITLE if st.session_state.get("_default_seed_active", False) else None
         ),
+        profile_name=_profile_name,
     )
 
 # ── Build recommender engine ─────────────────────────────────────────────────
@@ -192,22 +197,11 @@ elif (
     render_personalized_gate(pipeline_result.personalized_gate_reason)
 
 else:
-    if sidebar_state.selected_seed_ids and sidebar_state.selected_seed_titles:
-        if len(sidebar_state.selected_seed_titles) == 1:
-            section_title = f"Similar to {sidebar_state.selected_seed_titles[0]}"
-        else:
-            seed_display = ", ".join(sidebar_state.selected_seed_titles[:3])
-            if len(sidebar_state.selected_seed_titles) > 3:
-                seed_display += (
-                    f" +{len(sidebar_state.selected_seed_titles) - 3} more"
-                )
-            section_title = f"Blended from {seed_display}"
-    else:
-        section_title = (
-            "Your Recommendations"
-            if sidebar_state.ui_mode == "Personalized"
-            else "Recommendations"
-        )
+    section_title = ranked_section_title(
+        sidebar_state.ui_mode,
+        list(sidebar_state.selected_seed_titles or []) if sidebar_state.selected_seed_ids else [],
+        profile_name=_profile_name,
+    )
 
 # ── Results / empty state ────────────────────────────────────────────────────
 if section_title and not pipeline_result.recs:

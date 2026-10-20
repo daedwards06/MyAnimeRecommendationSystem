@@ -6,7 +6,13 @@ import re
 
 import pytest
 
-from app.display import header_html, header_text, title_card
+from app.display import (
+    header_html,
+    header_text,
+    profile_display_name,
+    ranked_section_title,
+    title_card,
+)
 from src.app.components.instructions import intro_line, intro_line_html
 
 FMAB = "Fullmetal Alchemist: Brotherhood"
@@ -74,3 +80,33 @@ def test_intro_line_html_matches_markdown_wording():
         "Seed-based", [FMAB], default_seed_title=FMAB
     ).replace("**", "")
     assert "style=" not in html
+
+
+def test_intro_line_names_the_active_profile_in_for_me_mode():
+    # Audit F2: the load-a-profile hint stayed up with a demo profile loaded.
+    line = intro_line("Personalized", [FMAB], default_seed_title=FMAB, profile_name="Action Adventurer")
+    assert line.startswith("Ranked for **Action Adventurer**")
+    assert "Load a rated profile" not in line
+    assert "Load a rated profile" in intro_line("Personalized", [FMAB], profile_name=None)
+
+
+def test_profile_display_name_prefers_demo_label():
+    assert profile_display_name({"username": "demo_x", "label": "Action Adventurer"}) == "Action Adventurer"
+    assert profile_display_name({"username": "Relentless649"}) == "Relentless649"
+    assert profile_display_name(None) is None
+
+
+@pytest.mark.parametrize(
+    ("ui_mode", "seeds", "profile", "title"),
+    [
+        ("Personalized", [FMAB], "Action Adventurer", f"For Action Adventurer · anchored on {FMAB}"),
+        ("Personalized", [], "Action Adventurer", "For Action Adventurer"),
+        ("Personalized", ["A", "B", "C", "D"], "P", "For P · anchored on A, B, C +1 more"),
+        ("Personalized", [], None, "Your Recommendations"),
+        ("Seed-based", [FMAB], "Action Adventurer", f"Similar to {FMAB}"),
+        ("Seed-based", ["A", "B"], None, "Blended from A, B"),
+        ("Seed-based", [], None, "Recommendations"),
+    ],
+)
+def test_ranked_section_title(ui_mode, seeds, profile, title):
+    assert ranked_section_title(ui_mode, seeds, profile_name=profile) == title
