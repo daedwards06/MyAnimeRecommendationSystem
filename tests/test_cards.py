@@ -7,6 +7,7 @@ from streamlit.testing.v1 import AppTest
 from src.app.components.cards import (
     GENRE_ROW_MARKER_HTML,
     GRID_MARKER_HTML,
+    MAL_STAR_HTML,
     explanation_html,
     poster_html,
     score_badge_html,
@@ -201,3 +202,13 @@ def test_card_buttons_have_word_labels():
         assert {"Good 8", "Love 10", "Meh 4"} <= labels, view
         for label in labels:
             assert not any(unicodedata.category(ch) == "So" for ch in label), (view, label)
+
+
+def test_poster_caption_is_hidden_and_mal_star_is_named():
+    # A11Y_PASS follow-ups: the title was read twice, and the star as "black star".
+    html = poster_html("https://cdn.myanimelist.net/x.jpg", "Steins;Gate")
+    assert "alt='Steins;Gate'" in html
+    assert "<figure class='mars-poster-figure' role='none'>" in html
+    assert "<figcaption class='mars-poster-caption' aria-hidden='true'>" in html
+    for view in ("list", "grid"):
+        assert f"{MAL_STAR_HTML} 9." in _markdown(_run(view)), view

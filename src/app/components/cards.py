@@ -49,11 +49,14 @@ GENRE_ROW_MARKER_HTML = "<span class='mars-genre-row' aria-hidden='true'></span>
 
 
 def poster_html(src: str, title: str) -> str:
-    """Poster as a real <img> whose alt is the title (st.image in 1.38 sets alt to "0")."""
+    """Poster as a real <img> whose alt is the title (st.image in 1.38 sets alt to "0").
+
+    The caption repeats the alt, so it and the figure's name (taken from it) are hidden from
+    screen readers."""
     t = escape(title, quote=True)
     return (
-        f"<figure class='mars-poster-figure'><img class='mars-poster' src='{escape(src, quote=True)}' "
-        f"alt='{t}'><figcaption class='mars-poster-caption'>{t}</figcaption></figure>"
+        f"<figure class='mars-poster-figure' role='none'><img class='mars-poster' src='{escape(src, quote=True)}' "
+        f"alt='{t}'><figcaption class='mars-poster-caption' aria-hidden='true'>{t}</figcaption></figure>"
     )
 
 
@@ -92,6 +95,10 @@ def status_tone(status) -> str:
 def meta_span(text, tone: str, role: str | None = None) -> str:
     role_class = f" mars-meta-{role}" if role else ""
     return f'<span class="mars-tone-{tone}{role_class}">{text}</span>'
+
+
+# The star alone is read as "black star"; it is named as what it stands for.
+MAL_STAR_HTML = "<span role='img' aria-label='MAL score'>★</span>"
 
 
 def flag_html(text: str, tone: str, *, strong: bool = True) -> str:
@@ -214,7 +221,7 @@ def render_card_grid(
         # Metadata chips
         meta_parts = []
         if mal_score:
-            meta_parts.append(meta_span(f"★ {mal_score:.1f}", mal_score_tone(mal_score), "score"))
+            meta_parts.append(meta_span(f"{MAL_STAR_HTML} {mal_score:.1f}", mal_score_tone(mal_score), "score"))
 
         anime_type = row.get("type")
         if anime_type and pd.notna(anime_type):
@@ -376,7 +383,7 @@ def render_card(
             # Metadata chips
             meta_parts = []
             if mal_score:
-                meta_parts.append(meta_span(f"★ {mal_score:.2f}", mal_score_tone(mal_score), "score"))
+                meta_parts.append(meta_span(f"{MAL_STAR_HTML} {mal_score:.2f}", mal_score_tone(mal_score), "score"))
             if anime_type and pd.notna(anime_type):
                 meta_parts.append(meta_span(anime_type, "purple", "type"))
             if episodes:
