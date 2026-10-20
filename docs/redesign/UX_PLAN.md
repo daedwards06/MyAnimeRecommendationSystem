@@ -41,6 +41,7 @@ later), or **won't fix**, with the reason.
 | F15 | **The explanation line repeats the seed title.** "Shares Action with Fullmetal Alchemist: Brotherhood · fans of Fullmetal Alchemist: Brotherhood also rate it highly". | `seed_1440x900.png` cards; text built in `src/app/explanations.py` | **Defer.** The explanation text is a portfolio-plan contract with tests on its wording. Changing it belongs in a follow-up to that plan, not a restyle. |
 | F16 | **The sidebar is long before Personalize.** The Refine section always shows six controls (genre, type, year, Top N, sort, view). | `app/sidebar.py:717-853`; `seed_1440x900.png` sidebar | **Won't fix.** The portfolio plan set this IA, with Find, then Refine, then Personalize, then Advanced. Phase 2.5 makes it scan faster without moving controls. |
 | F17 | **The last pipeline time appears twice.** It shows in Advanced → Performance and again in Scoring details. | `app/sidebar.py:990-992`; `app/display.py:662-663` | **Won't fix.** Both panels are collapsed by default, are reviewer-facing, and cost the visitor nothing. |
+| F18 | **Switching to Grid does nothing until something else reruns the app.** The List/Grid radio is inside `_render_filters_display_fragment`, an `@st.fragment`. Changing it reruns only the fragment: the radio shows Grid and `view_mode` is set to `"grid"`, but the main area still shows list cards. The grid appears only after a full rerun, such as clicking "How it works". Found during Task 2.4, 2026-10-19; it was already there before that task. | `app/sidebar.py:716, 834-842`; `app/display.py:261-267`. Reproduced in a headless browser: after Grid was selected and the app was left for 180 s, it still showed 10 list cards and 0 grid cards. | **Fix in Phase 3 (3.4).** On a change, call `st.rerun()` (full scope), or move the radio out of the fragment. Keep the `view_mode` key and its values as they are. Add a test that a view change reaches `_render_cards`. |
 
 ## Phase 3 work this produces
 
@@ -49,4 +50,4 @@ later), or **won't fix**, with the reason.
 | 3.1 Loading, empty, error states | F4, F9, F10 (F14 restyle only) |
 | 3.2 Phone width | F5 |
 | 3.3 Accessibility pass | F3 (re-check), F7 (order and semantics), F11, F12 |
-| 3.4 Audit-driven fixes | F1, F2, F6, F7 (wording), F8 |
+| 3.4 Audit-driven fixes | F1, F2, F6, F7 (wording), F8, F18 |

@@ -452,7 +452,7 @@ most readable thing on the card, not compete with it.
 ```
 $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
 ruff check src/ tests/ app/
-streamlit run app/main.py   # visual: cards at 4/3/2/1 columns by width; explanation sentence is the highest-contrast text after the title
+streamlit run app/main.py   # visual: explanation sentence is the highest-contrast text after the title (responsive 4/3/2/1 grid moved to Task 3.2)
 python scripts/check_live_app.py --url http://localhost:8501   # exit 0
 ```
 
@@ -588,6 +588,7 @@ screens, but cards, outlined headings, and the sidebar toggle are where layouts 
 **Preflight Files:**
 
 - `src/app/components/cards.py` (`render_card_grid` column count)
+- `app/display.py` (`_render_cards`: the grid is a fixed `st.columns(3)` per row of three)
 - `app/styles/components.css`
 - `docs/redesign/baseline/*_390x844.png`
 
@@ -596,6 +597,7 @@ screens, but cards, outlined headings, and the sidebar toggle are where layouts 
 ```
 python scripts/capture_ui_baseline.py --url http://localhost:8501 --out docs/redesign/after_3_2
 # Visual: no horizontal scroll at 390 px; title-card text wraps without clipping; first card visible after the header
+# Visual: grid view at 4/3/2/1 columns across 1440 / 1024 / 768 / 390 px
 ```
 
 **Checklist:**
@@ -604,6 +606,9 @@ python scripts/capture_ui_baseline.py --url http://localhost:8501 --out docs/red
 - [ ] Display-type outline and shadow scale down at narrow widths so headings stay legible
 - [ ] Long titles and genre tags wrap; nothing is clipped without an accessible full value
 - [ ] Touch targets ≥ 44 px for card actions and sample-seed tags
+- [ ] Grid view is responsive at 4/3/2/1 columns by width (moved here from Task 2.4). Today
+      `_render_cards` makes a fixed `st.columns(3)` for each row of three, so the column count
+      can't change in CSS alone. The layout change keeps card order and the `view_mode` values.
 - [ ] Tests + ruff green
 
 ---
