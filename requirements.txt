@@ -7,10 +7,14 @@
 # versions with pre-built wheels for the target Python.
 # Streamlit Cloud uses Python 3.13 which requires newer
 # releases of packages with C extensions.
+# Exception: Streamlit is pinned to the version the app is
+# developed and tested on. The UI's CSS targets 1.38's
+# data-testid names, and a newer build broke the deployed
+# app on a private import. 1.38.0 has wheels for 3.13.
 ############################################################
 
 # Core Streamlit App
-streamlit>=1.38.0
+streamlit==1.38.0
 
 # Data Processing
 pandas>=2.2.2

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+from functools import lru_cache
 from html import escape
 from pathlib import Path
 
@@ -102,29 +104,31 @@ def _clean_url(value) -> str | None:
     return value
 
 
-def _local_poster_url(thumb_rel: str, image_id: str) -> str | None:
-    """Media URL for a local thumbnail (``data/processed/images/posters/*_thumb.webp``), resized
-    to 180 px as st.image did; None when the file is missing or there is no runtime."""
-    from streamlit.elements.image import image_to_url
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_IMAGE_MIME = {".webp": "image/webp", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 
-    try:
-        repo_root = Path(__file__).resolve().parents[3]
-    except Exception:
-        repo_root = Path(".").resolve()
+
+@lru_cache(maxsize=512)
+def _local_poster_url(thumb_rel: str) -> str | None:
+    """Local thumbnail (``data/processed/images/posters/*_thumb.webp``, ~15 kB) as a data URI;
+    None when the file is missing. Streamlit's media-URL helper is private and moved between
+    releases (1.38 → Cloud's newer build broke on import), so it is not used."""
     rel_path = Path(str(thumb_rel))
-    img_path = rel_path if rel_path.is_absolute() else repo_root / "data" / "processed" / rel_path
-    if not img_path.exists():
+    img_path = rel_path if rel_path.is_absolute() else _REPO_ROOT / "data" / "processed" / rel_path
+    mime = _IMAGE_MIME.get(img_path.suffix.lower())
+    if mime is None or not img_path.is_file():
         return None
     try:
-        return image_to_url(str(img_path), 180, False, "RGB", "auto", image_id) or None
-    except Exception:
+        data = base64.b64encode(img_path.read_bytes()).decode("ascii")
+    except OSError:
         return None
+    return f"data:{mime};base64,{data}"
 
 
 def _render_poster(thumb_rel: str | None, title_display: str, remote_url: str | None, anime_id: int):
     """Render a poster: the local thumbnail when shipped, else the MyAnimeList CDN URL (slim
     deployments do not ship the image cache), else a placeholder box."""
-    src = _local_poster_url(thumb_rel, f"mars-poster-{anime_id}") if thumb_rel else None
+    src = _local_poster_url(str(thumb_rel)) if isinstance(thumb_rel, str) and thumb_rel else None
     src = src or _clean_url(remote_url)
     if src:
         st.markdown(poster_html(src, title_display), unsafe_allow_html=True)

@@ -90,3 +90,27 @@ def test_poster_alt_is_the_escaped_title():
     html = poster_html("https://example.com/p.jpg", "Kaguya-sama: 'Love' & War")
     assert "alt='Kaguya-sama: &#x27;Love&#x27; &amp; War'" in html
     assert html.count("<img ") == 1
+
+
+def test_local_poster_is_a_data_uri_and_missing_files_fall_back(tmp_path):
+    from src.app.components.cards import _local_poster_url
+
+    thumb = tmp_path / "1_thumb.webp"
+    thumb.write_bytes(b"RIFF0000WEBP")
+    assert _local_poster_url(str(thumb)) == "data:image/webp;base64,UklGRjAwMDBXRUJQ"
+    assert _local_poster_url(str(tmp_path / "missing_thumb.webp")) is None
+
+
+def test_app_code_does_not_import_private_streamlit_modules():
+    # Cloud installs a newer Streamlit than the local 1.38 (requirements.txt floors the version);
+    # streamlit.elements.image.image_to_url moved and took the deployed app down. The style loader's
+    # get_script_run_ctx is the one allowed exception: it is still exported by current releases.
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    offenders = {
+        p.relative_to(root).as_posix()
+        for p in [*root.glob("app/**/*.py"), *root.glob("src/**/*.py")]
+        if any(m in p.read_text(encoding="utf-8") for m in ("streamlit.elements", "streamlit.runtime"))
+    }
+    assert offenders <= {"app/styles/__init__.py"}

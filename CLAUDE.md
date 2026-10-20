@@ -144,8 +144,9 @@ Apply to every task in `docs/plans/MARS_UI_REDESIGN_PLAN.md` and to any UI chang
   strings in components beyond values read from the tokens module.
 - **No `st-emotion-cache-*` selectors.** Target the app's own classes and Streamlit's
   `data-testid` attributes; generated class names change between Streamlit releases.
-- **Local Streamlit is 1.38.0** (`requirements.txt`: `>=1.38.0`); check a theming or API option
-  exists in 1.38 before relying on it.
+- **Streamlit is pinned to 1.38.0** (`requirements.txt`: `==1.38.0`, local and Cloud alike); check a
+  theming or API option exists in 1.38 before relying on it, and never import private
+  `streamlit.elements.*` modules.
 - **The eight design principles** in the plan's "Design principles for this plan" section are
   binding (first-card time budget, era not IP, contrast ≥ 4.5:1, contract-preserving, one token
   source, stable selectors, live check green, green gate). Read them before each task.
