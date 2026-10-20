@@ -20,6 +20,8 @@ from playwright.sync_api import Frame, Page
 HEADER_RE = re.compile(r"^\s*\d+ recommendations\s*$")
 POLL_S = 0.5
 
+# Posters are the app's own `img.mars-poster` since UI redesign Task 2.4 (for a real alt); the
+# `st.image` selector stays for builds deployed before it.
 # Outside the sidebar rather than inside `stMain`: older Streamlit releases have no `stMain`
 # test id, and requirements.txt only floors the version.
 _FIRST_CARD_JS = """
@@ -29,7 +31,7 @@ _FIRST_CARD_JS = """
   const header = [...document.querySelectorAll('body *')].some(
     (e) => e.children.length === 0 && re.test(e.textContent) && outsideSidebar(e)
   );
-  const poster = [...document.querySelectorAll('[data-testid=stImageContainer] img')].some(
+  const poster = [...document.querySelectorAll('[data-testid=stImageContainer] img, img.mars-poster')].some(
     (e) => e.complete && e.naturalWidth > 0 && outsideSidebar(e)
   );
   return header && poster;

@@ -68,11 +68,10 @@ Every pair used for text is listed in `TEXT_PAIRS` and tested at ≥ 4.5:1. A ne
 an existing color on a new surface, goes into `TEXT_PAIRS` in the same change.
 
 **Rollout:** since Task 2.2 the Streamlit theme (`base = "dark"`), page and sidebar surfaces, and
-all neutral text come from these tokens. The remaining pre-redesign accents (tier badges, the
-popularity and chart colors, the old primary on the explanation border and stream links) are held
-in `LIVE` in the same module and painted as `--mars-live-*`; each passes 4.5:1 on the night
-surfaces or is not used as text. Task 2.4 moves the tier colors, and `LIVE` is deleted once the
-last accent has moved.
+all neutral text come from these tokens; since Task 2.4 so do the tier badges and the card.
+The remaining pre-redesign accents (the popularity and chart colors, the old primary on stream
+links) are held in `LIVE` in the same module and painted as `--mars-live-*`; each passes 4.5:1
+on the night surfaces or is not used as text. `LIVE` is deleted once the last accent has moved.
 
 ### Typography
 

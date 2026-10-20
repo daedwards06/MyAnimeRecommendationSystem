@@ -9,6 +9,7 @@ from src.app.score_semantics import (
     format_user_friendly_score,
     match_rank,
 )
+from src.app.theme_tokens import TIER_TOKENS, TOKENS
 
 
 def test_score_semantics_constants_are_unbounded() -> None:
@@ -44,10 +45,12 @@ def test_format_user_friendly_score_uneven_run_length() -> None:
     assert labels[-1] == "Worth a look"
 
 
-def test_format_user_friendly_score_colors_unchanged() -> None:
+def test_format_user_friendly_score_tuple_contract() -> None:
     scores = [4.0, 3.0, 2.0, 1.0]
-    colors = [format_user_friendly_score(s, scores)[2] for s in scores]
-    assert colors == ["#27AE60", "#3498DB", "#E67E22", "#95A5A6"]
+    results = [format_user_friendly_score(s, scores) for s in scores]
+    assert all(isinstance(r, tuple) and len(r) == 3 and all(isinstance(x, str) for x in r) for r in results)
+    assert [r[0] for r in results] == ["Top match", "Strong match", "Good match", "Worth a look"]
+    assert [r[2] for r in results] == [TOKENS["color"][t] for t in TIER_TOKENS]
 
 
 def test_format_user_friendly_score_has_no_percentage() -> None:
@@ -68,13 +71,13 @@ def test_format_user_friendly_score_single_item() -> None:
     display, tooltip, color = format_user_friendly_score(0.75, [0.75])
     assert display == "Top match"
     assert "Rank 1 of 1" in tooltip
-    assert color == "#27AE60"
+    assert color == TOKENS["color"]["tier_top"]
 
 
 def test_format_user_friendly_score_empty_scores() -> None:
     display, tooltip, color = format_user_friendly_score(0.5, [])
     assert display == "—"
-    assert color == "#95A5A6"
+    assert color == TOKENS["color"]["tier_look"]
 
 
 def test_match_rank_is_one_based_and_ties_share_rank() -> None:

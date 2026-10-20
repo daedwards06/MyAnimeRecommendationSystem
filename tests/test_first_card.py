@@ -65,6 +65,11 @@ def test_times_out_without_first_card(page, main, sidebar):
     assert first_card.wait_for_first_card(page, timeout_s=1.2) is None
 
 
+def test_fires_with_the_apps_own_poster_img(page):
+    page.set_content(_page(HEADER + f"<figure><img class='mars-poster' src='{PIXEL}' alt='Steins;Gate'></figure>"))
+    assert first_card.wait_for_first_card(page, timeout_s=5) is not None
+
+
 def test_custom_header_pattern(page):
     page.set_content(_page("<span>40 titles</span>" + POSTER))
     header_re = re.compile(r"^\s*\d+ (recommendations|titles)\s*$")

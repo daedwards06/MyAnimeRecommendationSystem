@@ -11,7 +11,14 @@ import pytest
 import app.styles as styles
 from app.display import header_html, mix_bar_html, result_scope_html, title_card
 from app.sidebar import section_label_html
-from src.app.components.cards import flag_html, meta_span, score_badge_html
+from src.app.components.cards import (
+    CARD_MARKER_HTML,
+    explanation_html,
+    flag_html,
+    meta_span,
+    poster_html,
+    score_badge_html,
+)
 from src.app.components.instructions import intro_line_html
 from src.app.components.taste_profile import stat_row_html
 
@@ -96,6 +103,10 @@ HELPER_HTML = {
     "badge_tiered": score_badge_html(0.9, SCORES),
     "badge_compact": score_badge_html(0.3, SCORES, compact=True),
     "badge_untiered": score_badge_html(0.42, None),
+    "card_marker": CARD_MARKER_HTML,
+    "poster": poster_html("https://example.com/p.jpg", "Steins;Gate"),
+    "explanation": explanation_html("You rate Drama highly"),
+    "explanation_compact": explanation_html("You rate Drama highly", compact=True),
     "meta": meta_span("★ 8.50", "success", "score"),
     "flag": flag_html("Trained", "success"),
     "section_label": section_label_html("Find"),

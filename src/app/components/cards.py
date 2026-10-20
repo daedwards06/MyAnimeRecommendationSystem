@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -37,6 +38,24 @@ def _render_placeholder_box(label: str):
     st.markdown(f'<div class="mars-poster-placeholder">{label}</div>', unsafe_allow_html=True)
 
 
+# Hidden first element of every card container; CSS finds the card through it with :has().
+CARD_MARKER_HTML = "<span class='mars-card-marker' aria-hidden='true'></span>"
+
+
+def poster_html(src: str, title: str) -> str:
+    """Poster as a real <img> whose alt is the title (st.image in 1.38 sets alt to "0")."""
+    t = escape(title, quote=True)
+    return (
+        f"<figure class='mars-poster-figure'><img class='mars-poster' src='{escape(src, quote=True)}' "
+        f"alt='{t}'><figcaption class='mars-poster-caption'>{t}</figcaption></figure>"
+    )
+
+
+def explanation_html(explanation: str, *, compact: bool = False) -> str:
+    size = " mars-explanation-compact" if compact else ""
+    return f"<p class='mars-explanation{size}'>{explanation}</p>"
+
+
 def score_badge_html(score, all_raw_scores: list[float] | None, *, compact: bool = False) -> str:
     """Match badge (tier label, or the raw score when there is no run to rank in) plus rank."""
     if not has_match_score(score):
@@ -46,10 +65,9 @@ def score_badge_html(score, all_raw_scores: list[float] | None, *, compact: bool
         label, tooltip, _ = format_user_friendly_score(float(score), all_raw_scores)
         rank = match_rank(float(score), all_raw_scores)
         tier = _TIER_CLASSES.get(label, "mars-tier-look")
-        rank_size = " mars-rank-compact" if compact else ""
         return (
-            f"<span class='mars-badge{size} {tier}' title='{tooltip}'>{label}</span>"
-            f"<span class='mars-rank{rank_size}'>#{rank}</span>"
+            f"<span class='mars-badge{size} {tier}' title='{tooltip}'>"
+            f"<span class='mars-rank'>#{rank}</span>{label}</span>"
         )
     return (
         f"<span class='mars-badge{size} mars-tier-none'>"
@@ -84,70 +102,35 @@ def _clean_url(value) -> str | None:
     return value
 
 
-def _render_image_streamlit(
-    thumb_rel: str | None, title_display: str, remote_url: str | None = None
-):
-    """Render a poster via Streamlit's native image component.
+def _local_poster_url(thumb_rel: str, image_id: str) -> str | None:
+    """Media URL for a local thumbnail (``data/processed/images/posters/*_thumb.webp``), resized
+    to 180 px as st.image did; None when the file is missing or there is no runtime."""
+    from streamlit.elements.image import image_to_url
 
-    Resolution order:
-    1. Local optimized thumbnail (``data/processed/images/posters/*_thumb.webp``)
-       when present — fastest, smallest payload.
-    2. Remote CDN URL (``poster_url`` from metadata) — used when the local
-       thumbnail is absent, e.g. on a slim deployment that does not ship the
-       image cache. Streamlit fetches it directly from MyAnimeList's CDN.
-    3. Placeholder box when neither is available.
-    """
-    debug = False
     try:
-        debug = bool(st.session_state.get("__IMG_DEBUG__", False))
+        repo_root = Path(__file__).resolve().parents[3]
     except Exception:
-        debug = False
+        repo_root = Path(".").resolve()
+    rel_path = Path(str(thumb_rel))
+    img_path = rel_path if rel_path.is_absolute() else repo_root / "data" / "processed" / rel_path
+    if not img_path.exists():
+        return None
+    try:
+        return image_to_url(str(img_path), 180, False, "RGB", "auto", image_id) or None
+    except Exception:
+        return None
 
-    remote = _clean_url(remote_url)
 
-    # 1. Local thumbnail (preferred when shipped).
-    if thumb_rel:
-        try:
-            repo_root = Path(__file__).resolve().parents[3]
-        except Exception:
-            repo_root = Path(".").resolve()
-        base_processed = repo_root / "data" / "processed"
-        rel_path = Path(str(thumb_rel))
-        img_path = rel_path if rel_path.is_absolute() else base_processed / rel_path
-
-        if debug:
-            try:
-                st.text(f"[img debug] rel={thumb_rel} | resolved={img_path} | exists={img_path.exists()}")
-            except Exception:
-                pass
-
-        if img_path.exists():
-            try:
-                st.image(str(img_path), width=180, caption=title_display)
-                if debug:
-                    st.caption(f"[img ok local] {img_path}")
-                return
-            except Exception as e:
-                if debug:
-                    st.caption(f"[img error local] {img_path}: {e}")
-                # fall through to remote / placeholder
-
-    # 2. Remote CDN fallback.
-    if remote:
-        try:
-            st.image(remote, width=180, caption=title_display)
-            if debug:
-                st.caption(f"[img ok remote] {remote}")
-            return
-        except Exception as e:
-            if debug:
-                st.caption(f"[img error remote] {remote}: {e}")
-
-    # 3. Nothing available.
+def _render_poster(thumb_rel: str | None, title_display: str, remote_url: str | None, anime_id: int):
+    """Render a poster: the local thumbnail when shipped, else the MyAnimeList CDN URL (slim
+    deployments do not ship the image cache), else a placeholder box."""
+    src = _local_poster_url(thumb_rel, f"mars-poster-{anime_id}") if thumb_rel else None
+    src = src or _clean_url(remote_url)
+    if src:
+        st.markdown(poster_html(src, title_display), unsafe_allow_html=True)
+        return
     _render_placeholder_box("No Image")
     st.caption(f"{title_display} (no image available)")
-    if debug:
-        st.caption(f"[img missing] thumb={thumb_rel} remote={remote_url}")
 
 def render_card_grid(
     row, rec: dict, pop_pct: float, *, is_in_training: bool, all_raw_scores: list[float] | None = None
@@ -191,8 +174,8 @@ def render_card_grid(
 
     container = st.container(border=True)
     with container:
-        # Image
-        _render_image_streamlit(thumb, title_display, row.get("poster_url"))
+        st.markdown(CARD_MARKER_HTML, unsafe_allow_html=True)
+        _render_poster(thumb, title_display, row.get("poster_url"), anime_id)
 
         # Title + score
         truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
@@ -209,7 +192,7 @@ def render_card_grid(
         # Personalized explanation
         explanation = rec.get("explanation")
         if explanation:
-            st.markdown(f"<p class='mars-explanation-compact'>{explanation}</p>", unsafe_allow_html=True)
+            st.markdown(explanation_html(explanation, compact=True), unsafe_allow_html=True)
 
         # Metadata chips
         meta_parts = []
@@ -347,11 +330,12 @@ def render_card(
 
     container = st.container(border=True)
     with container:
+        st.markdown(CARD_MARKER_HTML, unsafe_allow_html=True)
         # Two-column layout: image | content
         col_img, col_content = st.columns([1, 3])
 
         with col_img:
-            _render_image_streamlit(thumb, title_display, row.get("poster_url"))
+            _render_poster(thumb, title_display, row.get("poster_url"), anime_id)
 
         with col_content:
             # Title + match score on same line
@@ -361,17 +345,13 @@ def render_card(
                 f"<h3 class='mars-card-title'>{title_display}{score_html}</h3>",
                 unsafe_allow_html=True,
             )
+            explanation = rec.get("explanation")
+            if explanation:
+                st.markdown(explanation_html(explanation), unsafe_allow_html=True)
+
             if alt_title:
                 st.markdown(
                     f"<p class='mars-alt-title'>{alt_title}</p>",
-                    unsafe_allow_html=True,
-                )
-
-            # Personalized explanation
-            explanation = rec.get("explanation")
-            if explanation:
-                st.markdown(
-                    f"<div class='mars-explanation'><span>{explanation}</span></div>",
                     unsafe_allow_html=True,
                 )
 

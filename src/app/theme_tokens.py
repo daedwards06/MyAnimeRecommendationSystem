@@ -72,16 +72,10 @@ TEXT_PAIRS: list[tuple[str, str]] = [
     *((_C[t], _C["bg"]) for t in TIER_TOKENS),
 ]
 
-# Pre-redesign accent colors the app still paints with until a later task moves each to TOKENS:
-# tier badges in Task 2.4, the rest with the component that uses them. All pass 4.5:1 on the
-# night surfaces except "primary", which is never used as text.
+# Pre-redesign accent colors the app still paints with until a later task moves each to TOKENS
+# with the component that uses them. All pass 4.5:1 on the night surfaces except "primary",
+# which is never used as text.
 LIVE: dict[str, dict[str, str]] = {
-    "tier_colors": {
-        "tier_top": "#27AE60",
-        "tier_strong": "#3498DB",
-        "tier_good": "#E67E22",
-        "tier_look": "#95A5A6",
-    },
     # Painted by app/styles/components.css as --mars-live-*.
     "color": {
         "text_inverse": "#FFFFFF",
@@ -110,18 +104,12 @@ LIVE: dict[str, dict[str, str]] = {
     },
 }
 
-# Badge backgrounds: the badge color at alpha 0x15.
-_TINT_ALPHA = "15"
-
-
 def css_var(group: str, key: str) -> str:
     return f"--mars-{group}-{key.replace('_', '-')}"
 
 
 def _live_css_values() -> dict[str, str]:
-    values = {**LIVE["color"], **LIVE["tier_colors"]}
-    tinted = {**LIVE["tier_colors"], "primary": LIVE["color"]["primary"]}
-    values.update({f"{k}_tint": v + _TINT_ALPHA for k, v in tinted.items()})
+    values = dict(LIVE["color"])
     values.update({f"chart_{k}": v for k, v in LIVE["chart"].items()})
     return values
 

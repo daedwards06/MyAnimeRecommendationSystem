@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 
-from src.app.theme_tokens import LIVE, TIER_TOKENS
+from src.app.theme_tokens import TIER_TOKENS, TOKENS
 
 SCORE_SEMANTIC_NAME: str = "Match score (relative)"
 SCORE_LABEL_SHORT: str = "Match score"
@@ -45,7 +45,7 @@ def format_match_score(value: float | None, *, decimals: int = 3) -> str:
     return fmt.format(v)
 
 
-_TIER_COLORS = LIVE["tier_colors"]
+_TIER_COLORS = TOKENS["color"]
 
 MATCH_TIERS: tuple[tuple[str, str], ...] = tuple(
     zip(("Top match", "Strong match", "Good match", "Worth a look"), (_TIER_COLORS[t] for t in TIER_TOKENS))

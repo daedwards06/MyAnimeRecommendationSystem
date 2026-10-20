@@ -458,20 +458,20 @@ python scripts/check_live_app.py --url http://localhost:8501   # exit 0
 
 **Checklist:**
 
-- [ ] Card: 1 px ink border, no shadow, flat panel color (Task 1.3 chose Subtle), poster with a
+- [x] Card: 1 px ink border, no shadow, flat panel color (Task 1.3 chose Subtle), poster with a
       thin ink outline; title in the body face bold (display face is for headers only, it is
       too heavy at card size)
-- [ ] Match badge restyled as a small "broadcast tag"; tier colors from tokens; rank ("#1") kept;
+- [x] Match badge restyled as a small "broadcast tag"; tier colors from tokens; rank ("#1") kept;
       tooltip text unchanged
-- [ ] Explanation sentence directly under the title in the subtitle style from MASTER.md
+- [x] Explanation sentence directly under the title in the subtitle style from MASTER.md
       (`subtitle` yellow on panel, in `TEXT_PAIRS`, bold, 1 px ink outline); "More details" and
       the signal breakdown keep their current content
-- [ ] Poster `<img>` keeps a meaningful `alt` (the title) and stays a real `img` element (the
+- [x] Poster `<img>` keeps a meaningful `alt` (the title) and stays a real `img` element (the
       live check depends on it)
-- [ ] Rating buttons for demo profiles stay visibly disabled (portfolio Task 1.6)
-- [ ] Tests: card HTML contains the explanation sentence, rank, and badge label; no inline styles;
+- [x] Rating buttons for demo profiles stay visibly disabled (portfolio Task 1.6)
+- [x] Tests: card HTML contains the explanation sentence, rank, and badge label; no inline styles;
       score_semantics tuple contract unchanged
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

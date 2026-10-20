@@ -114,17 +114,6 @@ button[kind="secondary"]:hover {
     transform: translateY(-1px) !important;
 }
 
-/* ===== Containers / Cards ===== */
-[data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {
-    border-radius: 12px !important;
-    border: 1px solid var(--mars-color-line) !important;
-    transition: border-color 0.2s ease, transform 0.2s ease;
-}
-[data-testid="stVerticalBlock"] > div[data-testid="stContainer"]:hover {
-    border-color: var(--mars-color-text-muted) !important;
-    transform: translateY(-2px);
-}
-
 /* ===== Metrics ===== */
 [data-testid="stMetric"] {
     background: var(--mars-color-panel);

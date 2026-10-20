@@ -148,46 +148,93 @@
     margin: 0 0 24px 0;
 }
 
-/* ===== Cards: poster placeholder ===== */
+/* ===== Cards: container ===== */
+/* Cards are st.container(border=True). Streamlit 1.38 gives a bordered block no class of its own,
+   so the card is found by the hidden marker that is its first element (CARD_MARKER_HTML). */
+.stApp [data-testid="element-container"]:has(.mars-card-marker) { display: none; }
+.stApp [data-testid="stVerticalBlockBorderWrapper"]:has(
+    > div > [data-testid="stVerticalBlock"] > [data-testid="element-container"] .mars-card-marker
+) {
+    background: var(--mars-color-panel);
+    border: var(--mars-border-thin) solid var(--mars-color-ink);
+    border-radius: var(--mars-radius-md);
+    box-shadow: none;
+}
+.stApp [data-testid="stVerticalBlockBorderWrapper"]:has(
+    > div > [data-testid="stVerticalBlock"] > [data-testid="element-container"] .mars-card-marker
+):hover {
+    border-color: var(--mars-color-line);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .stApp [data-testid="stVerticalBlockBorderWrapper"]:has(
+        > div > [data-testid="stVerticalBlock"] > [data-testid="element-container"] .mars-card-marker
+    ) {
+        transition: border-color 150ms ease;
+    }
+}
+
+/* ===== Cards: poster ===== */
+.stApp .mars-poster-figure {
+    max-width: 180px;
+    margin: 0;
+}
+.stApp .mars-poster {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: var(--mars-border-thin) solid var(--mars-color-ink);
+    border-radius: var(--mars-radius-sm);
+}
+.stApp .mars-poster-caption {
+    color: var(--mars-color-text-muted);
+    font-size: 0.82rem;
+    text-align: center;
+    margin: var(--mars-space-xs) 0 0;
+}
 .stApp .mars-poster-placeholder {
     width: 180px;
     height: 260px;
-    background: var(--mars-color-panel);
+    background: var(--mars-color-bg);
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--mars-color-line);
-    border-radius: 8px;
+    border: var(--mars-border-thin) solid var(--mars-color-line);
+    border-radius: var(--mars-radius-sm);
     font-size: 12px;
     color: var(--mars-color-text-muted);
 }
 
-/* ===== Cards: match badge and rank ===== */
+/* ===== Cards: match badge ("broadcast tag": rank, then tier label) ===== */
 .stApp .mars-badge {
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--mars-space-xs);
+    padding: 1px var(--mars-space-sm);
+    border: var(--mars-border-thin) solid currentColor;
+    border-radius: var(--mars-radius-sm);
+    font-family: var(--mars-font-body);
+    font-size: 0.72rem;
     font-weight: 700;
-    margin-left: 8px;
+    line-height: 1.5;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+    margin-left: var(--mars-space-sm);
 }
 .stApp .mars-badge-compact {
-    padding: 2px 8px;
-    border-radius: 16px;
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     margin-left: 0;
 }
-.stApp .mars-tier-top { color: var(--mars-live-tier-top); background: var(--mars-live-tier-top-tint); }
-.stApp .mars-tier-strong { color: var(--mars-live-tier-strong); background: var(--mars-live-tier-strong-tint); }
-.stApp .mars-tier-good { color: var(--mars-live-tier-good); background: var(--mars-live-tier-good-tint); }
-.stApp .mars-tier-look { color: var(--mars-live-tier-look); background: var(--mars-live-tier-look-tint); }
-.stApp .mars-tier-none { color: var(--mars-color-cyan); background: var(--mars-live-primary-tint); }
+.stApp .mars-tier-top { color: var(--mars-color-tier-top); }
+.stApp .mars-tier-strong { color: var(--mars-color-tier-strong); }
+.stApp .mars-tier-good { color: var(--mars-color-tier-good); }
+.stApp .mars-tier-look { color: var(--mars-color-tier-look); }
+.stApp .mars-tier-none { color: var(--mars-color-cyan); }
 .stApp .mars-rank {
-    color: var(--mars-color-text-muted);
-    font-size: 0.78rem;
-    font-weight: 400;
-    margin-left: 6px;
+    color: var(--mars-color-text);
+    letter-spacing: 0;
 }
-.stApp .mars-rank-compact { font-size: 0.72rem; }
 .stApp .mars-badge-row { margin: 2px 0; }
 
 /* ===== Cards: titles and text ===== */
@@ -199,6 +246,7 @@
     font-weight: 700;
 }
 .stApp .mars-card-title-compact {
+    font-family: var(--mars-font-body);
     font-weight: 700;
     font-size: 0.95rem;
     color: var(--mars-color-text);
@@ -210,23 +258,22 @@
     font-size: 0.85rem;
     margin: 2px 0 0 0;
 }
+/* The subtitle line (MASTER.md): fansub yellow, body bold, 1 px ink outline. Nothing else uses it. */
 .stApp .mars-explanation {
-    background: var(--mars-color-panel);
-    padding: 6px 12px;
-    border-radius: 6px;
-    margin: 6px 0;
-    border-left: 3px solid var(--mars-live-primary);
+    color: var(--mars-color-subtitle);
+    font-family: var(--mars-font-body);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.45;
+    text-shadow:
+        1px 0 0 var(--mars-color-ink),
+        -1px 0 0 var(--mars-color-ink),
+        0 1px 0 var(--mars-color-ink),
+        0 -1px 0 var(--mars-color-ink),
+        0 2px 0 var(--mars-color-ink);
+    margin: var(--mars-space-xs) 0 var(--mars-space-sm);
 }
-.stApp .mars-explanation > span {
-    font-size: 0.82rem;
-    color: var(--mars-color-text-muted);
-}
-.stApp .mars-explanation-compact {
-    font-size: 0.72rem;
-    color: var(--mars-color-text-muted);
-    margin: 4px 0;
-    font-style: italic;
-}
+.stApp .mars-explanation-compact { font-size: 0.88rem; }
 .stApp .mars-studio {
     color: var(--mars-color-text-muted);
     font-size: 0.82rem;
