@@ -5,6 +5,7 @@ from __future__ import annotations
 from streamlit.testing.v1 import AppTest
 
 from src.app.components.cards import GRID_MARKER_HTML, explanation_html, poster_html, score_badge_html
+from src.app.score_semantics import MATCH_TIERS, SCORE_LABEL_SHORT
 
 SCORES = [0.9, 0.7, 0.5, 0.3]
 EXPLANATION = "You rate Drama and Mystery highly"
@@ -53,7 +54,7 @@ def test_list_card_html_has_explanation_rank_badge_and_poster_alt():
     html = _markdown(_run("list"))
     assert "mars-card-marker" in html
     assert explanation_html(EXPLANATION) in html
-    assert "<span class='mars-rank'>#1</span>Top match" in html
+    assert "<span class='mars-rank'>#1</span> Top match" in html
     assert "<img class='mars-poster'" in html and "alt='Steins;Gate'" in html
     assert "style=" not in html
 
@@ -62,7 +63,7 @@ def test_grid_card_html_has_explanation_rank_and_badge():
     html = _markdown(_run("grid"))
     assert "mars-card-marker" in html
     assert explanation_html(EXPLANATION, compact=True) in html
-    assert "#1</span>Top match" in html
+    assert "#1</span> Top match" in html
     assert "style=" not in html
 
 
@@ -84,6 +85,16 @@ def test_badge_tooltip_text_is_unchanged():
     assert "title='Rank 1 of 4 in this run, raw score 0.900 (relative, not a probability)'" in score_badge_html(
         0.9, SCORES
     )
+
+
+def test_badge_meaning_is_in_text_not_only_color():
+    labels = [label for label, _ in MATCH_TIERS]
+    scores = [i / 20 for i in range(20)]
+    for score in scores:
+        for compact in (False, True):
+            html = score_badge_html(score, scores, compact=compact)
+            assert sum(f"</span> {label}</span>" in html for label in labels) == 1, html
+    assert f"{SCORE_LABEL_SHORT}: " in score_badge_html(0.42, None)
 
 
 def test_poster_alt_is_the_escaped_title():

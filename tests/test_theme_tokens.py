@@ -16,6 +16,7 @@ from src.app.theme_tokens import (
     TIER_TOKENS,
     TOKENS,
     contrast_ratio,
+    css_var,
     render_tokens_css,
     streamlit_theme,
 )
@@ -23,6 +24,10 @@ from src.app.theme_tokens import (
 ROOT = Path(__file__).resolve().parents[1]
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 WCAG_AA = 4.5
+SHIPPED_CSS = ("base.css", "components.css")
+CSS_VAR = re.compile(r"^var\((--[\w-]+)\)$")
+# Leaves the color to the parent rule, which is checked in its own right.
+INHERITED_COLORS = {"inherit", "currentcolor", "transparent"}
 
 
 def _load_build_theme():
@@ -100,3 +105,68 @@ def test_streamlit_theme_is_dark_and_from_tokens() -> None:
         "textColor": c["text"],
         "font": "sans serif",
     }
+
+
+def _css_var_values() -> dict[str, str]:
+    values = {css_var("color", k): v for k, v in TOKENS["color"].items()}
+    values.update({css_var("live", k): v for k, v in LIVE["color"].items()})
+    values.update({css_var("live", f"chart_{k}"): v for k, v in LIVE["chart"].items()})
+    return values
+
+
+def _css_rules(css: str) -> list[tuple[str, dict[str, str]]]:
+    """Innermost ``selector { declarations }`` blocks, so rules inside @media are included."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules = []
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        decls = {}
+        for decl in body.split(";"):
+            if ":" in decl:
+                prop, value = decl.split(":", 1)
+                decls[prop.strip().lower()] = value.replace("!important", "").strip()
+        rules.append((" ".join(selector.split()), decls))
+    return rules
+
+
+def _shipped_text_pairs() -> list[tuple[str, str, str]]:
+    """(rule, fg, bg) for every text color in the shipped CSS. A rule that sets no solid background
+    of its own is drawn on the page or a panel, so it is checked against both."""
+    values = _css_var_values()
+    surfaces = (TOKENS["color"]["bg"], TOKENS["color"]["panel"])
+
+    def resolve(value: str, rule: str) -> str | None:
+        if value.lower() in INHERITED_COLORS:
+            return None
+        match = CSS_VAR.match(value)
+        assert match and match.group(1) in values, f"{rule}: color {value!r} is not a token variable"
+        return values[match.group(1)]
+
+    pairs = []
+    for file in SHIPPED_CSS:
+        for selector, decls in _css_rules((ROOT / "app" / "styles" / file).read_text(encoding="utf-8")):
+            if "color" not in decls:
+                continue
+            rule = f"{file}: {selector}"
+            fg = resolve(decls["color"], rule)
+            if fg is None:
+                continue
+            bgs = [decls[p] for p in ("background-color", "background") if CSS_VAR.match(decls.get(p, ""))]
+            for bg in [resolve(b, rule) for b in bgs] or surfaces:
+                pairs.append((rule, fg, bg))
+    return pairs
+
+
+def test_css_rule_parser_reads_media_blocks_and_strips_comments() -> None:
+    css = "/* a { color: red } */ .x { color: var(--a) !important; }\n@media (max-width: 1px) { .y { color: b } }"
+    assert _css_rules(css) == [(".x", {"color": "var(--a)"}), (".y", {"color": "b"})]
+
+
+def test_every_shipped_text_color_is_a_listed_pair() -> None:
+    pairs = _shipped_text_pairs()
+    assert len(pairs) > 40, "parser found too few color rules; has the CSS layout changed?"
+    unlisted = [
+        f"{rule}: {fg} on {bg} ({contrast_ratio(fg, bg):.2f}:1)"
+        for rule, fg, bg in pairs
+        if (fg, bg) not in TEXT_PAIRS
+    ]
+    assert not unlisted, "text colors missing from TEXT_PAIRS:\n" + "\n".join(unlisted)

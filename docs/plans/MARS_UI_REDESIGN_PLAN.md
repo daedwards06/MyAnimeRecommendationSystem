@@ -643,12 +643,12 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q tests/test_theme_tokens.py
 
 **Checklist:**
 
-- [ ] Every text color in the shipped CSS appears in `TEXT_PAIRS` (test parses `components.css`
+- [x] Every text color in the shipped CSS appears in `TEXT_PAIRS` (test parses `components.css`
       for color properties and fails on an unlisted pair)
-- [ ] Decorative katakana and texture marked `aria-hidden`
-- [ ] Badge meaning does not rely on color alone (tier label text is always present)
-- [ ] Keyboard pass in all three modes recorded in `docs/redesign/A11Y_PASS.md`
-- [ ] Tests + ruff green
+- [x] Decorative katakana and texture marked `aria-hidden`
+- [x] Badge meaning does not rely on color alone (tier label text is always present)
+- [x] Keyboard pass in all three modes recorded in `docs/redesign/A11Y_PASS.md`
+- [x] Tests + ruff green
 
 ---
 

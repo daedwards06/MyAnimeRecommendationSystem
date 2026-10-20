@@ -190,14 +190,15 @@ def test_sample_seed_tags_are_scoped_to_the_try_row() -> None:
     assert '[data-testid="stHorizontalBlock"]:has(.mars-try-label) button[kind="secondary"]' in css
 
 
-def test_sidebar_focus_ring_uses_the_focus_token() -> None:
+def test_focus_ring_uses_the_focus_token_across_the_app() -> None:
     base = (STYLES / "base.css").read_text(encoding="utf-8")
     assert re.search(
-        r'\[data-testid="stSidebar"\] button:focus-visible,[^{]*\{\s*outline: 2px solid var\(--mars-color-focus\)',
+        r'\.stApp button:focus-visible,[^{]*\{\s*outline: 2px solid var\(--mars-color-focus\)',
         base,
     )
     colors = TOKENS["color"]
     assert contrast_ratio(colors["focus"], colors["panel"]) >= 3.0
+    assert contrast_ratio(colors["focus"], colors["bg"]) >= 3.0
 
 
 def test_reduced_motion_disables_all_animation_and_transitions() -> None:

@@ -71,7 +71,7 @@ def score_badge_html(score, all_raw_scores: list[float] | None, *, compact: bool
         tier = _TIER_CLASSES.get(label, "mars-tier-look")
         return (
             f"<span class='mars-badge{size} {tier}' title='{tooltip}'>"
-            f"<span class='mars-rank'>#{rank}</span>{label}</span>"
+            f"<span class='mars-rank'>#{rank}</span> {label}</span>"
         )
     return (
         f"<span class='mars-badge{size} mars-tier-none'>"

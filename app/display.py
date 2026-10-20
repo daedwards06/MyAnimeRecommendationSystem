@@ -203,9 +203,9 @@ def mix_bar_html(mix_label: str, pop_count: int, mid_count: int, long_tail_count
         '<div class="mars-mix-head">'
         f'<span class="mars-mix-label">{mix_label}</span>'
         '<span class="mars-mix-legend">'
-        f'<span class="mars-mix-dot-popular">●</span> Popular {pop_count}'
-        f' &nbsp;<span class="mars-mix-dot-midrange">●</span> Mid {mid_count}'
-        f' &nbsp;<span class="mars-mix-dot-longtail">●</span> Hidden gems {long_tail_count}'
+        f'<span class="mars-mix-dot-popular" aria-hidden="true">●</span> Popular {pop_count}'
+        f' &nbsp;<span class="mars-mix-dot-midrange" aria-hidden="true">●</span> Mid {mid_count}'
+        f' &nbsp;<span class="mars-mix-dot-longtail" aria-hidden="true">●</span> Hidden gems {long_tail_count}'
         "</span>"
         "</div>"
         f'<svg class="mars-mix-track" width="100%" height="6" aria-hidden="true">{"".join(rects)}</svg>'

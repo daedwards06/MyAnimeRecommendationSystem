@@ -54,32 +54,11 @@ TOKENS: dict[str, dict[str, str]] = {
 
 TIER_TOKENS: tuple[str, ...] = ("tier_top", "tier_strong", "tier_good", "tier_look")
 
-_C = TOKENS["color"]
-
-TEXT_PAIRS: list[tuple[str, str]] = [
-    (_C["text"], _C["bg"]),
-    (_C["text"], _C["panel"]),
-    (_C["text_muted"], _C["bg"]),
-    (_C["text_muted"], _C["panel"]),
-    (_C["signal"], _C["bg"]),
-    (_C["signal"], _C["panel"]),
-    (_C["subtitle"], _C["bg"]),
-    (_C["subtitle"], _C["panel"]),
-    (_C["cyan"], _C["bg"]),
-    (_C["cyan"], _C["panel"]),
-    (_C["on_signal"], _C["signal"]),
-    *((_C[t], _C["panel"]) for t in TIER_TOKENS),
-    *((_C[t], _C["bg"]) for t in TIER_TOKENS),
-]
-
 # Pre-redesign accent colors the app still paints with until a later task moves each to TOKENS
-# with the component that uses them. All pass 4.5:1 on the night surfaces except "primary",
-# which is never used as text.
+# with the component that uses them. Every one is used as text and listed in TEXT_PAIRS.
 LIVE: dict[str, dict[str, str]] = {
     # Painted by app/styles/components.css as --mars-live-*.
     "color": {
-        "text_inverse": "#FFFFFF",
-        "primary": "#6C63FF",
         "accent_alt": "#4ECDC4",
         "success": "#48BB78",
         "warn": "#ECC94B",
@@ -101,6 +80,27 @@ LIVE: dict[str, dict[str, str]] = {
         "bad": "#E74C3C",
     },
 }
+
+_C = TOKENS["color"]
+
+TEXT_PAIRS: list[tuple[str, str]] = [
+    (_C["text"], _C["bg"]),
+    (_C["text"], _C["panel"]),
+    (_C["text_muted"], _C["bg"]),
+    (_C["text_muted"], _C["panel"]),
+    (_C["signal"], _C["bg"]),
+    (_C["signal"], _C["panel"]),
+    (_C["subtitle"], _C["bg"]),
+    (_C["subtitle"], _C["panel"]),
+    (_C["cyan"], _C["bg"]),
+    (_C["cyan"], _C["panel"]),
+    (_C["on_signal"], _C["signal"]),
+    (_C["bg"], _C["cyan"]),  # hovered genre pills and seed tags, streaming links
+    *((_C[t], _C["panel"]) for t in TIER_TOKENS),
+    *((_C[t], _C["bg"]) for t in TIER_TOKENS),
+    *((c, _C[s]) for c in (*LIVE["color"].values(), *LIVE["chart"].values()) for s in ("bg", "panel")),
+]
+
 
 def css_var(group: str, key: str) -> str:
     return f"--mars-{group}-{key.replace('_', '-')}"

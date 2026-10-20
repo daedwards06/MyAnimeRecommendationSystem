@@ -74,19 +74,26 @@ h3 {
     color: var(--mars-color-text-muted);
 }
 
-/* ===== Sidebar focus rings ===== */
-/* Keyboard focus on every sidebar widget, in the focus token (well above 3:1 on the panel).
-   Hidden radio/checkbox inputs ring their visible label instead. */
-[data-testid="stSidebar"] button:focus-visible,
-[data-testid="stSidebar"] summary:focus-visible,
-[data-testid="stSidebar"] [role="slider"]:focus-visible,
-[data-testid="stSidebar"] [data-baseweb="select"]:focus-within,
-[data-testid="stSidebar"] [data-baseweb="input"]:focus-within,
-[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:focus-visible),
-[data-testid="stSidebar"] [data-baseweb="checkbox"]:has(input:focus-visible) {
+/* ===== Focus rings ===== */
+/* Keyboard focus on every widget, in the focus token (well above 3:1 on page and panel); Streamlit's
+   own ring is a half-transparent signal red that is faint on the panel. Hidden radio/checkbox inputs
+   ring their visible label instead. */
+.stApp button:focus-visible,
+.stApp summary:focus-visible,
+.stApp a:focus-visible,
+.stApp [role="slider"]:focus-visible,
+.stApp [data-baseweb="select"]:focus-within,
+.stApp [data-baseweb="input"]:focus-within,
+.stApp [data-baseweb="radio"]:has(input:focus-visible),
+.stApp [data-baseweb="checkbox"]:has(input:focus-visible) {
     outline: 2px solid var(--mars-color-focus) !important;
     outline-offset: 2px;
     border-radius: var(--mars-radius-sm);
+}
+/* The main area's scroll container takes focus too; ring it inside the viewport edge. */
+.stApp [data-testid="stAppViewContainer"] section:focus-visible {
+    outline: 2px solid var(--mars-color-focus) !important;
+    outline-offset: -2px;
 }
 
 /* ===== Buttons ===== */
