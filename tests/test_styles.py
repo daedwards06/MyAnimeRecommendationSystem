@@ -9,9 +9,10 @@ from types import SimpleNamespace
 import pytest
 
 import app.styles as styles
-from app.display import header_html, mix_bar_html, result_count_html
+from app.display import header_html, mix_bar_html, result_scope_html, title_card
 from app.sidebar import section_label_html
 from src.app.components.cards import flag_html, meta_span, score_badge_html
+from src.app.components.instructions import intro_line_html
 from src.app.components.taste_profile import stat_row_html
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,7 +88,9 @@ SCORES = [0.9, 0.7, 0.5, 0.3]
 
 HELPER_HTML = {
     "header": header_html("Seed-based"),
-    "result_count": result_count_html(10, "recommendations", 13062, "  ·  filtered by 1 genre"),
+    "title_card": title_card("Similar to Steins;Gate", "10 recommendations"),
+    "result_scope": result_scope_html(13062, "  ·  filtered by 1 genre"),
+    "intro_line": intro_line_html("Seed-based", ["Steins;Gate"], default_seed_title="Steins;Gate"),
     "mix_bar": mix_bar_html("Recommendation mix", 3, 5, 2),
     "mix_bar_empty": mix_bar_html("Catalog mix", 0, 0, 0),
     "badge_tiered": score_badge_html(0.9, SCORES),

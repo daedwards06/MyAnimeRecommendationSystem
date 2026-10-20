@@ -7,6 +7,7 @@ scoring details).
 
 from __future__ import annotations
 
+import html
 import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -47,7 +48,7 @@ def header_text(ui_mode: str) -> tuple[str, str]:
 def header_html(ui_mode: str) -> str:
     title, subtitle = header_text(ui_mode)
     return (
-        f"<h1 class='mars-header-title'>{title}</h1>"
+        f"<h1 class='mars-wordmark'>{title}</h1>"
         f"<p class='mars-header-subtitle'>{subtitle}</p>"
     )
 
@@ -111,16 +112,29 @@ def render_intro_section(
 # ── Results rendering ────────────────────────────────────────────────────────
 
 
+def title_card(label: str, text: str = "") -> str:
+    """Section header: the label in the display face, an optional plain-text line under it."""
+    parts = [f"<h2 class='mars-title-card-label'>{html.escape(label)}</h2>"]
+    if text:
+        parts.append(f"<p class='mars-title-card-text'>{html.escape(text)}</p>")
+    return f"<div class='mars-title-card'>{''.join(parts)}</div>"
+
+
+def render_title_card(label: str, text: str = "") -> None:
+    st.markdown(title_card(label, text), unsafe_allow_html=True)
+
+
 def render_results(
     recs: list[dict],
     metadata: pd.DataFrame,
     sidebar: SidebarResult,
     pipeline: PipelineRunResult,
     *,
+    title: str = "Recommendations",
     pop_pct_fn: Callable[[int], float],
     is_in_training_fn: Callable[[int], bool],
 ) -> None:
-    """Render recommendation results: count, mix bar, cards."""
+    """Render recommendation results: title card with the count, mix bar, cards."""
     # Result count
     total_anime = len(metadata)
     filter_parts: list[str] = []
@@ -135,7 +149,8 @@ def render_results(
 
     item_type = "titles" if sidebar.browse_mode else "recommendations"
     st.markdown(
-        result_count_html(len(recs), item_type, total_anime, filters_text),
+        title_card(title, f"{len(recs)} {item_type}")
+        + result_scope_html(total_anime, filters_text),
         unsafe_allow_html=True,
     )
 
@@ -155,13 +170,8 @@ def render_results(
     _render_cards(recs, metadata, pop_pct_fn=pop_pct_fn, is_in_training_fn=is_in_training_fn)
 
 
-def result_count_html(count: int, item_type: str, total: int, filters_text: str = "") -> str:
-    return (
-        "<div class='mars-result-count'>"
-        f"<span class='mars-result-count-main'>{count} {item_type}</span>"
-        f"<span class='mars-result-count-sub'>of {total:,}{filters_text}</span>"
-        "</div>"
-    )
+def result_scope_html(total: int, filters_text: str = "") -> str:
+    return f"<p class='mars-result-scope'>of {total:,}{html.escape(filters_text)}</p>"
 
 
 def mix_bar_html(mix_label: str, pop_count: int, mid_count: int, long_tail_count: int) -> str:

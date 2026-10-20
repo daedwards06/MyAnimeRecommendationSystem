@@ -11,32 +11,71 @@
 .stApp .mars-tone-purple { color: var(--mars-live-purple); }
 
 /* ===== Header ===== */
-.stApp .mars-header-title {
-    margin-bottom: 0;
+/* Plain wordmark in the display face: no outline, offset shadow, or katakana (Task 1.3). */
+.stApp .mars-wordmark {
+    font-family: var(--mars-font-display);
     font-weight: 800;
+    font-size: 2.6rem;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: var(--mars-color-text);
+    margin: 0;
+    padding: 0;
 }
 .stApp .mars-header-subtitle {
     color: var(--mars-color-text-muted);
     font-size: 1.05rem;
-    margin-top: 0;
-    margin-bottom: 1rem;
+    margin: var(--mars-space-xs) 0 var(--mars-space-sm);
+}
+@media (max-width: 640px) {
+    .stApp .mars-wordmark { font-size: 2rem; }
 }
 
-/* ===== Result count ===== */
-.stApp .mars-result-count {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 6px;
+/* ===== Intro line ===== */
+.stApp .mars-intro {
+    font-size: 0.88rem;
+    color: var(--mars-color-text);
+    margin: 0;
 }
-.stApp .mars-result-count-main {
-    font-size: 1.15rem;
+.stApp .mars-intro-highlight { color: var(--mars-color-subtitle); }
+/* The intro's two buttons are plain outline buttons, not the genre-pill style every other
+   secondary button gets. Streamlit 1.38 has no per-key class, so the row is found by its text. */
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) button[kind="secondary"] {
+    background-color: transparent !important;
+    color: var(--mars-color-text) !important;
+    border: var(--mars-border-thin) solid var(--mars-color-text-muted) !important;
+    border-radius: var(--mars-radius-sm) !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+}
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) button[kind="secondary"]:hover {
+    background-color: transparent !important;
+    color: var(--mars-color-subtitle) !important;
+    border-color: var(--mars-color-subtitle) !important;
+    transform: none !important;
+}
+
+/* ===== Title cards (result section headers) ===== */
+.stApp .mars-title-card { margin: 0 0 var(--mars-space-xs); }
+.stApp .mars-title-card-label {
+    font-family: var(--mars-font-display);
+    font-weight: 800;
+    font-size: 1.4rem;
+    line-height: 1.3;
+    color: var(--mars-color-text);
+    margin: 0;
+    padding: 0;
+}
+.stApp .mars-title-card-text {
+    font-size: 1rem;
     font-weight: 700;
     color: var(--mars-color-text);
+    margin: var(--mars-space-xs) 0 0;
 }
-.stApp .mars-result-count-sub {
+.stApp .mars-result-scope {
     font-size: 0.82rem;
     color: var(--mars-color-text-muted);
+    margin: 0 0 var(--mars-space-xs);
 }
 
 /* ===== Recommendation mix bar ===== */

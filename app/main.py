@@ -35,6 +35,7 @@ from app.display import (
     render_import_light_warning,
     render_intro_section,
     render_results,
+    render_title_card,
 )
 from app.pipeline_runner import (
     RecommenderEngine,
@@ -161,21 +162,23 @@ st.session_state["_pipeline_ms"] = pipeline_elapsed
 # ── Main-area content header ─────────────────────────────────────────────────
 st.markdown("---")
 
+# Shown in the results title card with the count, or alone when there are no results.
+section_title: str | None = None
 if sidebar_state.browse_mode:
     if sidebar_state.genre_filter:
         genre_list_display = ", ".join(sidebar_state.genre_filter[:3])
         if len(sidebar_state.genre_filter) > 3:
             genre_list_display += f" +{len(sidebar_state.genre_filter) - 3} more"
-        st.subheader(f"Browsing: {genre_list_display}")
+        section_title = f"Browsing: {genre_list_display}"
     else:
-        st.subheader("Browse by Genre")
+        render_title_card("Browse by Genre")
         st.info("Select at least one genre in the sidebar to start browsing.")
 
 elif (
     sidebar_state.ui_mode == "Personalized"
     and pipeline_result.personalized_gate_reason
 ):
-    st.subheader("Your Recommendations")
+    render_title_card("Your Recommendations")
     st.warning(
         f"Personalized mode selected, but it can't run: "
         f"{pipeline_result.personalized_gate_reason}"
@@ -189,29 +192,32 @@ elif (
 else:
     if sidebar_state.selected_seed_ids and sidebar_state.selected_seed_titles:
         if len(sidebar_state.selected_seed_titles) == 1:
-            st.subheader(f"Similar to {sidebar_state.selected_seed_titles[0]}")
+            section_title = f"Similar to {sidebar_state.selected_seed_titles[0]}"
         else:
             seed_display = ", ".join(sidebar_state.selected_seed_titles[:3])
             if len(sidebar_state.selected_seed_titles) > 3:
                 seed_display += (
                     f" +{len(sidebar_state.selected_seed_titles) - 3} more"
                 )
-            st.subheader(f"Blended from {seed_display}")
+            section_title = f"Blended from {seed_display}"
     else:
-        label = (
+        section_title = (
             "Your Recommendations"
             if sidebar_state.ui_mode == "Personalized"
             else "Recommendations"
         )
-        st.subheader(label)
 
 # ── Results / empty state ────────────────────────────────────────────────────
+if section_title and not pipeline_result.recs:
+    render_title_card(section_title)
+
 if pipeline_result.recs:
     render_results(
         pipeline_result.recs,
         metadata,
         sidebar_state,
         pipeline_result,
+        title=section_title or "Recommendations",
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
     )

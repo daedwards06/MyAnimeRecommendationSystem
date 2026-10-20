@@ -4,6 +4,9 @@ Dismissible; its "How it works" button opens the Help panel in the footer.
 """
 from __future__ import annotations
 
+import html
+import re
+
 import streamlit as st
 
 _MODE_HINTS: dict[str, str] = {
@@ -31,6 +34,18 @@ def intro_line(
     return _MODE_HINTS.get(ui_mode, _MODE_HINTS["Seed-based"])
 
 
+def intro_line_html(
+    ui_mode: str,
+    seed_titles: list[str],
+    *,
+    default_seed_title: str | None = None,
+) -> str:
+    """The intro line as HTML; the markdown bold becomes the highlighted name."""
+    text = html.escape(intro_line(ui_mode, seed_titles, default_seed_title=default_seed_title))
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong class='mars-intro-highlight'>\1</strong>", text)
+    return f"<p class='mars-intro'>{text}</p>"
+
+
 def render_intro_line(
     ui_mode: str,
     seed_titles: list[str],
@@ -42,7 +57,10 @@ def render_intro_line(
 
     text_col, help_col, close_col = st.columns([8, 1.6, 0.6], vertical_alignment="center")
     with text_col:
-        st.markdown(intro_line(ui_mode, seed_titles, default_seed_title=default_seed_title))
+        st.markdown(
+            intro_line_html(ui_mode, seed_titles, default_seed_title=default_seed_title),
+            unsafe_allow_html=True,
+        )
     with help_col:
         st.button(
             "How it works",
@@ -60,4 +78,4 @@ def _set_state(key: str) -> None:
     st.session_state[key] = True
 
 
-__all__ = ["intro_line", "render_intro_line"]
+__all__ = ["intro_line", "intro_line_html", "render_intro_line"]

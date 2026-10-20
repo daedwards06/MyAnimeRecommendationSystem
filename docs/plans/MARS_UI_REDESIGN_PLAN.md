@@ -419,16 +419,16 @@ python scripts/check_live_app.py --url http://localhost:8501   # exit 0
 
 **Checklist:**
 
-- [ ] MARS wordmark in the display face, plain (no outline, no offset shadow, no katakana:
+- [x] MARS wordmark in the display face, plain (no outline, no offset shadow, no katakana:
       Task 1.3 decision); subtitle per mode unchanged in wording
-- [ ] `title_card(label, text)` helper in `app/display.py` (pure, returns HTML) used for result
+- [x] `title_card(label, text)` helper in `app/display.py` (pure, returns HTML) used for result
       section headers, set in the display face without episode-style framing (Task 1.3); the
       "N recommendations" string stays present and readable as text, not baked into decoration
-- [ ] The dismissible intro line from portfolio Task 1.1 restyled, behavior unchanged
-- [ ] Tests: `title_card` output contains the plain text and no inline styles; header helper
+- [x] The dismissible intro line from portfolio Task 1.1 restyled, behavior unchanged
+- [x] Tests: `title_card` output contains the plain text and no inline styles; header helper
       tests updated only where markup (not wording) changed
-- [ ] Live-check detector fires on the local app
-- [ ] Tests + ruff green
+- [x] Live-check detector fires on the local app
+- [x] Tests + ruff green
 
 ---
 
