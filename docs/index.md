@@ -21,7 +21,8 @@ project told as a narrative: approach, results, what went wrong, and what is nex
 | [Project structure](project_structure.md) | Directory layout and tech stack |
 | [Features](features.md) | Content, metadata, and CF features |
 | [Decision log](decisions.md) | Why things are the way they are |
-| [UI design](ui_design.md) | Layout, design tokens, imagery, UX backlog |
+| [UI design](ui_design.md) | The 90s anime redesign: design system, tokens, before/after |
+| [UX plan](redesign/UX_PLAN.md) · [accessibility pass](redesign/A11Y_PASS.md) | Redesign audit findings and how each was closed; contrast, focus, screen-reader order |
 | [Project proposal](PROJECT_PROPOSAL.md) | Original scope and goals |
 
 ## Data
@@ -40,6 +41,7 @@ project told as a narrative: approach, results, what went wrong, and what is nex
 | [Deployment](DEPLOYMENT.md) | Streamlit Community Cloud setup and limits |
 | [Running plan tasks](HOW_TO_RUN_TASKS.md) | How plan tasks are executed and validated |
 | [Portfolio product plan](plans/MARS_PORTFOLIO_PRODUCT_PLAN.md) | Current roadmap |
+| [UI redesign plan](plans/MARS_UI_REDESIGN_PLAN.md) | The 2026-10 visual redesign, task by task |
 
 ## Notebooks
 

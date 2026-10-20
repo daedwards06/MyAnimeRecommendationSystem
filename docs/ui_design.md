@@ -1,145 +1,40 @@
-# UI / UX Redesign & Imagery Integration
+# UI Design
 
-## Goals
-- Reduce cognitive load: clear separation between recommendation list, explanations, and diversity metrics.
-- Accelerate comprehension: visual artwork anchors and structured typography.
-- Accessibility: WCAG AA contrast, keyboard navigable components, descriptive alt text.
-- Performance: time-to-first-rec <5s; incremental loading; image latency amortized via local cache.
-- Personalization readiness: session persistence of persona, weight preset, and top-N.
+The Streamlit app was redesigned in October 2026 as a late-90s anime broadcast: a plum-black
+"Signal OVA" palette, Shippori Mincho titles, and each card's plain-language explanation set like
+a VHS fansub subtitle. The plan was [MARS_UI_REDESIGN_PLAN.md](plans/MARS_UI_REDESIGN_PLAN.md);
+why this direction and what was ruled out are in the [decision log](decisions.md) (2026-10-19 and
+2026-10-20 entries).
 
-## Primary User Journeys
-1. Browse recommendations (scan cards, adjust weights, pick interesting titles).
-2. Understand why an item appears (view contribution shares, badges, and genres).
-3. Assess diversity/novelty (open metrics drawer, glance at coverage & genre exposure).
-4. Iterate preferences (change persona or top-N, observe instant UI update).
+## Where the design lives
 
-## Information Architecture
-- Persistent header: app title + weight toggle + latency badge.
-- Left sidebar: persona selector, search box, filters (future), top-N slider.
-- Main content: responsive grid of recommendation cards.
-- Secondary drawer (collapsible): diversity metrics, sparklines, popularity distribution.
-- Onboarding modal (first visit): quick usage tips (dismiss -> session flag).
+| Source | What it holds |
+|--------|---------------|
+| [design-system/mars/MASTER.md](../design-system/mars/MASTER.md) | The design system: direction, the 90s overrides, type, UX rules, anti-patterns, pre-delivery checklist |
+| [src/app/theme_tokens.py](../src/app/theme_tokens.py) | The only source for colors, fonts, spacing, radii. `scripts/build_theme.py` generates `.streamlit/config.toml` `[theme]` and `app/styles/tokens.css` from it; `tests/test_theme_tokens.py` fails if either drifts or a text pair drops below 4.5:1 |
+| [app/styles/](../app/styles/) | All app CSS, injected once from `app/main.py` |
 
-## Component Breakdown
-| Component | Responsibility |
-|-----------|----------------|
-| `layout.py` | Page scaffold, header, global containers |
-| `state.py` | Session state management + URL param sync |
-| `cards.py` | Recommendation card (image, title, genres, badges, expand explanation) |
-| `tooltips.py` | Central registry for tooltip text + accessible descriptions |
-| `diversity_panel.py` | Metrics drawer with charts & definitions |
-| `images.py` | Image path resolution, placeholder logic, alt text assembly |
+## Before and after
 
-## Design System (Tokens)
-Declare semantic tokens (colors, spacing, typography) in a single source (JSON or Python dict). Example keys:
-- Colors: `background`, `surface`, `surface-alt`, `border`, `text-primary`, `text-secondary`, `accent`, `accent-alt`, `danger`, `focus-ring`.
-- Spacing scale: `space-xxs (2)`, `xs (4)`, `sm (8)`, `md (12)`, `lg (16)`, `xl (24)`, `xxl (32)`.
-- Typography: `font-family-base`, size ramp (`xs 12`, `sm 13`, `md 15`, `lg 17`, `xl 20`, `display 24+`).
-- Radii: `radius-sm (4)`, `radius-md (8)`, `radius-lg (12)`.
-Dark mode duplicates tokens with adjusted backgrounds & text contrast.
+Seed-based mode at 1440×900, default seed (Fullmetal Alchemist: Brotherhood).
 
-## Imagery Integration
-### Source & Fields
-Use Jikan API anime full endpoint. Extract primary poster URL & small variant. Extend metadata schema:
-- `poster_url`
-- `poster_thumb_url`
-- `image_last_fetched`
-- `image_attribution`
-- `image_md5` (optional for change detection)
+| Before (2026-10-19, Task 0.2) | After (2026-10-20, Task 4.2) |
+|---|---|
+| ![Pre-redesign seed mode: light page, purple accents](redesign/baseline/seed_1440x900.png) | ![Redesigned seed mode: dark plum page, red and cyan accents, yellow subtitle explanations](redesign/after_4_2/seed_1440x900.png) |
 
-### Pipeline Overview
-1. Collect IDs (existing metadata parquet ids).
-2. Fetch image JSON (if not cached or expired >30 days).
-3. Download original poster; validate content-type starts with `image/`.
-4. Resize/compress to thumbnail (width ~180px) -> WebP or optimized JPEG.
-5. Write thumbnail under `data/processed/images/posters/<anime_id>_<hash>.webp`.
-6. Update metadata parquet with image fields.
+The baseline is the full page; the after shot covers the first two cards. Every mode and the
+phone width at baseline are in [redesign/baseline/](redesign/baseline/); intermediate sets are
+`redesign/after_2_1/`, `after_2_2/` and `after_3_2/`.
 
-### Caching & Refresh
-- Use last-fetched timestamp + age threshold.
-- Manual refresh flag (`--force-image-refresh`).
+## Redesign records
 
-### Alt Text Strategy
-`<title_display> anime poster` + optional truncated synopsis (first 12 words) for richer context.
+| Page | What it covers |
+|------|----------------|
+| [UX plan](redesign/UX_PLAN.md) | The first-five-minutes audit (F1–F18) and how each finding was closed, deferred or declined |
+| [Style inventory](redesign/STYLE_INVENTORY.md) | Every style source before consolidation |
+| [Skill search](redesign/SKILL_SEARCH.md) | Design-system queries and the shortlist |
+| [Mockups](redesign/mockups/index.html) | The three intensities and palette/type toggles the direction was picked from |
+| [Accessibility pass](redesign/A11Y_PASS.md) | Contrast, keyboard focus, screen-reader order, reduced motion |
 
-### Accessibility & Fallback
-- If image unavailable: placeholder SVG/PNG with neutral background and title initials.
-- Provide ARIA-label mirroring alt text; ensure focus ring visible when card selected via keyboard.
-
-### Performance Targets
-- Additional network for initial batch < 1.5s amortized (cached thumbnails after first run).
-- Thumbnails average size < 40KB.
-- No blocking on images: cards render skeleton placeholders, then populate image.
-
-## Metrics Drawer Design
-Contents:
-- Coverage: numeric + sparkline (recent sessions if stored).
-- Genre Exposure Ratio: gauge or pie (top genres only).
-- Novelty Average: numeric + histogram overlay of recommendation popularity ranks.
-- Popularity Band Legend: textual list with thresholds.
-
-## Tooltips & Help
-Central dictionary keyed by metric or badge ID to ensure consistency:
-```
-TOOLTIPS = {
-  'cold_start': 'Item shown due to minimal interaction data; content similarity path used.',
-  'popularity_band': 'Relative popularity segment based on MAL member counts.',
-  'novelty_ratio': 'Share of recommended items outside the user\'s historical genre footprint.',
-  'genre_exposure_ratio': 'Unique genres in current recommendations divided by unique genres in catalog.'
-}
-```
-
-## Session Persistence
-Store persona, weight mode, top-N, collapsed state of drawer under `st.session_state`. Reflect changes into query params for shareable deep links (e.g., `?persona=action_fan&weights=diversity&n=15`).
-
-## Roadmap Phases (Implementation Order)
-1. Token & theming infrastructure + state module.
-2. Card component (without images) refactor.
-3. Image pipeline & thumbnail integration.
-4. Metrics drawer & tooltips.
-5. Performance indicators & latency badge.
-6. Onboarding modal & empty/error states.
-7. Dark mode toggle.
-8. Accessibility audit and refinements.
-9. Documentation & screenshots.
-
-## Risks & Mitigations
-| Risk | Mitigation |
-|------|------------|
-| Image fetching rate limits | Respect throttle + incremental batches |
-| Large image sizes inflate memory | Enforce width & compression; WebP conversion |
-| Broken external URLs | Validate content-type; fallback placeholders |
-| Accessibility regressions | Automated aXe scan + keyboard walkthrough |
-| Performance regressions | Measure latency before/after; retain metrics badge |
-
-## Success Metrics
-- Time-to-first-render (cards skeleton) < 1s.
-- Image load complete for top 8 cards < 2.5s (warm cache < 0.8s).
-- Coverage & genre exposure accessible via one click (drawer) with keyboard focus.
-- Zero contrast ratio violations (AA) in color audit.
-
-## Backlog
-Open ideas carried over from an early UX review (the archived `UX_Suggestions.md`). Already
-shipped from that list: genre/type/year filters, sort options, reset filters, MAL score /
-episodes / studios on cards, grid view, clickable genre chips, "more like this", multi-seed
-blending, and quick ratings.
-
-- **Empty state:** when filters leave no results, suggest which filter to relax instead of only
-  warning.
-- **Session history:** previously viewed recommendations in the sidebar.
-- **Share / export:** copy the list, or a URL with the seeds and filters as query params (see
-  Session Persistence).
-- **Comparison mode:** pick 2–3 titles and compare them side by side.
-- **Watch-time estimate:** episodes × typical episode length, shown on the card.
-- **MAL link** on each card.
-- **Latency indicator:** the pipeline is instrumented but the timing is not shown.
-- **Onboarding:** something on screen on first load (a trending row or a pre-run example seed),
-  plus an optional short walkthrough.
-- **Accessibility:** keyboard navigation through cards, ARIA labels on badges/icons, a
-  high-contrast option.
-
-Not carried over: a "match percentage". Scores are relative and uncalibrated
-(`src/app/score_semantics.py`), so a percentage would overstate them.
-
----
-Last Updated: 2025-11-22
+The pre-redesign design notes (layout goals, imagery pipeline, UX backlog) are in git history
+before this page's 2026-10-20 rewrite.

@@ -5,6 +5,46 @@ and what would change the answer. Newest first.
 
 ---
 
+## 2026-10-20 — UI redesign closed: what shipped, what was deferred
+
+**Status:** Closed. Source: Task 4.2 of [MARS_UI_REDESIGN_PLAN.md](plans/MARS_UI_REDESIGN_PLAN.md);
+summary page [ui_design.md](ui_design.md).
+
+**Scope that shipped.** The Subtle / Signal OVA direction (entry below) across the header, cards
+and sidebar. Every color, font, spacing and radius comes from `src/app/theme_tokens.py`; the
+Streamlit theme and `app/styles/tokens.css` are generated from it, and
+`tests/test_theme_tokens.py` fails on drift or on any text pair under 4.5:1 (the pre-redesign
+muted text was 2.18:1). All CSS moved to `app/styles/`, with no `st-emotion-cache-*` selectors.
+Loading, empty and error states (Task 3.1), phone width (3.2), an accessibility pass (3.3,
+[A11Y_PASS.md](redesign/A11Y_PASS.md)) and the audit fixes F1, F2, F6, F7, F8, F12 and F18
+(3.4, [UX_PLAN.md](redesign/UX_PLAN.md)). The ranking pipeline, models, evaluation and every
+published number were out of scope and untouched. The deployed warm time to first card stayed
+within 1 s of the pre-redesign median ([DEPLOYMENT.md](DEPLOYMENT.md) § Performance). The README
+GIF and still were re-recorded on the final UI.
+
+**Deferred.**
+- **Texture and motion (Task 2.6 scanlines, VHS hover).** Ruled out by the Subtle pick; only the
+  reduced-motion rule shipped.
+- **Framework migration** (Reflex, or React over a FastAPI wrapper). Streamlit's limits did not
+  block any high-impact audit item.
+- **A light "daytime broadcast" theme**, **sound**, and **visual regression in CI** (needs a
+  pinned browser and font set). All in the plan's Phase 5.
+- **F14, Browse starts empty**, and **F15, the explanation repeats the seed title.** The first is
+  a product decision (a preselected genre), the second belongs to the explanation text, not the
+  visual layer.
+
+**Known gap.** `scripts/capture_ui_baseline.py` no longer completes its phone-width For me step
+(the demo-profile button is outside the viewport in the collapsed-then-opened sidebar), and its
+full-page height probe now stops seed mode after the first two cards. The Task 4.2 desktop
+set in `docs/redesign/after_4_2/` was captured before the phone step failed.
+
+**What would change this.** A reviewer reading the app as a generic dark theme: add the
+episode-style section headers first (the cheapest Title-card piece, per the entry below). A
+Streamlit upgrade past 1.38 that breaks the `data-testid` selectors: the live check and the
+capture script are the first things to rerun.
+
+---
+
 ## 2026-10-19 — Redesign direction: Subtle, Signal OVA palette, Mincho titles, subtitle line
 
 **Status:** Adopted (owner pick). Source: Task 1.3 of

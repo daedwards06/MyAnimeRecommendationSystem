@@ -128,6 +128,15 @@ with one click ([personalization guide](user_guide_personalization.md)). I also 
 deployed app, at a median 10.9 s to the first card, and added a scheduled browser visit that
 keeps it from sleeping ([deployment](DEPLOYMENT.md)).
 
+**A look of its own, held to a contrast test.** The app first shipped on Streamlit's default light
+theme, and the audit found most secondary text at 2.18:1 against its background. I redesigned it
+as a late-90s anime broadcast: a plum-black palette, a serif title face, and the explanation
+sentence set like a yellow VHS fansub subtitle, so the reason a title was picked is the second
+thing read on every card. Colors live in one tokens module that generates the Streamlit theme and
+the CSS, and a test fails if any text pair drops below 4.5:1 or the generated files drift. The
+cost was measured, not assumed: time to the first card on the deployed app stayed within its
+budget ([UI design](ui_design.md)).
+
 ## What I would do next
 
 The segment analysis ([notebook 03](../notebooks/03_segment_and_error_analysis.ipynb)) set the

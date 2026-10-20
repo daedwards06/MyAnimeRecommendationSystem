@@ -720,15 +720,20 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x   # README-numbers tests sti
 
 **Checklist:**
 
-- [ ] Re-record the GIF (10–15 s: pick a seed, read a card's explanation, switch to a demo
-      profile) and the still screenshot with the final UI
-- [ ] `docs/ui_design.md`: replace the old design notes with a pointer to
+- [x] Re-record the GIF (10–15 s: pick a seed, read a card's explanation, switch to a demo
+      profile) and the still screenshot with the final UI — *2026-10-20, local run, Playwright +
+      Edge frame capture assembled with Pillow (no ffmpeg): `demo.gif` 0.30 MB / 12.5 s (FMAB
+      landing → Steins;Gate → Lain's subtitle line → For me gate → Action Adventurer),
+      `demo_screenshot.png` 0.17 MB. Recorder not committed, as in portfolio Task 1.7*
+- [x] `docs/ui_design.md`: replace the old design notes with a pointer to
       `design-system/mars/MASTER.md`, the token module, and a before/after pair from
-      `docs/redesign/`
-- [ ] `docs/index.md` links the redesign docs; optional one paragraph in `docs/WRITEUP.md` §
+      `docs/redesign/` — *after shots are a new `docs/redesign/after_4_2/` desktop set;
+      `capture_ui_baseline.py` failed at the phone-width For me step (gap recorded in
+      `decisions.md`)*
+- [x] `docs/index.md` links the redesign docs; optional one paragraph in `docs/WRITEUP.md` §
       Product decisions on the aesthetic and the contrast test
-- [ ] `docs/decisions.md`: dated entry summarizing the redesign scope and what was deferred
-- [ ] Tests + ruff green
+- [x] `docs/decisions.md`: dated entry summarizing the redesign scope and what was deferred
+- [x] Tests + ruff green
 
 ---
 
