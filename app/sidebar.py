@@ -321,7 +321,7 @@ def _render_mal_import(
 ) -> None:
     # A toggle, not an expander: this already sits inside the Personalize expander,
     # and Streamlit forbids nesting expanders.
-    if not st.toggle("📥 Import from MAL", value=expanded, key=f"show_mal_import{key_suffix}"):
+    if not st.toggle("Import from MAL", value=expanded, key=f"show_mal_import{key_suffix}"):
         return
     with st.container(border=True):
         st.caption("Update your watchlist & ratings" if not key_suffix else "Get started by importing your watchlist")
@@ -347,7 +347,7 @@ def _render_mal_import(
             col1, col2 = st.columns(2)
 
             with col1:
-                if st.button("📊 Preview", use_container_width=True, key=f"preview{key_suffix}"):
+                if st.button("Preview", use_container_width=True, key=f"preview{key_suffix}"):
                     try:
                         import tempfile
 
@@ -361,7 +361,7 @@ def _render_mal_import(
                         st.error(f"Error: {e}")
 
             with col2:
-                if st.button("🔄 Parse", use_container_width=True, key=f"parse{key_suffix}"):
+                if st.button("Parse", use_container_width=True, key=f"parse{key_suffix}"):
                     try:
                         if "mal_tmp_path" not in st.session_state:
                             import tempfile
@@ -400,7 +400,7 @@ def _render_mal_import(
             )
 
             if st.button(
-                "💾 Save Profile",
+                "Save Profile",
                 type="primary",
                 use_container_width=True,
                 key=f"save{key_suffix}",
@@ -537,7 +537,7 @@ def _render_personalization_section(bundle: dict, metadata) -> bool:
         and st.session_state.get("user_embedding") is not None
         and ui_mode == "Personalized"
     ):
-        return bool(st.checkbox("🎨 View Taste Profile", key="show_taste_profile", value=False))
+        return bool(st.checkbox("View Taste Profile", key="show_taste_profile", value=False))
     return False
 
 
@@ -834,7 +834,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
 
     # View mode toggle
     view_mode = st.radio(
-        "📊 View Mode",
+        "View Mode",
         ["List", "Grid"],
         index=0 if st.session_state.get("view_mode", "list") == "list" else 1,
         horizontal=True,
@@ -844,7 +844,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
 
     # Clear filters button
     if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != default_sort_for_mode:
-        if st.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
+        if st.button("Reset Filters", help="Clear all filters and reset to defaults"):
             reset_filters(default_sort_for_mode)
             st.rerun()
 

@@ -260,7 +260,7 @@ def render_card_grid(
             st.caption("⚠️ Max 5")
         else:
             if st.button(
-                "🔄",
+                r"\+ Seed",  # labels are markdown; a bare "+ " becomes a list bullet
                 key=f"grid_more_{anime_id}",
                 help="Add as a seed (used in Seed-based / Personalized modes)",
                 use_container_width=True,
@@ -449,7 +449,7 @@ def render_card(
             elif len(current_ids) >= 5:
                 st.markdown(flag_html("Max 5 seeds", "muted", strong=False), unsafe_allow_html=True)
             else:
-                if st.button("+ Add to Seeds", key=f"more_like_{anime_id}", use_container_width=True):
+                if st.button(r"\+ Add to Seeds", key=f"more_like_{anime_id}", use_container_width=True):
                     current_ids.append(anime_id)
                     current_titles.append(title_display)
                     st.session_state["selected_seed_ids"] = current_ids

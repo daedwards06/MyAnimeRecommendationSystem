@@ -59,7 +59,7 @@ def render_rating_widget(anime_id: int, title: str, current_rating: int | None =
 
     with col2:
         # Save button
-        if st.button("💾", key=f"save_rating_{anime_id}", help="Save Rating", use_container_width=True):
+        if st.button("Save", key=f"save_rating_{anime_id}", help="Save Rating", use_container_width=True):
             if new_rating > 0:
                 _save_rating(anime_id, new_rating, title)
                 st.session_state[rating_key] = new_rating
@@ -70,7 +70,7 @@ def render_rating_widget(anime_id: int, title: str, current_rating: int | None =
 
 
 def render_quick_rating_buttons(anime_id: int, title: str, current_rating: int | None = None) -> None:
-    """Render quick rating buttons (👍 8, ❤️ 10, 👎 4).
+    """Render quick rating buttons (Good 8, Love 10, Meh 4).
 
     Parameters
     ----------
@@ -98,21 +98,21 @@ def render_quick_rating_buttons(anime_id: int, title: str, current_rating: int |
 
     with col1:
         if st.button(
-            "👍 8", key=f"quick_good_{anime_id}", help="Good (8/10)", use_container_width=True, disabled=is_demo
+            "Good 8", key=f"quick_good_{anime_id}", help="Good (8/10)", use_container_width=True, disabled=is_demo
         ):
             _save_rating(anime_id, 8, title)
             st.rerun()
 
     with col2:
         if st.button(
-            "❤️ 10", key=f"quick_love_{anime_id}", help="Love it! (10/10)", use_container_width=True, disabled=is_demo
+            "Love 10", key=f"quick_love_{anime_id}", help="Love it! (10/10)", use_container_width=True, disabled=is_demo
         ):
             _save_rating(anime_id, 10, title)
             st.rerun()
 
     with col3:
         if st.button(
-            "👎 4", key=f"quick_meh_{anime_id}", help="Meh (4/10)", use_container_width=True, disabled=is_demo
+            "Meh 4", key=f"quick_meh_{anime_id}", help="Meh (4/10)", use_container_width=True, disabled=is_demo
         ):
             _save_rating(anime_id, 4, title)
             st.rerun()

@@ -189,3 +189,15 @@ def test_card_flags_hide_routine_states_and_use_plain_words():
     assert card_flags({"cold_start": False, "popularity_band": "Mid", "novelty_ratio": 0.2})[-1][0] == "Familiar genres"
     for label, _ in routine + flags:
         assert not any(word in label for word in ("Trained", "Cold-start", "Novelty", "NA"))
+
+
+def test_card_buttons_have_word_labels():
+    # Audit F12 / A11Y_PASS: emoji labels are read aloud by name ("anticlockwise arrows button").
+    import unicodedata
+
+    for view, add_seed in (("list", r"\+ Add to Seeds"), ("grid", r"\+ Seed")):
+        labels = {b.label for b in _run(view, demo=False).button}
+        assert add_seed in labels, view
+        assert {"Good 8", "Love 10", "Meh 4"} <= labels, view
+        for label in labels:
+            assert not any(unicodedata.category(ch) == "So" for ch in label), (view, label)

@@ -21,7 +21,7 @@ def render_explanation_panel(recs: list[dict], top_k: int = 5) -> None:
     if not recs:
         return
 
-    with st.expander("🔍 **Why These Recommendations?** (Source Breakdown)", expanded=False):
+    with st.expander("**Why These Recommendations?** (Source Breakdown)", expanded=False):
         st.markdown(
             "This panel shows how each recommendation score is composed from "
             "**Matrix Factorization (MF)**, **k-Nearest Neighbors (kNN)**, and **Popularity (Pop)** signals."
