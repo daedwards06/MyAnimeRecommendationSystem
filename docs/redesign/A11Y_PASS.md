@@ -70,14 +70,14 @@ VoiceOver listen is still worth doing before Task 4.2's demo media.
 | Focus states visible | Every stop in all three modes; see the table above. |
 | `prefers-reduced-motion` | Covered by Task 2.6 and unchanged. |
 
-## Left for Task 3.4 (not fixed here)
+## Left for Task 3.4 (not fixed here; all three closed in Task 3.4)
 
 These are outside this task's checklist and are recorded so they are not lost:
 
 1. **Emoji in widget labels are read aloud by name.** Examples: `📥 Import from MAL`,
    `🎨 View Taste Profile`, `🔄 Reset Filters`, the `📊` before View Mode. The grid card's add-seed
    button is labelled only `🔄`, so its accessible name is "anticlockwise arrows button". The
-   tooltip is not the name. This is F12 in `UX_PLAN.md`.
+   tooltip is not the name. This is F12 in `UX_PLAN.md`. **Closed in `b33ba639`.**
 2. **The poster title is read twice before the heading:** once as the image alt and once as the
-   figcaption. The caption could be `aria-hidden`, since the alt already names the image.
-3. **The `★` before the MAL score** is read as "black star" with no "MAL score" label.
+   figcaption. The caption could be `aria-hidden`, since the alt already names the image. **Closed in `a9160d41`** (the figure also needed `role='none'`).
+3. **The `★` before the MAL score** is read as "black star" with no "MAL score" label. **Closed in `a9160d41`.**

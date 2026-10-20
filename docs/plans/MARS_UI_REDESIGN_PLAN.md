@@ -659,9 +659,9 @@ fix so any one can be reverted alone.
 
 **Checklist:**
 
-- [ ] For each item: Claude states the change before editing; owner confirms; implement; visual
+- [x] For each item: Claude states the change before editing; owner confirms; implement; visual
       check; tests + ruff green; commit referencing the UX_PLAN item number
-- [ ] UX_PLAN.md updated with the commit for each closed item
+- [x] UX_PLAN.md updated with the commit for each closed item
 
 ---
 
