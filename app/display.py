@@ -9,18 +9,21 @@ from __future__ import annotations
 
 import html
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import pandas as pd
 import streamlit as st
 
+from app.state import filter_defaults, reset_filters
 from src.app.artifacts_loader import FAMILY_LABELS, missing_expected_families
 from src.app.badges import badge_payload
 from src.app.components.cards import render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
 from src.app.components.instructions import render_intro_line
+from src.app.components.skeletons import card_skeleton_html
 from src.app.score_semantics import has_match_score
 
 if TYPE_CHECKING:
@@ -303,101 +306,182 @@ def _render_cards(
             )
 
 
-# ── Empty state ──────────────────────────────────────────────────────────────
+# ── Loading, empty and error states ──────────────────────────────────────────
+
+LOADING_EYECATCH = "Now loading…"
+
+ENGINE_UNAVAILABLE_TEXT = (
+    "Recommendations can't run right now because the model files didn't load. "
+    "Browse still works."
+)
+ENGINE_UNAVAILABLE_DEV_HINT = (
+    "Developer: the recommender engine was not built. Ranked modes need the MF artifacts in "
+    "models/ and a run without APP_IMPORT_LIGHT."
+)
+NO_FALLBACK_TEXT = "MARS does not silently fall back to Similar to a title results."
+
+_EMPTY_SUBJECT = {
+    "browse": "No titles",
+    "seed": "No similar titles",
+    "personalized": "No For me picks",
+}
+_EMPTY_HINT_WITHOUT_FILTERS = {
+    "browse": "Try another genre.",
+    "seed": "Try a different seed, or fewer seeds.",
+    "personalized": "Try another profile, or switch to Similar to a title.",
+}
 
 
-def render_empty_state(
-    sidebar: SidebarResult,
-    pipeline: PipelineRunResult,
-    metadata: pd.DataFrame,
-) -> None:
-    """Render the empty-state guidance when no results are available."""
-    browse_mode = sidebar.browse_mode
-    active_scoring_path = pipeline.active_scoring_path
+def loading_html(detail: str, *, cards: int = 3) -> str:
+    """The loading block: an eyecatch line with a spinner, over card-shaped skeletons."""
+    return (
+        "<div class='mars-loading' role='status' aria-live='polite'>"
+        "<p class='mars-loading-eyecatch'>"
+        "<span class='mars-loading-spinner' aria-hidden='true'></span>"
+        f"{LOADING_EYECATCH} <span class='mars-loading-detail'>{html.escape(detail)}</span>"
+        "</p>"
+        f"{card_skeleton_html(cards)}"
+        "</div>"
+    )
 
-    if browse_mode or active_scoring_path == "Ranked modes disabled":
-        st.markdown(f"**Active scoring path:** {active_scoring_path}")
 
-    if browse_mode:
-        return  # Browse empty state is rendered by the pipeline runner
+@contextmanager
+def loading_state(detail: str) -> Iterator[None]:
+    """Show the loading block while the body runs, then clear it."""
+    slot = st.empty()
+    slot.markdown(loading_html(detail), unsafe_allow_html=True)
+    try:
+        yield
+    finally:
+        slot.empty()
 
-    ui_mode_now = str(st.session_state.get("ui_mode", "Seed-based"))
 
-    if ui_mode_now == "Personalized":
-        _render_personalized_empty_state()
+def notice_panel_html(title: str, body_html: str, *, role: str = "status") -> str:
+    """Notice panel; ``body_html`` is trusted markup, so callers escape what goes into it."""
+    return (
+        f"<div class='mars-panel-notice' role='{role}'>"
+        f"<p class='mars-panel-notice-title'>{html.escape(title)}</p>"
+        f"<p class='mars-panel-notice-body'>{body_html}</p>"
+        "</div>"
+    )
+
+
+def start_panel_html(title: str, body: str) -> str:
+    return (
+        "<div class='mars-panel-start'>"
+        f"<h3 class='mars-panel-start-title'>{html.escape(title)}</h3>"
+        f"<p class='mars-panel-start-body'>{html.escape(body)}</p>"
+        "</div>"
+    )
+
+
+def active_filter_labels(
+    genre_filter: list[str],
+    type_filter: list[str],
+    year_range: tuple[int, int],
+    *,
+    include_genres: bool = True,
+) -> list[str]:
+    """One label per Refine filter that is narrowing the results, e.g. ``"Type: Movie"``."""
+    defaults = filter_defaults()
+    labels: list[str] = []
+    if include_genres and genre_filter:
+        labels.append(f"Genre: {', '.join(genre_filter)}")
+    if type_filter:
+        labels.append(f"Type: {', '.join(type_filter)}")
+    if year_range[0] > defaults["year_min"] or year_range[1] < defaults["year_max"]:
+        labels.append(f"Years: {year_range[0]}–{year_range[1]}")
+    return labels
+
+
+def empty_results_html(kind: str, filter_labels: list[str]) -> str:
+    """Zero-results panel naming the filters that removed everything (``kind``: browse/seed/personalized)."""
+    subject = _EMPTY_SUBJECT[kind]
+    if filter_labels:
+        named = " · ".join(f"<b>{html.escape(label)}</b>" for label in filter_labels)
+        return notice_panel_html(
+            f"{subject} match these filters.",
+            f"These filters removed everything: {named}. Clear them to see results again.",
+        )
+    return notice_panel_html(
+        f"{subject} came back.", html.escape(_EMPTY_HINT_WITHOUT_FILTERS[kind])
+    )
+
+
+def render_empty_results(sidebar: SidebarResult, kind: str) -> None:
+    """Zero-results panel plus one button that clears the filters it names."""
+    # Browse needs its genres, so only type and years count as filters to clear there.
+    labels = active_filter_labels(
+        sidebar.genre_filter,
+        sidebar.type_filter,
+        sidebar.year_range,
+        include_genres=not sidebar.browse_mode,
+    )
+    st.markdown(empty_results_html(kind, labels), unsafe_allow_html=True)
+    if labels and st.button("Clear filters", key="empty_clear_filters", type="primary"):
+        reset_filters(sidebar.default_sort_for_mode, keep_genres=sidebar.browse_mode)
+        st.rerun()
+
+
+def personalized_gate_copy(
+    active_profile: dict | None, personalization_enabled: bool
+) -> tuple[str, str]:
+    """(what is wrong, how to fix it) in visitor words, in the order the gate checks."""
+    ratings = active_profile.get("ratings") if isinstance(active_profile, dict) else None
+    if not active_profile:
+        return (
+            "For me needs a profile with ratings.",
+            "Pick a demo profile under Personalize in the sidebar, or import your MyAnimeList list.",
+        )
+    if not ratings:
+        return (
+            "This profile has no ratings yet.",
+            "Rate a few titles from their cards in Similar to a title, or pick a demo profile.",
+        )
+    if not personalization_enabled:
+        return (
+            "Personalization is switched off.",
+            "Tick Enable personalization under Personalize in the sidebar.",
+        )
+    return (
+        "For me can't rank with this profile yet.",
+        "Try a demo profile, or switch to Similar to a title.",
+    )
+
+
+def personalized_gate_html(active_profile: dict | None, personalization_enabled: bool) -> str:
+    headline, fix = personalized_gate_copy(active_profile, personalization_enabled)
+    return notice_panel_html(
+        headline, f"{html.escape(fix)} {html.escape(NO_FALLBACK_TEXT)}", role="alert"
+    )
+
+
+def render_personalized_gate(reason: str) -> None:
+    """The one main-area message for a For me run that can't start; the raw reason is folded away."""
+    st.markdown(
+        personalized_gate_html(
+            st.session_state.get("active_profile"),
+            bool(st.session_state.get("personalization_enabled", False)),
+        ),
+        unsafe_allow_html=True,
+    )
+    with st.expander("Technical reason", expanded=False):
+        st.caption(reason)
+
+
+def render_empty_state(sidebar: SidebarResult, metadata: pd.DataFrame) -> None:
+    """Render the guidance when a ranked mode returns no results."""
+    if str(st.session_state.get("ui_mode", "Seed-based")) == "Personalized":
+        render_empty_results(sidebar, "personalized")
     elif sidebar.selected_seed_ids:
-        _render_seed_empty_state()
+        render_empty_results(sidebar, "seed")
     else:
         _render_cold_start_state(metadata, sidebar.title_to_id)
 
 
-def _render_personalized_empty_state() -> None:
-    active_profile = st.session_state.get("active_profile")
-    ratings = (
-        (active_profile or {}).get("ratings", {}) if isinstance(active_profile, dict) else {}
-    )
-    blocked_reason = st.session_state.get("personalization_blocked_reason")
-    user_embedding = st.session_state.get("user_embedding")
-    personalization_enabled = bool(st.session_state.get("personalization_enabled", False))
-
-    personalized_unavailable_reason: str | None = None
-    if not active_profile:
-        personalized_unavailable_reason = "Select a rated profile"
-    elif not isinstance(ratings, dict) or len(ratings) == 0:
-        personalized_unavailable_reason = "Add at least one rating"
-    elif not personalization_enabled:
-        personalized_unavailable_reason = "Enable personalization"
-    elif blocked_reason or user_embedding is None:
-        personalized_unavailable_reason = "Personalization is not ready"
-
-    if personalized_unavailable_reason:
-        st.markdown(
-            "<div class='mars-panel-notice'>"
-            "<p class='mars-panel-notice-title'>"
-            "Personalized mode is selected, but it isn't running yet.</p>"
-            "<p class='mars-panel-notice-body'>What next: "
-            "<b>Select a rated profile</b>, <b>add at least one rating</b>, and "
-            "<b>enable personalization</b> in the sidebar.</p>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.warning("No personalized results found with the current filters.")
-        st.markdown("**Try:**")
-        st.markdown(
-            "\n".join(
-                [
-                    "- Use **Reset Filters** in the sidebar",
-                    "- Widen the year range (Filters)",
-                    "- Remove the type filter (Filters)",
-                    "- Switch to **Seed-based** mode to explore via a seed",
-                ]
-            )
-        )
-
-
-def _render_seed_empty_state() -> None:
-    st.warning("No similar titles found with the current filters.")
-    st.markdown("**Try:**")
-    st.markdown(
-        "\n".join(
-            [
-                "- Use **Reset Filters** in the sidebar",
-                "- Try fewer seeds (1–2) or a different seed",
-                "- Widen the year range (Filters)",
-                "- Remove the type filter (Filters)",
-            ]
-        )
-    )
-
-
 def _render_cold_start_state(metadata: pd.DataFrame, title_to_id: dict[str, int]) -> None:
     st.markdown(
-        "<div class='mars-panel-start'>"
-        "<h3 class='mars-panel-start-title'>Get Started</h3>"
-        "<p class='mars-panel-start-body'>"
-        "Pick a seed title to discover similar anime</p>"
-        "</div>",
+        start_panel_html("Get Started", "Pick a seed title to discover similar anime"),
         unsafe_allow_html=True,
     )
 
@@ -475,6 +559,8 @@ def _render_scoring_details(
     with st.expander("Scoring details", expanded=False):
         if pipeline is not None:
             st.caption(f"Active scoring path: {pipeline.active_scoring_path}")
+            if pipeline.active_scoring_path == "Ranked modes disabled":
+                st.caption(ENGINE_UNAVAILABLE_DEV_HINT)
             blocked_reason = st.session_state.get("personalization_blocked_reason")
             if (
                 st.session_state.get("personalization_enabled", False)

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import streamlit as st
 
-from app.state import ratings_signature
+from app.state import ratings_signature, reset_filters
 from src.app.constants import DEFAULT_TOP_N, SEED_RANKING_MODE
 from src.app.diversity import build_user_genre_hist
 from src.app.recommender import choose_weights
@@ -485,15 +485,11 @@ def _render_personalization_section(bundle: dict, metadata) -> bool:
         st.session_state["personalization_blocked_reason"] = None
     else:
         if not st.session_state.get("active_profile"):
-            st.warning("For me is unavailable: select a profile")
-            st.caption("Fix: Choose a profile above and add at least one rating.")
+            st.caption("For me needs a profile: pick a demo profile above.")
             st.session_state["personalization_enabled"] = False
             st.session_state["personalization_blocked_reason"] = "No active profile selected."
         elif not profile_has_ratings:
-            st.warning("For me is unavailable: no ratings")
-            st.caption(
-                "Fix: Add at least one rating (use the in-card rating buttons after selecting a profile)."
-            )
+            st.caption("This profile has no ratings yet.")
             st.session_state["personalization_enabled"] = False
             st.session_state["personalization_blocked_reason"] = "No ratings in active profile."
         else:
@@ -516,7 +512,7 @@ def _render_personalization_section(bundle: dict, metadata) -> bool:
             st.session_state["personalization_enabled"] = personalization_enabled
 
             if not personalization_enabled:
-                st.info("Enable personalization to run For me mode")
+                st.caption("Personalization is off.")
             else:
                 personalization_strength = st.slider(
                     "Strength",
@@ -585,7 +581,7 @@ def _refresh_user_embedding(bundle: dict, ratings: dict) -> None:
             except Exception as e:
                 st.session_state["user_embedding"] = None
                 st.session_state["personalization_blocked_reason"] = f"Failed generating user embedding: {e}"
-                st.error("Personalization unavailable: embedding failed")
+                st.caption("This profile couldn't be read for For me.")
             else:
                 try:
                     emb_norm = float(np.linalg.norm(user_embedding))
@@ -596,7 +592,7 @@ def _refresh_user_embedding(bundle: dict, ratings: dict) -> None:
                     st.session_state["personalization_blocked_reason"] = (
                         "Your rated items do not overlap the MF model training set."
                     )
-                    st.warning("Personalization unavailable: no MF overlap")
+                    st.caption("None of this profile's titles are in the model yet.")
                 else:
                     st.session_state["user_embedding"] = user_embedding
                     st.session_state["personalization_blocked_reason"] = None
@@ -850,11 +846,7 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
     # Clear filters button
     if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != default_sort_for_mode:
         if st.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
-            st.session_state["sort_by"] = default_sort_for_mode
-            st.session_state["genre_filter"] = []
-            st.session_state["type_filter"] = []
-            st.session_state["year_min"] = 1960
-            st.session_state["year_max"] = 2025
+            reset_filters(default_sort_for_mode)
             st.rerun()
 
 

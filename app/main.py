@@ -28,14 +28,18 @@ if root_str not in sys.path:
 
 # ── Project imports ──────────────────────────────────────────────────────────
 from app.display import (
+    ENGINE_UNAVAILABLE_TEXT,
     render_artifact_notice,
+    render_empty_results,
     render_empty_state,
     render_footer,
     render_header,
     render_import_light_warning,
     render_intro_section,
+    render_personalized_gate,
     render_results,
     render_title_card,
+    start_panel_html,
 )
 from app.pipeline_runner import (
     RecommenderEngine,
@@ -67,7 +71,7 @@ logger = logging.getLogger(__name__)
 # ── Cached loaders ───────────────────────────────────────────────────────────
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_resource(show_spinner="Now loading… model files (first visit only)")
 def init_bundle():
     """Load and cache the full artifact bundle."""
     return build_artifacts()
@@ -82,6 +86,10 @@ def load_personas(path: str) -> list[dict]:
     with p.open("r", encoding="utf-8") as f:
         return json.load(f)
 
+
+# ── Page configuration ───────────────────────────────────────────────────────
+# Before the bundle loads, so the cold-load status line is not the first Streamlit command.
+st.set_page_config(page_title="MARS", layout="wide", page_icon="🎬")
 
 # ── Lightweight-import mode (for test_app_import) ────────────────────────────
 IMPORT_LIGHT = bool(os.environ.get("APP_IMPORT_LIGHT"))
@@ -109,9 +117,6 @@ else:
 
 metadata: pd.DataFrame = bundle["metadata"]
 personas = load_personas(PERSONAS_JSON)
-
-# ── Page configuration ───────────────────────────────────────────────────────
-st.set_page_config(page_title="MARS", layout="wide", page_icon="🎬")
 
 # ── State initialisation ─────────────────────────────────────────────────────
 init_mode_state()
@@ -172,22 +177,19 @@ if sidebar_state.browse_mode:
         section_title = f"Browsing: {genre_list_display}"
     else:
         render_title_card("Browse by Genre")
-        st.info("Select at least one genre in the sidebar to start browsing.")
+        st.markdown(
+            start_panel_html(
+                "Pick a genre to start", "Choose one or more genres under Refine in the sidebar."
+            ),
+            unsafe_allow_html=True,
+        )
 
 elif (
     sidebar_state.ui_mode == "Personalized"
     and pipeline_result.personalized_gate_reason
 ):
     render_title_card("Your Recommendations")
-    st.warning(
-        f"Personalized mode selected, but it can't run: "
-        f"{pipeline_result.personalized_gate_reason}"
-    )
-    st.info(
-        "Fix it by adding ratings (or choosing a rated profile), then enable "
-        "personalization in the sidebar. "
-        "This app does not silently fall back to Seed-based results."
-    )
+    render_personalized_gate(pipeline_result.personalized_gate_reason)
 
 else:
     if sidebar_state.selected_seed_ids and sidebar_state.selected_seed_titles:
@@ -221,27 +223,15 @@ if pipeline_result.recs:
         pop_pct_fn=engine.pop_pct_for_anime_id,
         is_in_training_fn=engine.is_in_training,
     )
-elif sidebar_state.browse_mode and sidebar_state.genre_filter:
-    # Browse returned zero results
-    st.warning("No titles found matching your filters.")
-    st.markdown("**Try:**")
-    st.markdown(
-        "\n".join(
-            [
-                "- Widen the year range (Filters)",
-                "- Remove the type filter (Filters)",
-                "- Reduce the number of selected genres (Filters)",
-                "- Use **Reset Filters** in the sidebar",
-            ]
-        )
-    )
-elif not sidebar_state.browse_mode and engine.recommender is None:
-    st.error(
-        "Recommendation engine is unavailable because required artifacts did not "
-        "load. Disable APP_IMPORT_LIGHT and ensure MF artifacts are present/valid."
-    )
-elif not sidebar_state.browse_mode:
-    render_empty_state(sidebar_state, pipeline_result, metadata)
+elif sidebar_state.browse_mode:
+    if sidebar_state.genre_filter:
+        render_empty_results(sidebar_state, "browse")
+elif pipeline_result.personalized_gate_reason:
+    pass  # explained once, under the section title above
+elif engine.recommender is None:
+    st.error(ENGINE_UNAVAILABLE_TEXT)
+else:
+    render_empty_state(sidebar_state, metadata)
 
 # ── Footer (diversity panel, help, scoring details) ──────────────────────────
 st.markdown("---")

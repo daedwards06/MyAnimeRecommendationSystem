@@ -89,10 +89,8 @@ LIVE: dict[str, dict[str, str]] = {
         "popular": "#FC8181",
         "midrange": "#63B3ED",
         "longtail": "#B794F4",
-        "notice_border": "#F0AD4E",
         "mmr_lambda": "#B0B0B0",
         "mmr_note": "#888888",
-        "skeleton": "#2A2F36",
     },
     # Taste-profile charts and their legend rows.
     "chart": {

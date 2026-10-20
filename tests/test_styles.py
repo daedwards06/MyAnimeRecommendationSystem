@@ -9,7 +9,16 @@ from types import SimpleNamespace
 import pytest
 
 import app.styles as styles
-from app.display import header_html, mix_bar_html, result_scope_html, title_card
+from app.display import (
+    empty_results_html,
+    header_html,
+    loading_html,
+    mix_bar_html,
+    personalized_gate_html,
+    result_scope_html,
+    start_panel_html,
+    title_card,
+)
 from app.sidebar import SAMPLE_SEEDS_LABEL_HTML, group_label_html, section_label_html
 from src.app.components.cards import (
     CARD_MARKER_HTML,
@@ -114,6 +123,11 @@ HELPER_HTML = {
     "group_label": group_label_html("Find"),
     "try_label": SAMPLE_SEEDS_LABEL_HTML,
     "stat_row": stat_row_html("Action", "8.2/10", "high"),
+    "loading": loading_html("ranking the catalog"),
+    "empty_filtered": empty_results_html("seed", ["Type: Movie"]),
+    "empty_unfiltered": empty_results_html("personalized", []),
+    "gate": personalized_gate_html(None, False),
+    "start_panel": start_panel_html("Pick a genre to start", "Choose a genre."),
 }
 
 

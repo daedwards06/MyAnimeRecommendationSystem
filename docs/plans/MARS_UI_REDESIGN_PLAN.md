@@ -572,13 +572,13 @@ streamlit run app/main.py   # visual: spinner text while running; filter to an i
 
 **Checklist:**
 
-- [ ] Loading: styled spinner with a short "Now loading…" eyecatch line; no fake progress bar
-- [ ] Empty state: says which filters removed everything and offers one button that clears
+- [x] Loading: styled spinner with a short "Now loading…" eyecatch line; no fake progress bar
+- [x] Empty state: says which filters removed everything and offers one button that clears
       filters (state keys unchanged; reuses existing defaults)
-- [ ] Gate and error messages: plain language first, technical reason in an expander (same rule
+- [x] Gate and error messages: plain language first, technical reason in an expander (same rule
       as the portfolio plan: users see words, reviewers see numbers)
-- [ ] Tests: empty-state message names active filters; reset restores defaults
-- [ ] Tests + ruff green
+- [x] Tests: empty-state message names active filters; reset restores defaults
+- [x] Tests + ruff green
 
 ---
 

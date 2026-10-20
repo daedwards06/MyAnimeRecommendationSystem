@@ -1,13 +1,20 @@
-"""Skeleton loading components for perceived performance; `.skel-box` lives in app/styles/components.css."""
+"""Card-shaped loading skeletons; the classes live in app/styles/components.css."""
 from __future__ import annotations
 
-import streamlit as st
+_SKELETON_CARD = (
+    "<div class='mars-skel-card'>"
+    "<div class='mars-skel-poster'></div>"
+    "<div class='mars-skel-lines'>"
+    "<div class='mars-skel-line mars-skel-line-title'></div>"
+    "<div class='mars-skel-line'></div>"
+    "<div class='mars-skel-line mars-skel-line-short'></div>"
+    "</div>"
+    "</div>"
+)
 
 
-def render_card_skeleton(count: int = 5):
+def card_skeleton_html(count: int = 3) -> str:
+    """``count`` list-view card placeholders, hidden from screen readers."""
     if count <= 0:
-        return
-    cols = st.columns(min(count, 5))
-    for i in range(count):
-        with cols[i % len(cols)]:
-            st.markdown('<div class="skel-box"></div>', unsafe_allow_html=True)
+        return ""
+    return f"<div class='mars-skel-list' aria-hidden='true'>{_SKELETON_CARD * count}</div>"

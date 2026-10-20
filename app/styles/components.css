@@ -116,7 +116,7 @@
 /* ===== Empty-state panels ===== */
 .stApp .mars-panel-notice {
     background: var(--mars-color-panel);
-    border-left: 4px solid var(--mars-live-notice-border);
+    border-left: 4px solid var(--mars-color-subtitle);
     border-radius: 8px;
     padding: 20px;
     margin: 20px 0;
@@ -445,23 +445,75 @@
 .stApp .mars-chart-low { color: var(--mars-live-chart-low); }
 .stApp .mars-chart-bad { color: var(--mars-live-chart-bad); }
 
-/* ===== Loading skeleton (src/app/components/skeletons.py) ===== */
-.stApp .skel-box {
-    background: var(--mars-live-skeleton);
-    border-radius: 4px;
-    height: 260px;
-    width: 100%;
+/* ===== Loading state: eyecatch line + card skeletons (app/display.py loading_html) ===== */
+.stApp .mars-loading { margin: var(--mars-space-md) 0; }
+.stApp .mars-loading-eyecatch {
+    font-family: var(--mars-font-display);
+    color: var(--mars-color-subtitle);
+    font-size: 1.1rem;
+    margin: 0 0 var(--mars-space-md) 0;
+}
+.stApp .mars-loading-detail {
+    font-family: var(--mars-font-body);
+    color: var(--mars-color-text-muted);
+    font-size: 0.95rem;
+}
+.stApp .mars-loading-spinner {
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    margin-right: var(--mars-space-sm);
+    vertical-align: -0.1em;
+    border: 2px solid var(--mars-color-line);
+    border-top-color: var(--mars-color-subtitle);
+    border-radius: 50%;
+}
+.stApp [data-testid="stSpinner"] { color: var(--mars-color-text-muted); }
+.stApp .mars-skel-list { display: flex; flex-direction: column; gap: var(--mars-space-md); }
+.stApp .mars-skel-card {
+    display: flex;
+    gap: var(--mars-space-md);
+    padding: var(--mars-space-md);
+    background: var(--mars-color-panel);
+    border: var(--mars-border-thin) solid var(--mars-color-ink);
+    border-radius: var(--mars-radius-md);
     position: relative;
     overflow: hidden;
 }
-.stApp .skel-box:before {
+.stApp .mars-skel-poster {
+    flex: 0 0 120px;
+    height: 170px;
+    background: var(--mars-color-line);
+    border-radius: var(--mars-radius-sm);
+}
+.stApp .mars-skel-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mars-space-sm);
+    padding-top: var(--mars-space-xs);
+}
+.stApp .mars-skel-line {
+    height: 12px;
+    width: 80%;
+    background: var(--mars-color-line);
+    border-radius: var(--mars-radius-sm);
+}
+.stApp .mars-skel-line-title { height: 18px; width: 50%; }
+.stApp .mars-skel-line-short { width: 35%; }
+.stApp .mars-skel-card::before {
     content: '';
     position: absolute;
     top: 0;
     left: -40%;
     height: 100%;
     width: 40%;
-    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.08), rgba(255,255,255,0));
-    animation: shimmer 1.2s infinite;
+    background: linear-gradient(90deg, transparent, var(--mars-color-text-muted), transparent);
+    opacity: 0.08;
 }
-@keyframes shimmer { 0% { left: -40%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: no-preference) {
+    .stApp .mars-loading-spinner { animation: mars-spin 0.9s linear infinite; }
+    .stApp .mars-skel-card::before { animation: mars-shimmer 1.2s infinite; }
+}
+@keyframes mars-spin { to { transform: rotate(360deg); } }
+@keyframes mars-shimmer { 0% { left: -40%; } 100% { left: 100%; } }

@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from app.display import loading_state
 from src.app.artifacts_loader import ArtifactContractError
 from src.app.constants import COMMUNITY_BASELINE_WEIGHTS, SEED_RANKING_MODE
 from src.app.diversity import compute_popularity_percentiles
@@ -95,32 +96,31 @@ class PipelineRunResult:
 def render_artifact_load_failure(err: Exception) -> None:
     """Display artifact-load error and halt the app via ``st.stop()``."""
     st.error(
-        "Required artifacts are missing or invalid. "
-        "Ranked modes are disabled until this is fixed."
+        "MARS can't start right now because its model files didn't load. "
+        "Please try again in a few minutes."
     )
-    st.markdown("**Active scoring path:** Ranked modes disabled")
     details: list[str] = []
     if isinstance(err, ArtifactContractError):
         details = getattr(err, "details", [])
-    elif isinstance(err, FileNotFoundError):
-        details = [str(err)]
     else:
         details = [str(err)]
 
-    st.markdown("**Checklist**")
-    st.markdown(
-        "\n".join(
-            [
-                "- data/processed/anime_metadata.parquet exists",
-                "- models/ contains MF .joblib artifact(s)",
-                "- MF artifact provides: Q, item_to_index, index_to_item",
-                "- If multiple MF artifacts exist, set APP_MF_MODEL_STEM to choose one",
-            ]
+    with st.expander("Technical details", expanded=False):
+        st.markdown("**Active scoring path:** Ranked modes disabled")
+        st.markdown("**Checklist**")
+        st.markdown(
+            "\n".join(
+                [
+                    "- data/processed/anime_metadata.parquet exists",
+                    "- models/ contains MF .joblib artifact(s)",
+                    "- MF artifact provides: Q, item_to_index, index_to_item",
+                    "- If multiple MF artifacts exist, set APP_MF_MODEL_STEM to choose one",
+                ]
+            )
         )
-    )
-    if details:
-        st.markdown("**Details**")
-        st.markdown("\n".join([f"- {d}" for d in details]))
+        if details:
+            st.markdown("**Details**")
+            st.markdown("\n".join([f"- {d}" for d in details]))
     st.stop()
 
 
@@ -374,7 +374,7 @@ def _run_ranked(
     # Hygiene exclusion set (once per run).
     ranked_hygiene_exclude_ids = build_ranked_candidate_hygiene_exclude_ids(metadata)
 
-    with st.spinner("🔍 Finding recommendations..."), latency_timer("recommendations"):
+    with loading_state("ranking the catalog"), latency_timer("recommendations"):
         recs, personalization_applied = _execute_pipeline(
             engine, sidebar, bundle, metadata,
             n_requested, ranked_hygiene_exclude_ids,

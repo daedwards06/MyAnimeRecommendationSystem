@@ -15,6 +15,23 @@ from src.app.constants import DEFAULT_TOP_N, SEED_RANKING_MODE
 
 DEFAULT_SEED_TITLE = "Fullmetal Alchemist: Brotherhood"
 
+
+def filter_defaults() -> dict:
+    """The Refine filters' default values (a fresh dict, so callers can't share the lists)."""
+    return {"genre_filter": [], "type_filter": [], "year_min": 1960, "year_max": 2025}
+
+
+def reset_filters(default_sort: str, *, keep_genres: bool = False) -> None:
+    """Put the Refine filters and the sort back to their defaults.
+
+    Browse needs a genre to show anything, so its reset keeps the genres (``keep_genres``).
+    """
+    st.session_state["sort_by"] = default_sort
+    for key, value in filter_defaults().items():
+        if keep_genres and key == "genre_filter":
+            continue
+        st.session_state[key] = value
+
 # ── Query-param helpers ──────────────────────────────────────────────────────
 
 
@@ -61,10 +78,7 @@ def init_session_state() -> None:
         "top_n": int(qp_get("n", DEFAULT_TOP_N)),
         "sort_by": qp_get("sort", "Match score"),
         "browse_mode": bool(st.session_state.get("browse_mode", False)),
-        "genre_filter": [],
-        "type_filter": [],
-        "year_min": 1960,
-        "year_max": 2025,
+        **filter_defaults(),
         "view_mode": "list",
         "selected_seed_ids": [],
         "selected_seed_titles": [],
