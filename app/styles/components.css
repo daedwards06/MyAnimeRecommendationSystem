@@ -316,6 +316,70 @@
     font-weight: 600;
 }
 
+/* ===== Sidebar: group labels (Find / Refine / Personalize / Advanced) ===== */
+.stApp .mars-group-label {
+    display: flex;
+    align-items: center;
+    gap: var(--mars-space-sm);
+    margin: var(--mars-space-md) 0 var(--mars-space-xs);
+    font-family: var(--mars-font-display);
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mars-color-text);
+}
+.stApp .mars-group-label::before {
+    content: "";
+    flex: none;
+    width: var(--mars-space-xs);
+    height: 1em;
+    background: var(--mars-color-signal);
+}
+.stApp .mars-group-label::after {
+    content: "";
+    flex: 1;
+    height: var(--mars-border-thin);
+    background: var(--mars-color-line);
+}
+
+/* ===== Sidebar: sample seeds as tags ===== */
+/* Native buttons, so keyboard and screen-reader behavior is Streamlit's own. The row is found by
+   the "Try:" marker in its first column; columns size to their tag and wrap. */
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-try-label) {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mars-space-xs) var(--mars-space-sm);
+}
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-try-label) > [data-testid="column"] {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+}
+.stApp .mars-try-label {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--mars-color-text-muted);
+}
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-try-label) button[kind="secondary"] {
+    background-color: transparent !important;
+    color: var(--mars-color-cyan) !important;
+    border: var(--mars-border-thin) solid currentColor !important;
+    border-radius: var(--mars-radius-sm) !important;
+    padding: 1px var(--mars-space-sm) !important;
+    min-height: 0 !important;
+    height: auto !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase;
+    transform: none !important;
+}
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-try-label) button[kind="secondary"]:hover {
+    background-color: var(--mars-color-cyan) !important;
+    color: var(--mars-color-bg) !important;
+    border-color: var(--mars-color-cyan) !important;
+}
+
 /* ===== Sidebar ===== */
 .stApp .mars-section-label {
     font-weight: 700;

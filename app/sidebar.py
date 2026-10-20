@@ -70,23 +70,20 @@ def render_sidebar(
     """
     result = SidebarResult()
 
-    # Find
-    _section_label("Find")
+    _group_label("Find")
     _render_mode_selector(result)
     _render_search_seeds_section(metadata, result)
     _render_seed_indicator(result)
 
-    # Refine
     _render_filters_display_section(metadata, result)
 
-    # Personalize
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("Personalize", expanded=result.ui_mode == "Personalized"):
+    _group_label("Personalize")
+    with st.sidebar.expander("Profile and ratings", expanded=result.ui_mode == "Personalized"):
         _render_profile_section(metadata)
         show_taste_profile = _render_personalization_section(bundle, metadata)
 
-    # Advanced
-    with st.sidebar.expander("Advanced", expanded=False):
+    _group_label("Advanced")
+    with st.sidebar.expander("Ranking and diagnostics", expanded=False):
         _render_advanced_section(result, clear_cache_fn)
 
     # Persist to query params
@@ -116,6 +113,14 @@ def _section_label(text: str, *, container=None) -> None:
 
 def section_label_html(text: str) -> str:
     return f"<p class='mars-section-label'>{text}</p>"
+
+
+def _group_label(text: str, *, container=None) -> None:
+    (container or st.sidebar).markdown(group_label_html(text), unsafe_allow_html=True)
+
+
+def group_label_html(text: str) -> str:
+    return f"<p class='mars-group-label'>{text}</p>"
 
 
 # ── Find: mode selector ─────────────────────────────────────────────────────
@@ -614,6 +619,7 @@ SAMPLE_SEEDS = {
     "Your Name": "Your Name.",
     "Cowboy Bebop": "Cowboy Bebop",
 }
+SAMPLE_SEEDS_LABEL_HTML = "<p class='mars-try-label'>Try:</p>"
 
 
 def _render_search_seeds_section(metadata, result: SidebarResult) -> None:
@@ -689,11 +695,12 @@ def _render_sample_seeds(result: SidebarResult) -> None:
     ]
     if not samples:
         return
-    st.sidebar.caption("Try:")
-    cols = st.sidebar.columns(len(samples))
+    # The marker sits inside the row so the CSS can find it; Streamlit 1.38 has no per-key class.
+    try_col, *cols = st.sidebar.columns(len(samples) + 1)
+    try_col.markdown(SAMPLE_SEEDS_LABEL_HTML, unsafe_allow_html=True)
     for col, (label, title) in zip(cols, samples):
         with col:
-            if st.button(label, key=f"sample_{label}", use_container_width=True):
+            if st.button(label, key=f"sample_{label}"):
                 st.session_state["selected_seed_ids"] = [*result.selected_seed_ids, result.title_to_id[title]]
                 st.session_state["selected_seed_titles"] = [*current_titles, title]
                 st.session_state["_default_seed_active"] = False
@@ -716,8 +723,7 @@ def _render_filters_display_section(metadata, result: SidebarResult) -> None:
 @st.fragment
 def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
     """Filter panel fragment - reruns independently without triggering pipeline."""
-    st.markdown("---")
-    _section_label("Refine", container=st)
+    _group_label("Refine", container=st)
 
     browse_mode = bool(st.session_state.get("browse_mode", False))
     if browse_mode:

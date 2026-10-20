@@ -74,6 +74,21 @@ h3 {
     color: var(--mars-color-text-muted);
 }
 
+/* ===== Sidebar focus rings ===== */
+/* Keyboard focus on every sidebar widget, in the focus token (well above 3:1 on the panel).
+   Hidden radio/checkbox inputs ring their visible label instead. */
+[data-testid="stSidebar"] button:focus-visible,
+[data-testid="stSidebar"] summary:focus-visible,
+[data-testid="stSidebar"] [role="slider"]:focus-visible,
+[data-testid="stSidebar"] [data-baseweb="select"]:focus-within,
+[data-testid="stSidebar"] [data-baseweb="input"]:focus-within,
+[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:focus-visible),
+[data-testid="stSidebar"] [data-baseweb="checkbox"]:has(input:focus-visible) {
+    outline: 2px solid var(--mars-color-focus) !important;
+    outline-offset: 2px;
+    border-radius: var(--mars-radius-sm);
+}
+
 /* ===== Buttons ===== */
 .stButton > button {
     border-radius: 8px;

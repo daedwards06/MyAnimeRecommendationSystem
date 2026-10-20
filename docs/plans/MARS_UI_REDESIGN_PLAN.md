@@ -497,13 +497,13 @@ streamlit run app/main.py   # visual: four labelled groups; Advanced collapsed; 
 
 **Checklist:**
 
-- [ ] Group labels for Find / Refine / Personalize / Advanced via one helper, styled from tokens
-- [ ] "Try: Steins;Gate · Your Name · Cowboy Bebop" buttons styled as tags; still native buttons
+- [x] Group labels for Find / Refine / Personalize / Advanced via one helper, styled from tokens
+- [x] "Try: Steins;Gate · Your Name · Cowboy Bebop" buttons styled as tags; still native buttons
       (keyboard and screen reader behavior unchanged)
-- [ ] Widget focus rings visible on the dark theme (token color, ≥ 3:1 against panel)
-- [ ] `SidebarResult`, session keys, mode values, and query params untouched (diff check in the
+- [x] Widget focus rings visible on the dark theme (token color, ≥ 3:1 against panel)
+- [x] `SidebarResult`, session keys, mode values, and query params untouched (diff check in the
       commit)
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 

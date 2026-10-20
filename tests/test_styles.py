@@ -10,7 +10,7 @@ import pytest
 
 import app.styles as styles
 from app.display import header_html, mix_bar_html, result_scope_html, title_card
-from app.sidebar import section_label_html
+from app.sidebar import SAMPLE_SEEDS_LABEL_HTML, group_label_html, section_label_html
 from src.app.components.cards import (
     CARD_MARKER_HTML,
     explanation_html,
@@ -21,6 +21,7 @@ from src.app.components.cards import (
 )
 from src.app.components.instructions import intro_line_html
 from src.app.components.taste_profile import stat_row_html
+from src.app.theme_tokens import TOKENS, contrast_ratio
 
 ROOT = Path(__file__).resolve().parents[1]
 STYLES = ROOT / "app" / "styles"
@@ -109,7 +110,9 @@ HELPER_HTML = {
     "explanation_compact": explanation_html("You rate Drama highly", compact=True),
     "meta": meta_span("★ 8.50", "success", "score"),
     "flag": flag_html("Trained", "success"),
-    "section_label": section_label_html("Find"),
+    "section_label": section_label_html("Profile"),
+    "group_label": group_label_html("Find"),
+    "try_label": SAMPLE_SEEDS_LABEL_HTML,
     "stat_row": stat_row_html("Action", "8.2/10", "high"),
 }
 
@@ -154,3 +157,28 @@ def test_headings_body_and_code_use_the_font_tokens() -> None:
     for token in ("--mars-font-body", "--mars-font-display", "--mars-font-mono"):
         assert f"font-family: var({token});" in base
     assert re.search(r"\.stApp code,[^{]*\{\s*font-family: var\(--mars-font-mono\);", base)
+
+
+def test_sidebar_groups_render_in_order_through_one_helper() -> None:
+    source = (ROOT / "app" / "sidebar.py").read_text(encoding="utf-8")
+    assert sorted(re.findall(r'_group_label\("([^"]+)"', source)) == ["Advanced", "Find", "Personalize", "Refine"]
+    # Refine's label is drawn inside the filters fragment, so render order is checked by call site.
+    body = source[source.index("def render_sidebar(") : source.index("def _section_label(")]
+    calls = ['_group_label("Find")', "_render_filters_display_section(", '_group_label("Personalize")', '_group_label("Advanced")']
+    positions = [body.index(call) for call in calls]
+    assert positions == sorted(positions)
+
+
+def test_sample_seed_tags_are_scoped_to_the_try_row() -> None:
+    css = (STYLES / "components.css").read_text(encoding="utf-8")
+    assert '[data-testid="stHorizontalBlock"]:has(.mars-try-label) button[kind="secondary"]' in css
+
+
+def test_sidebar_focus_ring_uses_the_focus_token() -> None:
+    base = (STYLES / "base.css").read_text(encoding="utf-8")
+    assert re.search(
+        r'\[data-testid="stSidebar"\] button:focus-visible,[^{]*\{\s*outline: 2px solid var\(--mars-color-focus\)',
+        base,
+    )
+    colors = TOKENS["color"]
+    assert contrast_ratio(colors["focus"], colors["panel"]) >= 3.0
