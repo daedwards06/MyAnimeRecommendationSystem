@@ -6,8 +6,8 @@
 .stApp .mars-tone-warn { color: var(--mars-live-warn); }
 .stApp .mars-tone-error { color: var(--mars-live-error); }
 .stApp .mars-tone-info { color: var(--mars-live-info); }
-.stApp .mars-tone-muted { color: var(--mars-live-text-muted); }
-.stApp .mars-tone-primary { color: var(--mars-live-primary); }
+.stApp .mars-tone-muted { color: var(--mars-color-text-muted); }
+.stApp .mars-tone-primary { color: var(--mars-color-cyan); }
 .stApp .mars-tone-purple { color: var(--mars-live-purple); }
 
 /* ===== Header ===== */
@@ -16,7 +16,7 @@
     font-weight: 800;
 }
 .stApp .mars-header-subtitle {
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     font-size: 1.05rem;
     margin-top: 0;
     margin-bottom: 1rem;
@@ -32,11 +32,11 @@
 .stApp .mars-result-count-main {
     font-size: 1.15rem;
     font-weight: 700;
-    color: var(--mars-live-text-primary);
+    color: var(--mars-color-text);
 }
 .stApp .mars-result-count-sub {
     font-size: 0.82rem;
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
 }
 
 /* ===== Recommendation mix bar ===== */
@@ -49,14 +49,14 @@
 }
 .stApp .mars-mix-label {
     font-size: 0.75rem;
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 600;
 }
 .stApp .mars-mix-legend {
     font-size: 0.72rem;
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
 }
 .stApp .mars-mix-dot-popular { color: var(--mars-live-popular); }
 .stApp .mars-mix-dot-midrange { color: var(--mars-live-midrange); }
@@ -67,44 +67,44 @@
     height: 6px;
     border-radius: 3px;
     overflow: hidden;
-    background: var(--mars-live-border-light);
+    background: var(--mars-color-line);
 }
 .stApp .mars-mix-popular { fill: var(--mars-live-popular); }
 .stApp .mars-mix-midrange { fill: var(--mars-live-midrange); }
 .stApp .mars-mix-longtail { fill: var(--mars-live-longtail); }
-.stApp .mars-mix-empty { fill: var(--mars-live-text-muted); }
+.stApp .mars-mix-empty { fill: var(--mars-color-text-muted); }
 
 /* ===== Empty-state panels ===== */
 .stApp .mars-panel-notice {
-    background: linear-gradient(135deg, var(--mars-live-notice-bg-from) 0%, var(--mars-live-notice-bg-to) 100%);
+    background: var(--mars-color-panel);
     border-left: 4px solid var(--mars-live-notice-border);
     border-radius: 8px;
     padding: 20px;
     margin: 20px 0;
 }
 .stApp .mars-panel-notice-title {
-    color: var(--mars-live-notice-text);
+    color: var(--mars-color-text);
     font-weight: 600;
     margin: 0;
 }
 .stApp .mars-panel-notice-body {
-    color: var(--mars-live-notice-text);
+    color: var(--mars-color-text);
     margin: 8px 0 0 0;
 }
 .stApp .mars-panel-start {
-    background: var(--mars-live-primary-bg);
+    background: var(--mars-color-panel);
     border-radius: 12px;
     padding: 32px;
     margin: 24px 0;
     text-align: center;
 }
 .stApp .mars-panel-start-title {
-    color: var(--mars-live-text-primary);
+    color: var(--mars-color-text);
     margin: 0 0 8px 0;
     font-weight: 800;
 }
 .stApp .mars-panel-start-body {
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
     font-size: 1.0rem;
     margin: 0 0 24px 0;
 }
@@ -113,14 +113,14 @@
 .stApp .mars-poster-placeholder {
     width: 180px;
     height: 260px;
-    background: var(--mars-live-surface-alt);
+    background: var(--mars-color-panel);
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--mars-live-border);
+    border: 1px solid var(--mars-color-line);
     border-radius: 8px;
     font-size: 12px;
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
 }
 
 /* ===== Cards: match badge and rank ===== */
@@ -141,9 +141,9 @@
 .stApp .mars-tier-strong { color: var(--mars-live-tier-strong); background: var(--mars-live-tier-strong-tint); }
 .stApp .mars-tier-good { color: var(--mars-live-tier-good); background: var(--mars-live-tier-good-tint); }
 .stApp .mars-tier-look { color: var(--mars-live-tier-look); background: var(--mars-live-tier-look-tint); }
-.stApp .mars-tier-none { color: var(--mars-live-primary); background: var(--mars-live-primary-tint); }
+.stApp .mars-tier-none { color: var(--mars-color-cyan); background: var(--mars-live-primary-tint); }
 .stApp .mars-rank {
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     font-size: 0.78rem;
     font-weight: 400;
     margin-left: 6px;
@@ -153,25 +153,26 @@
 
 /* ===== Cards: titles and text ===== */
 .stApp .mars-card-title {
+    font-family: var(--mars-font-body);
     margin: 0;
     font-size: 1.15rem;
-    color: var(--mars-live-text-primary);
+    color: var(--mars-color-text);
     font-weight: 700;
 }
 .stApp .mars-card-title-compact {
     font-weight: 700;
     font-size: 0.95rem;
-    color: var(--mars-live-text-primary);
+    color: var(--mars-color-text);
     margin: 8px 0 4px 0;
 }
 .stApp .mars-alt-title {
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     font-style: italic;
     font-size: 0.85rem;
     margin: 2px 0 0 0;
 }
 .stApp .mars-explanation {
-    background: var(--mars-live-primary-bg);
+    background: var(--mars-color-panel);
     padding: 6px 12px;
     border-radius: 6px;
     margin: 6px 0;
@@ -179,21 +180,21 @@
 }
 .stApp .mars-explanation > span {
     font-size: 0.82rem;
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
 }
 .stApp .mars-explanation-compact {
     font-size: 0.72rem;
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
     margin: 4px 0;
     font-style: italic;
 }
 .stApp .mars-studio {
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     font-size: 0.82rem;
     margin: 4px 0;
 }
 .stApp .mars-synopsis {
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
     font-size: 0.88rem;
     line-height: 1.6;
     margin: 4px 0 8px 0;
@@ -233,7 +234,7 @@
 .stApp .mars-section-label {
     font-weight: 700;
     font-size: 0.8rem;
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     margin-bottom: 4px;
@@ -241,19 +242,19 @@
 .stApp .mars-quick-guide {
     font-size: 0.88rem;
     line-height: 1.9;
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
 }
 .stApp .mars-stat-tile {
-    background: var(--mars-live-bg-alt);
+    background: var(--mars-color-panel);
     border-radius: 8px;
     padding: 12px;
     margin-bottom: 8px;
-    border: 1px solid var(--mars-live-border);
+    border: 1px solid var(--mars-color-line);
 }
 .stApp .mars-stat-tile-label {
     margin: 0;
     font-size: 0.78rem;
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -265,7 +266,7 @@
 
 /* ===== Diversity panel: MMR banner ===== */
 .stApp .mars-mmr-banner {
-    background-color: var(--mars-live-text-primary);
+    background-color: var(--mars-color-panel);
     padding: 8px 12px;
     border-radius: 4px;
     margin-bottom: 12px;

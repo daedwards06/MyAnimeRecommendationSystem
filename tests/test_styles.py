@@ -59,7 +59,8 @@ def test_stylesheet_is_tokens_then_base_then_components(monkeypatch, emitted):
     styles.inject_styles()
     body = emitted[0]
     assert body.startswith("<style>") and body.rstrip().endswith("</style>")
-    positions = [body.index((STYLES / name).read_text(encoding="utf-8")) for name in styles.STYLESHEETS]
+    first_lines = [(STYLES / name).read_text(encoding="utf-8").splitlines()[0] for name in styles.STYLESHEETS]
+    positions = [body.index(line) for line in first_lines]
     assert positions == sorted(positions)
 
 
@@ -122,3 +123,20 @@ def test_mix_bar_segments_fill_the_track():
     assert sum(float(w) for w in widths[1:]) == pytest.approx(100.0)  # [0] is the <svg>
     assert "Popular 3" in mix_bar_html("Recommendation mix", 3, 5, 2)
     assert "mars-mix-empty" in mix_bar_html("Catalog mix", 0, 0, 0)
+
+
+def test_font_import_is_hoisted_to_the_top_of_the_stylesheet() -> None:
+    sheet = styles.stylesheet()
+    first_rule = next(line for line in sheet.splitlines() if line.strip())
+    assert first_rule.startswith("@import url('https://fonts.googleapis.com/css2?")
+    assert "display=swap" in first_rule
+    assert "Shippori+Mincho+B1:wght@800" in first_rule
+    assert "M+PLUS+Rounded+1c:wght@400;700" in first_rule
+    assert sheet.count("@import") == 1
+
+
+def test_headings_body_and_code_use_the_font_tokens() -> None:
+    base = (STYLES / "base.css").read_text(encoding="utf-8")
+    for token in ("--mars-font-body", "--mars-font-display", "--mars-font-mono"):
+        assert f"font-family: var({token});" in base
+    assert re.search(r"\.stApp code,[^{]*\{\s*font-family: var\(--mars-font-mono\);", base)

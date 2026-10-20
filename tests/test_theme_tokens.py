@@ -44,8 +44,8 @@ def test_text_pairs_meet_wcag_aa(fg: str, bg: str) -> None:
 
 
 def test_color_tokens_are_hex() -> None:
-    colors = {**TOKENS["color"], **LIVE["tier_colors"]}
-    colors.update({k: v for k, v in LIVE["streamlit_theme"].items() if k.endswith("Color")})
+    colors = {**TOKENS["color"], **LIVE["tier_colors"], **LIVE["color"], **LIVE["chart"]}
+    colors.update({k: v for k, v in streamlit_theme().items() if k.endswith("Color")})
     bad = {k: v for k, v in colors.items() if not HEX.match(v)}
     assert not bad
 
@@ -88,3 +88,15 @@ def test_replace_section_keeps_other_sections() -> None:
 def test_badge_tier_colors_come_from_tokens() -> None:
     assert [color for _, color in MATCH_TIERS] == [LIVE["tier_colors"][t] for t in TIER_TOKENS]
     assert set(LIVE["tier_colors"]) == set(TIER_TOKENS)
+
+
+def test_streamlit_theme_is_dark_and_from_tokens() -> None:
+    c = TOKENS["color"]
+    assert streamlit_theme() == {
+        "base": "dark",
+        "primaryColor": c["signal"],
+        "backgroundColor": c["bg"],
+        "secondaryBackgroundColor": c["panel"],
+        "textColor": c["text"],
+        "font": "sans serif",
+    }

@@ -386,14 +386,14 @@ ruff check src/ tests/ app/
 
 **Checklist:**
 
-- [ ] `config.toml` `[theme]`: `base = "dark"`, primary, background, secondary background, text
+- [x] `config.toml` `[theme]`: `base = "dark"`, primary, background, secondary background, text
       from tokens (generated, not hand-edited)
-- [ ] `base.css`: Google Fonts `@import` for Shippori Mincho B1 (800) and M PLUS Rounded 1c (400, 700)
+- [x] `base.css`: Google Fonts `@import` for Shippori Mincho B1 (800) and M PLUS Rounded 1c (400, 700)
       with `display=swap`; body and widget text use the body stack; headings use the display
       stack; every stack ends in a system fallback
-- [ ] Code blocks and the reviewer panels (Scoring details) keep a monospace stack
-- [ ] Visual check at 1440×900 and 390×844 in all three modes
-- [ ] Tests + ruff green
+- [x] Code blocks and the reviewer panels (Scoring details) keep a monospace stack
+- [x] Visual check at 1440×900 and 390×844 in all three modes
+- [x] Tests + ruff green
 
 ---
 

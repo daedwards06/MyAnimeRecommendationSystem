@@ -5,10 +5,11 @@ maxUploadSize = 5
 enableStaticServing = false
 
 [theme]
-primaryColor = "#6C63FF"
-backgroundColor = "#FAFBFC"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#1A1A2E"
+base = "dark"
+primaryColor = "#FF4A4A"
+backgroundColor = "#110D14"
+secondaryBackgroundColor = "#1E1823"
+textColor = "#F4ECE2"
 font = "sans serif"
 
 [client]

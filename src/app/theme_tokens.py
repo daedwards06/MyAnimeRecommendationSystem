@@ -12,6 +12,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "bg": "#110D14",  # plum black
         "panel": "#1E1823",
         "ink": "#050307",  # outlines, and the subtitle text outline
+        "line": "#3A3142",  # dividers and widget borders; never text
         "text": "#F4ECE2",  # warm off-white
         "text_muted": "#B0A6B8",
         "signal": "#FF4A4A",  # signal red: primary action
@@ -71,40 +72,21 @@ TEXT_PAIRS: list[tuple[str, str]] = [
     *((_C[t], _C["bg"]) for t in TIER_TOKENS),
 ]
 
-# What the deployed app still renders until Phase 2 switches it to TOKENS: the Streamlit theme
-# in Task 2.2, the tier badge colors in Task 2.4. Kept here so the generated config.toml and the
-# badges already read from this module; not in TEXT_PAIRS because they fail 4.5:1 (audit F3).
+# Pre-redesign accent colors the app still paints with until a later task moves each to TOKENS:
+# tier badges in Task 2.4, the rest with the component that uses them. All pass 4.5:1 on the
+# night surfaces except "primary", which is never used as text.
 LIVE: dict[str, dict[str, str]] = {
-    "streamlit_theme": {
-        "primaryColor": "#6C63FF",
-        "backgroundColor": "#FAFBFC",
-        "secondaryBackgroundColor": "#F0F2F6",
-        "textColor": "#1A1A2E",
-        "font": "sans serif",
-    },
     "tier_colors": {
         "tier_top": "#27AE60",
         "tier_strong": "#3498DB",
         "tier_good": "#E67E22",
         "tier_look": "#95A5A6",
     },
-    # The light palette app/styles/*.css paints with (as --mars-live-*) until Task 2.2.
+    # Painted by app/styles/components.css as --mars-live-*.
     "color": {
-        "text_primary": "#1A1A2E",
-        "text_secondary": "#4A5568",
-        "text_dark": "#2D3748",
-        "text_muted": "#A0AEC0",
         "text_inverse": "#FFFFFF",
         "primary": "#6C63FF",
-        "primary_dark": "#5A52D5",
-        "primary_bg": "#F0EFFF",
-        "primary_border": "#D6D3FF",
         "accent_alt": "#4ECDC4",
-        "bg": "#FAFBFC",
-        "bg_alt": "#F7FAFC",
-        "surface_alt": "#F0F2F6",
-        "border": "#E2E8F0",
-        "border_light": "#EDF2F7",
         "success": "#48BB78",
         "warn": "#ECC94B",
         "error": "#FC8181",
@@ -113,10 +95,7 @@ LIVE: dict[str, dict[str, str]] = {
         "popular": "#FC8181",
         "midrange": "#63B3ED",
         "longtail": "#B794F4",
-        "notice_bg_from": "#FFF3CD",
-        "notice_bg_to": "#FCF8E3",
         "notice_border": "#F0AD4E",
-        "notice_text": "#8A6D3B",
         "mmr_lambda": "#B0B0B0",
         "mmr_note": "#888888",
         "skeleton": "#2A2F36",
@@ -128,12 +107,6 @@ LIVE: dict[str, dict[str, str]] = {
         "ok": "#F39C12",
         "low": "#95A5A6",
         "bad": "#E74C3C",
-    },
-    "shadow": {
-        "card": "0 1px 3px rgba(0,0,0,0.06)",
-        "card_hover": "0 8px 24px rgba(0,0,0,0.08)",
-        "button_hover": "0 4px 12px rgba(108, 99, 255, 0.18)",
-        "pill_hover": "0 3px 10px rgba(108, 99, 255, 0.25)",
     },
 }
 
@@ -150,7 +123,6 @@ def _live_css_values() -> dict[str, str]:
     tinted = {**LIVE["tier_colors"], "primary": LIVE["color"]["primary"]}
     values.update({f"{k}_tint": v + _TINT_ALPHA for k, v in tinted.items()})
     values.update({f"chart_{k}": v for k, v in LIVE["chart"].items()})
-    values.update({f"shadow_{k}": v for k, v in LIVE["shadow"].items()})
     return values
 
 
@@ -169,7 +141,17 @@ def render_tokens_css() -> str:
 
 
 def streamlit_theme() -> dict[str, str]:
-    return dict(LIVE["streamlit_theme"])
+    """The ``[theme]`` section. Streamlit 1.38 only takes its built-in fonts here; the web fonts
+    load from app/styles/base.css."""
+    c = TOKENS["color"]
+    return {
+        "base": "dark",
+        "primaryColor": c["signal"],
+        "backgroundColor": c["bg"],
+        "secondaryBackgroundColor": c["panel"],
+        "textColor": c["text"],
+        "font": "sans serif",
+    }
 
 
 def _relative_luminance(hex_color: str) -> float:

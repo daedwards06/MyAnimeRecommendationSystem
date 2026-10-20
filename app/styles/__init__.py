@@ -14,7 +14,12 @@ STYLESHEETS: tuple[str, ...] = ("tokens.css", "base.css", "components.css")
 
 @lru_cache(maxsize=1)
 def stylesheet() -> str:
-    return "\n".join((STYLES_DIR / name).read_text(encoding="utf-8") for name in STYLESHEETS)
+    """The three files concatenated, with every ``@import`` hoisted first so browsers honour it."""
+    text = "\n".join((STYLES_DIR / name).read_text(encoding="utf-8") for name in STYLESHEETS)
+    lines = text.splitlines()
+    imports = [line for line in lines if line.lstrip().startswith("@import")]
+    rest = [line for line in lines if not line.lstrip().startswith("@import")]
+    return "\n".join([*imports, *rest]) + "\n"
 
 
 def inject_styles() -> bool:

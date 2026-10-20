@@ -3,6 +3,7 @@
   --mars-color-bg: #110D14;
   --mars-color-panel: #1E1823;
   --mars-color-ink: #050307;
+  --mars-color-line: #3A3142;
   --mars-color-text: #F4ECE2;
   --mars-color-text-muted: #B0A6B8;
   --mars-color-signal: #FF4A4A;
@@ -26,21 +27,9 @@
   --mars-space-md: 16px;
   --mars-space-lg: 24px;
   --mars-space-xl: 32px;
-  --mars-live-text-primary: #1A1A2E;
-  --mars-live-text-secondary: #4A5568;
-  --mars-live-text-dark: #2D3748;
-  --mars-live-text-muted: #A0AEC0;
   --mars-live-text-inverse: #FFFFFF;
   --mars-live-primary: #6C63FF;
-  --mars-live-primary-dark: #5A52D5;
-  --mars-live-primary-bg: #F0EFFF;
-  --mars-live-primary-border: #D6D3FF;
   --mars-live-accent-alt: #4ECDC4;
-  --mars-live-bg: #FAFBFC;
-  --mars-live-bg-alt: #F7FAFC;
-  --mars-live-surface-alt: #F0F2F6;
-  --mars-live-border: #E2E8F0;
-  --mars-live-border-light: #EDF2F7;
   --mars-live-success: #48BB78;
   --mars-live-warn: #ECC94B;
   --mars-live-error: #FC8181;
@@ -49,10 +38,7 @@
   --mars-live-popular: #FC8181;
   --mars-live-midrange: #63B3ED;
   --mars-live-longtail: #B794F4;
-  --mars-live-notice-bg-from: #FFF3CD;
-  --mars-live-notice-bg-to: #FCF8E3;
   --mars-live-notice-border: #F0AD4E;
-  --mars-live-notice-text: #8A6D3B;
   --mars-live-mmr-lambda: #B0B0B0;
   --mars-live-mmr-note: #888888;
   --mars-live-skeleton: #2A2F36;
@@ -70,8 +56,4 @@
   --mars-live-chart-ok: #F39C12;
   --mars-live-chart-low: #95A5A6;
   --mars-live-chart-bad: #E74C3C;
-  --mars-live-shadow-card: 0 1px 3px rgba(0,0,0,0.06);
-  --mars-live-shadow-card-hover: 0 8px 24px rgba(0,0,0,0.08);
-  --mars-live-shadow-button-hover: 0 4px 12px rgba(108, 99, 255, 0.18);
-  --mars-live-shadow-pill-hover: 0 3px 10px rgba(108, 99, 255, 0.25);
 }

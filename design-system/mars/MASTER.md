@@ -50,6 +50,7 @@ the generated files or put a hex literal in a component. `tests/test_theme_token
 | `bg` | `#110D14` | Plum-black page background | — |
 | `panel` | `#1E1823` | Panels: cards, sidebar | — |
 | `ink` | `#050307` | Thin outlines, subtitle text outline | — |
+| `line` | `#3A3142` | Dividers and widget borders (ink is invisible on `bg`); never text | — |
 | `text` | `#F4ECE2` | Warm off-white body and title text | 16.4 / 14.8 |
 | `text_muted` | `#B0A6B8` | Secondary text, meta lines | 8.2 / 7.4 |
 | `signal` | `#FF4A4A` | Signal red: primary action, selected state | 5.8 / 5.2 |
@@ -66,10 +67,12 @@ Top match `tier_top` cyan 9.7, Strong match `tier_strong` yellow 12.5, Good matc
 Every pair used for text is listed in `TEXT_PAIRS` and tested at ≥ 4.5:1. A new text color, or
 an existing color on a new surface, goes into `TEXT_PAIRS` in the same change.
 
-**Rollout:** the app still renders the pre-redesign light theme and tier colors. They are held in
-`LIVE` in the same module, so the generated files already come from it. Task 2.2 points the
-Streamlit theme at these tokens (with `base = "dark"`), and Task 2.4 does the same for the tier
-colors. `LIVE` is deleted once both are done.
+**Rollout:** since Task 2.2 the Streamlit theme (`base = "dark"`), page and sidebar surfaces, and
+all neutral text come from these tokens. The remaining pre-redesign accents (tier badges, the
+popularity and chart colors, the old primary on the explanation border and stream links) are held
+in `LIVE` in the same module and painted as `--mars-live-*`; each passes 4.5:1 on the night
+surfaces or is not used as text. Task 2.4 moves the tier colors, and `LIVE` is deleted once the
+last accent has moved.
 
 ### Typography
 

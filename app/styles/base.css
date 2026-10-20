@@ -1,4 +1,39 @@
-/* Global Streamlit chrome. Values come from tokens.css (--mars-live-* until Task 2.2). */
+/* Global Streamlit chrome on the night tokens. Accent colors not yet redesigned stay --mars-live-*. */
+
+/* Hoisted to the top of the injected stylesheet by app/styles/__init__.py; a font import after any
+   other rule is ignored. */
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Shippori+Mincho+B1:wght@800&display=swap');
+
+/* ===== Fonts ===== */
+.stApp,
+.stApp p,
+.stApp li,
+.stApp label,
+.stApp button,
+.stApp input,
+.stApp textarea,
+.stApp [data-testid="stMarkdownContainer"],
+.stApp [data-testid="stCaptionContainer"],
+.stApp [data-testid="stWidgetLabel"],
+.stApp [data-baseweb="select"],
+.stApp [data-baseweb="tab"] {
+    font-family: var(--mars-font-body);
+}
+.stApp h1,
+.stApp h2,
+.stApp h3,
+.stApp h4,
+.stApp h5,
+.stApp h6 {
+    font-family: var(--mars-font-display);
+}
+.stApp code,
+.stApp pre,
+.stApp kbd,
+.stApp samp,
+.stApp [data-testid="stCode"] {
+    font-family: var(--mars-font-mono);
+}
 
 /* ===== Global Layout ===== */
 .main .block-container {
@@ -9,26 +44,26 @@
 
 /* ===== Typography ===== */
 h1 {
-    color: var(--mars-live-text-primary);
+    color: var(--mars-color-text);
     font-weight: 800;
     letter-spacing: -0.02em;
     margin-bottom: 0.25rem;
 }
 h2 {
-    color: var(--mars-live-text-primary);
-    font-weight: 700;
+    color: var(--mars-color-text);
+    font-weight: 800;
     letter-spacing: -0.01em;
 }
 h3 {
-    color: var(--mars-live-text-dark);
-    font-weight: 600;
+    color: var(--mars-color-text);
+    font-weight: 800;
 }
 .stMarkdown { line-height: 1.65; }
 
 /* ===== Sidebar ===== */
 [data-testid="stSidebar"] {
-    background: var(--mars-live-bg);
-    border-right: 1px solid var(--mars-live-border);
+    background: var(--mars-color-panel);
+    border-right: 1px solid var(--mars-color-line);
 }
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
@@ -36,67 +71,69 @@ h3 {
     font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
 }
 
 /* ===== Buttons ===== */
 .stButton > button {
     border-radius: 8px;
-    font-weight: 600;
+    font-weight: 700;
     transition: all 0.2s ease;
-    border: 1px solid var(--mars-live-border);
+    border: 1px solid var(--mars-color-line);
 }
 .stButton > button:hover {
     transform: translateY(-1px);
-    box-shadow: var(--mars-live-shadow-button-hover);
 }
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, var(--mars-live-primary) 0%, var(--mars-live-primary-dark) 100%);
+    background: var(--mars-color-signal);
+    color: var(--mars-color-on-signal);
     border: none;
 }
 
 /* ===== Genre pill buttons (every secondary button; audit F6) ===== */
 button[kind="secondary"] {
-    background-color: var(--mars-live-primary-bg) !important;
-    color: var(--mars-live-primary) !important;
-    border: 1px solid var(--mars-live-primary-border) !important;
-    padding: 4px 12px !important;
+    background-color: var(--mars-color-panel) !important;
+    color: var(--mars-color-cyan) !important;
+    border: 1px solid var(--mars-color-line) !important;
+    padding: 4px 8px !important;
     font-size: 0.78rem !important;
     border-radius: 20px !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     min-height: 30px !important;
     height: 30px !important;
     letter-spacing: 0.02em !important;
 }
+/* M PLUS Rounded 1c is wider than Source Sans; without this "Supernatural" breaks mid-word. */
+button[kind="secondary"] p {
+    white-space: nowrap;
+}
 button[kind="secondary"]:hover {
-    background-color: var(--mars-live-primary) !important;
-    color: var(--mars-live-text-inverse) !important;
-    border-color: var(--mars-live-primary) !important;
+    background-color: var(--mars-color-cyan) !important;
+    color: var(--mars-color-bg) !important;
+    border-color: var(--mars-color-cyan) !important;
     transform: translateY(-1px) !important;
-    box-shadow: var(--mars-live-shadow-pill-hover) !important;
 }
 
 /* ===== Containers / Cards ===== */
 [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {
     border-radius: 12px !important;
-    border: 1px solid var(--mars-live-border) !important;
-    box-shadow: var(--mars-live-shadow-card);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border: 1px solid var(--mars-color-line) !important;
+    transition: border-color 0.2s ease, transform 0.2s ease;
 }
 [data-testid="stVerticalBlock"] > div[data-testid="stContainer"]:hover {
-    box-shadow: var(--mars-live-shadow-card-hover);
+    border-color: var(--mars-color-text-muted) !important;
     transform: translateY(-2px);
 }
 
 /* ===== Metrics ===== */
 [data-testid="stMetric"] {
-    background: var(--mars-live-bg-alt);
-    border: 1px solid var(--mars-live-border);
+    background: var(--mars-color-panel);
+    border: 1px solid var(--mars-color-line);
     border-radius: 10px;
     padding: 12px 16px;
 }
 [data-testid="stMetricLabel"] {
-    color: var(--mars-live-text-secondary);
+    color: var(--mars-color-text-muted);
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -106,13 +143,13 @@ button[kind="secondary"]:hover {
 hr {
     border: none;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--mars-live-border), transparent);
+    background: var(--mars-color-line);
     margin: 24px 0;
 }
 
 /* ===== Captions ===== */
 [data-testid="stCaptionContainer"] {
-    color: var(--mars-live-text-muted);
+    color: var(--mars-color-text-muted);
     font-size: 0.82rem;
 }
 
