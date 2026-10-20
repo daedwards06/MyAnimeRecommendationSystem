@@ -19,7 +19,7 @@ import streamlit as st
 from app.state import filter_defaults, reset_filters
 from src.app.artifacts_loader import FAMILY_LABELS, missing_expected_families
 from src.app.badges import badge_payload
-from src.app.components.cards import render_card, render_card_grid
+from src.app.components.cards import GRID_MARKER_HTML, render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
 from src.app.components.instructions import render_intro_line
@@ -266,27 +266,24 @@ def _render_cards(
     metadata_by_id = metadata.set_index("anime_id", drop=False)
 
     if view_mode_state == "grid":
-        for i in range(0, len(recs), 3):
-            cols = st.columns(3)
-            for j, col in enumerate(cols):
-                if i + j < len(recs):
-                    rec = recs[i + j]
-                    anime_id = rec["anime_id"]
-                    try:
-                        row = metadata_by_id.loc[anime_id]
-                        if isinstance(row, pd.DataFrame):
-                            row = row.iloc[0]
-                        pop_pct = pop_pct_fn(int(anime_id))
-                        with col:
-                            render_card_grid(
-                                row,
-                                rec,
-                                pop_pct,
-                                is_in_training=is_in_training_fn(int(anime_id)),
-                                all_raw_scores=all_raw_scores,
-                            )
-                    except KeyError:
-                        pass
+        # One block of cards in rank order; CSS lays it out at 4/3/2/1 columns by width.
+        with st.container():
+            st.markdown(GRID_MARKER_HTML, unsafe_allow_html=True)
+            for rec in recs:
+                anime_id = rec["anime_id"]
+                try:
+                    row = metadata_by_id.loc[anime_id]
+                    if isinstance(row, pd.DataFrame):
+                        row = row.iloc[0]
+                except KeyError:
+                    continue
+                render_card_grid(
+                    row,
+                    rec,
+                    pop_pct_fn(int(anime_id)),
+                    is_in_training=is_in_training_fn(int(anime_id)),
+                    all_raw_scores=all_raw_scores,
+                )
     else:
         for rec in recs:
             anime_id = rec["anime_id"]

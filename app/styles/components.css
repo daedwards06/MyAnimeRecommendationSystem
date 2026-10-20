@@ -38,6 +38,23 @@
     margin: 0;
 }
 .stApp .mars-intro-highlight { color: var(--mars-color-subtitle); }
+/* Streamlit's -1rem cancels a paragraph margin .mars-intro does not have; when the line wraps it
+   pulled the second line under the buttons. */
+.stApp [data-testid="stMarkdownContainer"]:has(> .mars-intro) { margin-bottom: 0; }
+/* Buttons size to their label and the row wraps, so "How it works" never overflows into the ✕. */
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--mars-space-xs) var(--mars-space-sm);
+}
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) > [data-testid="column"] {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+}
+.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) > [data-testid="column"]:first-child {
+    flex: 1 1 16rem !important;
+}
 /* The intro's two buttons are plain outline buttons, not the genre-pill style every other
    secondary button gets. Streamlit 1.38 has no per-key class, so the row is found by its text. */
 .stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) button[kind="secondary"] {
@@ -82,10 +99,12 @@
 .stApp .mars-mix { margin: 8px 0 20px 0; }
 .stApp .mars-mix-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 2px 8px;
     margin-bottom: 6px;
 }
+.stApp .mars-mix-head > span { white-space: nowrap; }
 .stApp .mars-mix-label {
     font-size: 0.75rem;
     color: var(--mars-color-text-muted);
@@ -171,6 +190,49 @@
     ) {
         transition: border-color 150ms ease;
     }
+}
+
+/* ===== Cards: grid view (4/3/2/1 columns) ===== */
+/* The grid view is one st.container of cards in rank order, found by its hidden marker. Breakpoints
+   are on the viewport, not the container: the open sidebar makes the main area narrower at 1024 px
+   than at 768 px (where it is collapsed), so a container query would invert the column counts. */
+.stApp [data-testid="element-container"]:has(.mars-grid-marker) { display: none; }
+.stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker) {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--mars-space-md);
+}
+.stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker) > * {
+    width: auto !important;
+    min-width: 0;
+}
+@media (max-width: 1279px) {
+    .stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+@media (max-width: 999px) {
+    .stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 639px) {
+    .stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+/* Grid cards are too narrow for fixed button columns: genre pills and rating buttons size to
+   their label and wrap. "Leaf" rows only, so a row that holds other rows keeps its layout. */
+.stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker)
+    [data-testid="stHorizontalBlock"]:not(:has([data-testid="stHorizontalBlock"])) {
+    flex-wrap: wrap;
+    gap: var(--mars-space-xs);
+}
+.stApp [data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker)
+    [data-testid="stHorizontalBlock"]:not(:has([data-testid="stHorizontalBlock"])) > [data-testid="column"] {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
 }
 
 /* ===== Cards: poster ===== */
@@ -517,3 +579,42 @@
 }
 @keyframes mars-spin { to { transform: rotate(360deg); } }
 @keyframes mars-shimmer { 0% { left: -40%; } 100% { left: 100%; } }
+
+/* ===== Phone width and touch (Task 3.2) ===== */
+/* Long titles and headings wrap instead of overflowing; a single unbroken word may break. */
+.stApp .mars-wordmark,
+.stApp .mars-title-card-label,
+.stApp .mars-title-card-text,
+.stApp .mars-card-title,
+.stApp .mars-card-title-compact,
+.stApp .mars-alt-title {
+    overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+    .stApp .mars-title-card-label { font-size: 1.2rem; }
+    .stApp .mars-card-title { font-size: 1.05rem; }
+    /* Streamlit stacks every column below 640 px, which puts each genre pill and flag on its own
+       full-width line. Leaf rows inside a card flow inline and wrap instead. */
+    .stApp [data-testid="stVerticalBlockBorderWrapper"]:has(.mars-card-marker)
+        [data-testid="stHorizontalBlock"]:not(:has([data-testid="stHorizontalBlock"])) {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--mars-space-xs) var(--mars-space-sm);
+    }
+    .stApp [data-testid="stVerticalBlockBorderWrapper"]:has(.mars-card-marker)
+        [data-testid="stHorizontalBlock"]:not(:has([data-testid="stHorizontalBlock"])) > [data-testid="column"] {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+}
+/* 44 px touch targets (WCAG 2.5.5) on phones and any touch screen; a mouse keeps the compact pills. */
+@media (max-width: 640px), (pointer: coarse) {
+    .stApp .stButton button,
+    .stApp [data-testid="stHorizontalBlock"]:has(.mars-try-label) button[kind="secondary"],
+    .stApp [data-testid="stExpander"] summary {
+        min-height: 44px !important;
+        height: auto !important;
+    }
+}

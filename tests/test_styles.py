@@ -22,6 +22,7 @@ from app.display import (
 from app.sidebar import SAMPLE_SEEDS_LABEL_HTML, group_label_html, section_label_html
 from src.app.components.cards import (
     CARD_MARKER_HTML,
+    GRID_MARKER_HTML,
     explanation_html,
     flag_html,
     meta_span,
@@ -114,6 +115,7 @@ HELPER_HTML = {
     "badge_compact": score_badge_html(0.3, SCORES, compact=True),
     "badge_untiered": score_badge_html(0.42, None),
     "card_marker": CARD_MARKER_HTML,
+    "grid_marker": GRID_MARKER_HTML,
     "poster": poster_html("https://example.com/p.jpg", "Steins;Gate"),
     "explanation": explanation_html("You rate Drama highly"),
     "explanation_compact": explanation_html("You rate Drama highly", compact=True),
@@ -205,3 +207,26 @@ def test_reduced_motion_disables_all_animation_and_transitions() -> None:
     assert ".stApp *::before" in block.group(1)
     assert "animation: none !important;" in block.group(1)
     assert "transition: none !important;" in block.group(1)
+
+
+GRID_BLOCK = '[data-testid="stVerticalBlock"]:has(> [data-testid="element-container"] .mars-grid-marker)'
+
+
+def test_grid_view_steps_down_4_3_2_1_columns_by_viewport_width() -> None:
+    css = (STYLES / "components.css").read_text(encoding="utf-8")
+    steps = re.findall(
+        r"(?:@media \(max-width: (\d+)px\) \{\s*)?\.stApp " + re.escape(GRID_BLOCK)
+        + r" \{\s*(?:display: grid;\s*)?grid-template-columns: (repeat\((\d)|minmax)",
+        css,
+    )
+    columns = [(int(w) if w else None, int(n) if n else 1) for w, _, n in steps]
+    assert columns == [(None, 4), (1279, 3), (999, 2), (639, 1)]
+
+
+def test_phone_and_touch_buttons_are_at_least_44px() -> None:
+    css = (STYLES / "components.css").read_text(encoding="utf-8")
+    block = re.search(r"@media \(max-width: 640px\), \(pointer: coarse\) \{(.*?)\n\}", css, re.S)
+    assert block, "no phone/touch block"
+    assert ".stApp .stButton button," in block.group(1)
+    assert ".mars-try-label) button" in block.group(1)
+    assert "min-height: 44px !important;" in block.group(1)

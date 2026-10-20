@@ -42,6 +42,8 @@ def _render_placeholder_box(label: str):
 
 # Hidden first element of every card container; CSS finds the card through it with :has().
 CARD_MARKER_HTML = "<span class='mars-card-marker' aria-hidden='true'></span>"
+# Same trick for the grid view's container, which CSS turns into a responsive grid.
+GRID_MARKER_HTML = "<span class='mars-grid-marker' aria-hidden='true'></span>"
 
 
 def poster_html(src: str, title: str) -> str:
@@ -181,13 +183,10 @@ def render_card_grid(
         st.markdown(CARD_MARKER_HTML, unsafe_allow_html=True)
         _render_poster(thumb, title_display, row.get("poster_url"), anime_id)
 
-        # Title + score
-        truncated_title = title_display if len(title_display) <= 30 else title_display[:27] + "..."
-
         score_badge = score_badge_html(rec.get("score"), all_raw_scores, compact=True)
 
         st.markdown(
-            f"<p class='mars-card-title-compact'>{truncated_title}</p>",
+            f"<p class='mars-card-title-compact'>{title_display}</p>",
             unsafe_allow_html=True,
         )
         if score_badge:

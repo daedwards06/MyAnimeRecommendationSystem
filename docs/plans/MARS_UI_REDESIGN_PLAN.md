@@ -604,14 +604,22 @@ python scripts/capture_ui_baseline.py --url http://localhost:8501 --out docs/red
 
 **Checklist:**
 
-- [ ] No horizontal scroll at 375–390 px in any mode
-- [ ] Display-type outline and shadow scale down at narrow widths so headings stay legible
-- [ ] Long titles and genre tags wrap; nothing is clipped without an accessible full value
-- [ ] Touch targets ≥ 44 px for card actions and sample-seed tags
-- [ ] Grid view is responsive at 4/3/2/1 columns by width (moved here from Task 2.4). Today
+- [x] No horizontal scroll at 375–390 px in any mode (measured in Seed-based, Personalized, Browse
+      and grid view at both widths: document and main area scroll width equal the viewport)
+- [x] Display-type outline and shadow scale down at narrow widths so headings stay legible (Task 1.3
+      removed the outline and offset shadow from display type, so what scales is size: wordmark
+      2.6 → 2 rem and title cards 1.4 → 1.2 rem at ≤ 640 px; headings wrap with `overflow-wrap`)
+- [x] Long titles and genre tags wrap; nothing is clipped without an accessible full value (grid
+      titles are no longer cut to 27 characters; genre pills wrap inside cards; the intro line no
+      longer runs under its buttons at phone width, and "How it works" no longer overlaps ✕ at 1024)
+- [x] Touch targets ≥ 44 px for card actions and sample-seed tags (at ≤ 640 px and on any
+      `pointer: coarse` screen; a mouse keeps the 30 px pills)
+- [x] Grid view is responsive at 4/3/2/1 columns by width (moved here from Task 2.4). Today
       `_render_cards` makes a fixed `st.columns(3)` for each row of three, so the column count
       can't change in CSS alone. The layout change keeps card order and the `view_mode` values.
-- [ ] Tests + ruff green
+      (Now one marked container of cards in rank order, laid out as a CSS grid by viewport width;
+      measured 4/3/2/1 at 1440/1024/768/390.)
+- [x] Tests + ruff green
 
 ---
 

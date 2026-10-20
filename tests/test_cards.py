@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from streamlit.testing.v1 import AppTest
 
-from src.app.components.cards import explanation_html, poster_html, score_badge_html
+from src.app.components.cards import GRID_MARKER_HTML, explanation_html, poster_html, score_badge_html
 
 SCORES = [0.9, 0.7, 0.5, 0.3]
 EXPLANATION = "You rate Drama and Mystery highly"
@@ -90,6 +90,43 @@ def test_poster_alt_is_the_escaped_title():
     html = poster_html("https://example.com/p.jpg", "Kaguya-sama: 'Love' & War")
     assert "alt='Kaguya-sama: &#x27;Love&#x27; &amp; War'" in html
     assert html.count("<img ") == 1
+
+
+LONG_TITLE = "That Time I Got Reincarnated as a Slime Season 3"
+
+
+def _grid_app(view: str) -> None:
+    import pandas as pd
+    import streamlit as st
+
+    from app.display import _render_cards
+
+    titles = ["Steins;Gate", "That Time I Got Reincarnated as a Slime Season 3", "Cowboy Bebop", "Mushishi", "Monster"]
+    metadata = pd.DataFrame(
+        [{"anime_id": i, "title_english": t, "genres": "Drama", "poster_url": None} for i, t in enumerate(titles, 1)]
+    )
+    st.session_state["view_mode"] = view
+    recs = [{"anime_id": i, "score": 1.0 - i / 10} for i in (3, 1, 5, 2, 4)]
+    _render_cards(recs, metadata, pop_pct_fn=lambda _: 50.0, is_in_training_fn=lambda _: True)
+
+
+def test_grid_view_is_one_marked_block_in_rank_order():
+    at = AppTest.from_function(_grid_app, kwargs={"view": "grid"})
+    at.run(timeout=30)
+    assert not at.exception, at.exception
+    texts = [m.value for m in at.markdown]
+    assert texts.count(GRID_MARKER_HTML) == 1
+    assert texts.index(GRID_MARKER_HTML) < next(i for i, t in enumerate(texts) if "mars-card-marker" in t)
+    titles = [t for t in texts if "mars-card-title-compact" in t]
+    expected = ["Cowboy Bebop", "Steins;Gate", "Monster", LONG_TITLE, "Mushishi"]
+    assert titles == [f"<p class='mars-card-title-compact'>{t}</p>" for t in expected]
+
+
+def test_list_view_has_no_grid_marker():
+    at = AppTest.from_function(_grid_app, kwargs={"view": "list"})
+    at.run(timeout=30)
+    assert not at.exception, at.exception
+    assert GRID_MARKER_HTML not in [m.value for m in at.markdown]
 
 
 def test_local_poster_is_a_data_uri_and_missing_files_fall_back(tmp_path):
