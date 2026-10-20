@@ -388,6 +388,21 @@ About 2 s of the warm figure is the pipeline itself: the results heading appears
 first poster ~2 s later. The rest is Streamlit Cloud's auth redirect handshake, the frontend
 bundle and the websocket session.
 
+**After the UI redesign** (*measured 2026-10-20, UI Redesign Task 4.1*, deployed commit
+`7e939b14`, keep-awake workflow green on that push). Same detector, `scripts/check_live_app.py`,
+from the same home connection, app awake on every run:
+
+| Browser | Warm runs | Median | Range |
+|:---|---:|---:|---:|
+| Playwright Chromium (the script's default) | 6 | 9.8 s | 8.9–10.4 s |
+| Edge (`--channel msedge`) | 6 | 11.75 s | 11.5–13.8 s |
+
+The budget was the pre-redesign 10.9 s warm median plus 1 s. Both browsers are inside it, so the
+redesign's fonts and CSS did not cost a measurable second. Edge runs about 2 s slower than
+Chromium on the same app, as in the pre-redesign spot checks below (12.6 s in Edge). The first
+Chromium visit of the session, made right after the browser started, read 20.8 s and is not
+counted (the same first-run effect noted below).
+
 Cold start is still open. The one run that found the app asleep (the sleep page appeared 7.1 s
 after navigation) recorded the wake, but its first-card detector failed, so it has no number. A
 cold run needs the app to have slept first (Community Cloud sleeps an app after a period with no

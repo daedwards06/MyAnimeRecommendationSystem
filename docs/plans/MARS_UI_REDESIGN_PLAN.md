@@ -689,12 +689,14 @@ ruff check src/ tests/ app/
 
 **Checklist:**
 
-- [ ] Merge the redesign branch; keep-awake workflow green after the push
-- [ ] Three warm runs on the deployed app; median and range in `docs/DEPLOYMENT.md` §
-      Performance with the date
-- [ ] If over budget: fonts are the first suspect (check whether `@import` blocks render);
-      record options in `docs/decisions.md` before changing anything
-- [ ] Tests + ruff green
+- [x] Merge the redesign branch; keep-awake workflow green after the push — *the redesign was
+      committed straight to `main`; keep-awake green on the push of `7e939b14`*
+- [x] Three warm runs on the deployed app; median and range in `docs/DEPLOYMENT.md` §
+      Performance with the date — *2026-10-20: six runs per browser, Chromium 9.8 s, Edge 11.75 s*
+- [x] If over budget: fonts are the first suspect (check whether `@import` blocks render);
+      record options in `docs/decisions.md` before changing anything — *not triggered; both
+      browsers within 10.9 s + 1 s*
+- [x] Tests + ruff green
 
 ---
 
