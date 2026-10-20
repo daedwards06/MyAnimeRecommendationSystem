@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from streamlit.testing.v1 import AppTest
 
-from src.app.components.cards import GRID_MARKER_HTML, explanation_html, poster_html, score_badge_html
+from src.app.components.cards import (
+    GENRE_ROW_MARKER_HTML,
+    GRID_MARKER_HTML,
+    explanation_html,
+    poster_html,
+    score_badge_html,
+)
 from src.app.score_semantics import MATCH_TIERS, SCORE_LABEL_SHORT
 
 SCORES = [0.9, 0.7, 0.5, 0.3]
@@ -162,3 +168,11 @@ def test_app_code_does_not_import_private_streamlit_modules():
         if any(m in p.read_text(encoding="utf-8") for m in ("streamlit.elements", "streamlit.runtime"))
     }
     assert offenders <= {"app/styles/__init__.py"}
+
+
+def test_genre_buttons_follow_the_genre_row_marker():
+    # The pill style is scoped to the row right after this marker (audit F6).
+    for view in ("list", "grid"):
+        at = _run(view)
+        assert GENRE_ROW_MARKER_HTML in _markdown(at), view
+        assert {b.label for b in at.button} >= {"Drama", "Sci-Fi"}, view

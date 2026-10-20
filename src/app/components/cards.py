@@ -44,6 +44,8 @@ def _render_placeholder_box(label: str):
 CARD_MARKER_HTML = "<span class='mars-card-marker' aria-hidden='true'></span>"
 # Same trick for the grid view's container, which CSS turns into a responsive grid.
 GRID_MARKER_HTML = "<span class='mars-grid-marker' aria-hidden='true'></span>"
+# Placed right before a row of genre buttons; only that row gets the pill style.
+GENRE_ROW_MARKER_HTML = "<span class='mars-genre-row' aria-hidden='true'></span>"
 
 
 def poster_html(src: str, title: str) -> str:
@@ -216,6 +218,7 @@ def render_card_grid(
         if genres:
             genre_list = [g.strip() for g in genres.split('|') if g.strip()][:3]
             if genre_list:
+                st.markdown(GENRE_ROW_MARKER_HTML, unsafe_allow_html=True)
                 cols = st.columns(len(genre_list))
                 for idx, genre in enumerate(genre_list):
                     with cols[idx]:
@@ -395,6 +398,7 @@ def render_card(
             # Genres as pills
             if genres:
                 genre_list = [g.strip() for g in genres.split('|') if g.strip()]
+                st.markdown(GENRE_ROW_MARKER_HTML, unsafe_allow_html=True)
                 cols = st.columns([1] * min(len(genre_list[:5]), 5) + [max(0, 5 - len(genre_list[:5]))] if len(genre_list[:5]) < 5 else [1] * 5)
                 for idx, genre in enumerate(genre_list[:5]):
                     with cols[idx]:

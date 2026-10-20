@@ -112,8 +112,24 @@ h3 {
     border: none;
 }
 
-/* ===== Genre pill buttons (every secondary button; audit F6) ===== */
-button[kind="secondary"] {
+/* Every other secondary button is a quiet outline button (audit F6). Descendant, not child:
+   a button with help= sits inside a tooltip wrapper. */
+.stApp .stButton button[kind="secondary"] {
+    background-color: transparent;
+    color: var(--mars-color-text);
+    border: var(--mars-border-thin) solid var(--mars-color-text-muted);
+    border-radius: var(--mars-radius-sm);
+    font-weight: 400;
+}
+.stApp .stButton button[kind="secondary"]:hover {
+    color: var(--mars-color-subtitle);
+    border-color: var(--mars-color-subtitle);
+}
+
+/* ===== Genre pill buttons =====
+   Only the row right after a card's hidden GENRE_ROW_MARKER_HTML gets the pill style. */
+.stApp [data-testid="element-container"]:has(.mars-genre-row) { display: none; }
+.stApp [data-testid="element-container"]:has(.mars-genre-row) + [data-testid="stHorizontalBlock"] button[kind="secondary"] {
     background-color: var(--mars-color-panel) !important;
     color: var(--mars-color-cyan) !important;
     border: 1px solid var(--mars-color-line) !important;
@@ -126,10 +142,10 @@ button[kind="secondary"] {
     letter-spacing: 0.02em !important;
 }
 /* M PLUS Rounded 1c is wider than Source Sans; without this "Supernatural" breaks mid-word. */
-button[kind="secondary"] p {
+.stApp [data-testid="element-container"]:has(.mars-genre-row) + [data-testid="stHorizontalBlock"] button[kind="secondary"] p {
     white-space: nowrap;
 }
-button[kind="secondary"]:hover {
+.stApp [data-testid="element-container"]:has(.mars-genre-row) + [data-testid="stHorizontalBlock"] button[kind="secondary"]:hover {
     background-color: var(--mars-color-cyan) !important;
     color: var(--mars-color-bg) !important;
     border-color: var(--mars-color-cyan) !important;

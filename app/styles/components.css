@@ -55,23 +55,6 @@
 .stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) > [data-testid="column"]:first-child {
     flex: 1 1 16rem !important;
 }
-/* The intro's two buttons are plain outline buttons, not the genre-pill style every other
-   secondary button gets. Streamlit 1.38 has no per-key class, so the row is found by its text. */
-.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) button[kind="secondary"] {
-    background-color: transparent !important;
-    color: var(--mars-color-text) !important;
-    border: var(--mars-border-thin) solid var(--mars-color-text-muted) !important;
-    border-radius: var(--mars-radius-sm) !important;
-    font-weight: 400 !important;
-    letter-spacing: 0 !important;
-}
-.stApp [data-testid="stHorizontalBlock"]:has(.mars-intro) button[kind="secondary"]:hover {
-    background-color: transparent !important;
-    color: var(--mars-color-subtitle) !important;
-    border-color: var(--mars-color-subtitle) !important;
-    transform: none !important;
-}
-
 /* ===== Title cards (result section headers) ===== */
 .stApp .mars-title-card { margin: 0 0 var(--mars-space-xs); }
 .stApp .mars-title-card-label {
@@ -613,6 +596,7 @@
 @media (max-width: 640px), (pointer: coarse) {
     .stApp .stButton button,
     .stApp [data-testid="stHorizontalBlock"]:has(.mars-try-label) button[kind="secondary"],
+    .stApp [data-testid="element-container"]:has(.mars-genre-row) + [data-testid="stHorizontalBlock"] button[kind="secondary"],
     .stApp [data-testid="stExpander"] summary {
         min-height: 44px !important;
         height: auto !important;

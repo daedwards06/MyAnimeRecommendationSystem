@@ -230,4 +230,14 @@ def test_phone_and_touch_buttons_are_at_least_44px() -> None:
     assert block, "no phone/touch block"
     assert ".stApp .stButton button," in block.group(1)
     assert ".mars-try-label) button" in block.group(1)
+    assert ".mars-genre-row) + [data-testid=\"stHorizontalBlock\"] button" in block.group(1)
     assert "min-height: 44px !important;" in block.group(1)
+
+
+def test_genre_pill_style_is_scoped_to_genre_rows() -> None:
+    # Audit F6: the pill rule used to hit every secondary button in the app.
+    base = (STYLES / "base.css").read_text(encoding="utf-8")
+    assert not re.search(r"^button\[kind=\"secondary\"\]", base, re.MULTILINE)
+    pill = '[data-testid="element-container"]:has(.mars-genre-row) + [data-testid="stHorizontalBlock"] button[kind="secondary"] {'
+    assert pill in base
+    assert "height: 30px" in base[base.index(pill) :].split("}")[0]
