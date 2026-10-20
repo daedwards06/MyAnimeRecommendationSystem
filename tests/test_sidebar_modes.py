@@ -35,3 +35,32 @@ def test_sample_seed_titles_exist_in_catalog():
     assert list(SAMPLE_SEEDS) == ["Steins;Gate", "Your Name", "Cowboy Bebop"]
     for title in SAMPLE_SEEDS.values():
         assert title in titles
+
+
+class _FakeSt:
+    def __init__(self, view_mode: str) -> None:
+        self.session_state = {"view_mode": view_mode}
+        self.reruns: list[str] = []
+
+    def rerun(self, *, scope: str = "app") -> None:
+        self.reruns.append(scope)
+
+
+def test_view_mode_change_reruns_the_whole_app(monkeypatch):
+    # Audit F18: the radio is inside a fragment, so a fragment rerun never reached the cards.
+    import app.sidebar as sidebar
+
+    fake = _FakeSt("list")
+    monkeypatch.setattr(sidebar, "st", fake)
+    assert sidebar._apply_view_mode("Grid") == "grid"
+    assert fake.session_state["view_mode"] == "grid"
+    assert fake.reruns == ["app"]
+
+
+def test_unchanged_view_mode_does_not_rerun(monkeypatch):
+    import app.sidebar as sidebar
+
+    fake = _FakeSt("grid")
+    monkeypatch.setattr(sidebar, "st", fake)
+    assert sidebar._apply_view_mode("Grid") == "grid"
+    assert fake.reruns == []

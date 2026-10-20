@@ -840,14 +840,24 @@ def _render_filters_display_fragment(metadata, result: SidebarResult) -> None:
         horizontal=True,
         help="Switch between list and grid layout",
     )
-    st.session_state["view_mode"] = "list" if view_mode == "List" else "grid"
-    result.view_mode = st.session_state["view_mode"]
+    result.view_mode = _apply_view_mode(view_mode)
 
     # Clear filters button
     if genre_filter or type_filter or year_range[0] > 1960 or year_range[1] < 2025 or sort_by != default_sort_for_mode:
         if st.button("🔄 Reset Filters", help="Clear all filters and reset to defaults"):
             reset_filters(default_sort_for_mode)
             st.rerun()
+
+
+def _apply_view_mode(choice: str) -> str:
+    """Store the List/Grid choice. A change reruns the whole app: this radio sits in a fragment,
+    and a fragment-only rerun never reaches the cards (audit F18)."""
+    view_mode = "list" if choice == "List" else "grid"
+    changed = st.session_state.get("view_mode", "list") != view_mode
+    st.session_state["view_mode"] = view_mode
+    if changed:
+        st.rerun(scope="app")
+    return view_mode
 
 
 # ── Advanced ────────────────────────────────────────────────────────────────
