@@ -182,3 +182,12 @@ def test_sidebar_focus_ring_uses_the_focus_token() -> None:
     )
     colors = TOKENS["color"]
     assert contrast_ratio(colors["focus"], colors["panel"]) >= 3.0
+
+
+def test_reduced_motion_disables_all_animation_and_transitions() -> None:
+    sheet = styles.stylesheet()
+    block = re.search(r"@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}", sheet, re.S)
+    assert block, "no prefers-reduced-motion: reduce block"
+    assert ".stApp *::before" in block.group(1)
+    assert "animation: none !important;" in block.group(1)
+    assert "transition: none !important;" in block.group(1)

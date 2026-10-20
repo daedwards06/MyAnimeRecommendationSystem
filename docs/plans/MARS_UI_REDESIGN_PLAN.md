@@ -510,7 +510,9 @@ streamlit run app/main.py   # visual: four labelled groups; Advanced collapsed; 
 ## Task 2.6: Texture and Motion
 
 **Status:** Ruled out by the Task 1.3 decision (Subtle intensity; `docs/decisions.md`,
-2026-10-19). Skip unless that decision is revisited.
+2026-10-19). Skip unless that decision is revisited. Only the reduced-motion item was
+done (2026-10-19), because design principle 3 requires it whatever the intensity: a global
+`reduce` block in `base.css` now covers the button transition and the skeleton shimmer.
 
 **Why:** Scanlines and a VHS-style hover are what make it feel like a broadcast rather than a
 dark theme. They are also the part most likely to hurt readability and accessibility, so they
@@ -537,9 +539,9 @@ $env:APP_IMPORT_LIGHT = "1"; python -m pytest -q -x
       ≤ 6% opacity, below card panels in stacking order so no text sits on them
 - [ ] Card hover: hard-shadow offset shift plus an optional 150 ms chromatic "tracking" edge;
       no flashing, nothing above 3 flashes per second
-- [ ] `@media (prefers-reduced-motion: reduce)` disables all animation and transitions
+- [x] `@media (prefers-reduced-motion: reduce)` disables all animation and transitions
 - [ ] No image files for texture; CSS only
-- [ ] Tests + ruff green
+- [x] Tests + ruff green
 
 ---
 
