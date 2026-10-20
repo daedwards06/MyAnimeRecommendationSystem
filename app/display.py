@@ -18,7 +18,7 @@ import streamlit as st
 
 from app.state import filter_defaults, reset_filters
 from src.app.artifacts_loader import FAMILY_LABELS, missing_expected_families
-from src.app.badges import badge_payload
+from src.app.badges import band_counts, popularity_band
 from src.app.components.cards import GRID_MARKER_HTML, render_card, render_card_grid
 from src.app.components.diversity import render_diversity_panel
 from src.app.components.help import render_help_panel
@@ -166,7 +166,7 @@ def render_results(
 
     # Diversity mix bar
     _render_mix_bar(
-        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn, is_in_training_fn=is_in_training_fn
+        recs, sidebar.browse_mode, pop_pct_fn=pop_pct_fn
     )
 
     # Cards
@@ -204,7 +204,7 @@ def mix_bar_html(mix_label: str, pop_count: int, mid_count: int, long_tail_count
         f'<span class="mars-mix-label">{mix_label}</span>'
         '<span class="mars-mix-legend">'
         f'<span class="mars-mix-dot-popular" aria-hidden="true">●</span> Popular {pop_count}'
-        f' &nbsp;<span class="mars-mix-dot-midrange" aria-hidden="true">●</span> Mid {mid_count}'
+        f' &nbsp;<span class="mars-mix-dot-midrange" aria-hidden="true">●</span> Mid-range {mid_count}'
         f' &nbsp;<span class="mars-mix-dot-longtail" aria-hidden="true">●</span> Hidden gems {long_tail_count}'
         "</span>"
         "</div>"
@@ -218,34 +218,10 @@ def _render_mix_bar(
     browse_mode: bool,
     *,
     pop_pct_fn: Callable[[int], float],
-    is_in_training_fn: Callable[[int], bool],
 ) -> None:
     """Render the compact horizontal diversity mix bar."""
-    pop_count = sum(
-        1
-        for r in recs
-        if "Top 25%" in str(
-            badge_payload(
-                is_in_training=is_in_training_fn(int(r["anime_id"])),
-                pop_percentile=pop_pct_fn(int(r["anime_id"])),
-                user_genre_hist={},
-                item_genres=[],
-            ).get("popularity_band", "")
-        )
-    )
-    long_tail_count = sum(
-        1
-        for r in recs
-        if "Long-tail" in str(
-            badge_payload(
-                is_in_training=is_in_training_fn(int(r["anime_id"])),
-                pop_percentile=pop_pct_fn(int(r["anime_id"])),
-                user_genre_hist={},
-                item_genres=[],
-            ).get("popularity_band", "")
-        )
-    )
-    mid_count = len(recs) - pop_count - long_tail_count
+    bands = [popularity_band(pop_pct_fn(int(r["anime_id"]))) for r in recs]
+    pop_count, mid_count, long_tail_count = band_counts(bands)
 
     mix_label = "Catalog mix" if browse_mode else "Recommendation mix"
     st.markdown(

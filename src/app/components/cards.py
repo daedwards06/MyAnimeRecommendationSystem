@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from src.app.badges import badge_payload
+from src.app.badges import badge_payload, band_label
 from src.app.components.rating import render_quick_rating_buttons
 from src.app.components.tooltips import format_badge_tooltip
 from src.app.score_semantics import (
@@ -425,7 +425,7 @@ def render_card(
             tone = "warn" if badges['cold_start'] else "success"
             st.markdown(flag_html(lbl, tone), unsafe_allow_html=True)
         with badge_cols[1]:
-            st.markdown(flag_html(badges['popularity_band'], "info"), unsafe_allow_html=True)
+            st.markdown(flag_html(band_label(badges['popularity_band']), "info"), unsafe_allow_html=True)
         with badge_cols[2]:
             nov_val = badges.get('novelty_ratio')
             if nov_val is None:

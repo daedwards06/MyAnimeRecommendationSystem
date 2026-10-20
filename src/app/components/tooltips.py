@@ -36,7 +36,7 @@ def explain_popularity_band(band: str) -> str:
     Parameters
     ----------
     band : str
-        Popularity band label (e.g., 'Top 25%', 'Mid 50%', 'Long-tail').
+        A ``popularity_band`` value: 'Top 10%', 'Top 25%', 'Mid' or 'Long Tail'.
 
     Returns
     -------
@@ -44,22 +44,25 @@ def explain_popularity_band(band: str) -> str:
         Explanation text suitable for tooltip/expander display.
     """
     explanations = {
+        "Top 10%": (
+            "**Popular (top 10%)**: One of the most-rated titles in the catalog. "
+            "Mainstream and widely recognized."
+        ),
         "Top 25%": (
-            "**Top 25% Popularity**: This anime is among the most popular titles in the dataset "
-            "(high user engagement, many ratings). Mainstream and widely recognized."
+            "**Popular (top 25%)**: Among the more-rated titles in the catalog. "
+            "Well known to most anime viewers."
         ),
-        "Mid 50%": (
-            "**Mid 50% Popularity**: This anime has moderate popularity—not obscure, but not a blockbuster. "
-            "Represents a balanced mix of recognition and niche appeal."
+        "Mid": (
+            "**Mid-range (top 25–50%)**: Moderately rated: not obscure, but not a blockbuster."
         ),
-        "Long-tail": (
-            "**Long-Tail (Bottom 25%)**: This is a less commonly rated title with niche or specialized appeal. "
-            "Discovering these items can broaden your taste beyond mainstream hits."
+        "Long Tail": (
+            "**Hidden gem (less-rated half)**: Fewer viewers have rated this one. "
+            "Titles like this can broaden your taste beyond the mainstream hits."
         ),
     }
     return explanations.get(
         band,
-        f"**Popularity Band: {band}**: Percentile-based grouping indicating relative user engagement in the dataset."
+        f"**Popularity: {band}**: How many viewers have rated this title, relative to the catalog."
     )
 
 

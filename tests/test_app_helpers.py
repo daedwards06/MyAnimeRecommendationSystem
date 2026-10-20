@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from src.app.badges import badge_payload
+from src.app.badges import BAND_LABELS, badge_payload, band_counts, popularity_band
+from src.app.components.tooltips import explain_popularity_band
 from src.app.explanations import format_explanation
 from src.app.search import fuzzy_search, normalize_title
 
@@ -20,6 +21,19 @@ def test_badge_payload():
     payload = badge_payload(True, 0.3, {"action": 5}, ["drama", "action"])
     assert set(payload.keys()) == {"cold_start", "popularity_band", "novelty_ratio"}
     assert payload["popularity_band"] in {"Top 10%", "Top 25%", "Mid", "Long Tail"}
+
+
+def test_band_counts_use_every_popularity_band():
+    # Audit F1: Top 10% used to count as Mid and Long Tail never counted as a hidden gem.
+    bands = [popularity_band(p) for p in (0.01, 0.05, 0.2, 0.3, 0.45, 0.6, 0.9)]
+    assert band_counts(bands) == (3, 2, 2)
+
+
+def test_every_popularity_band_has_a_name_and_specific_tooltip():
+    for pct in (0.05, 0.2, 0.4, 0.8):
+        band = popularity_band(pct)
+        assert band in BAND_LABELS
+        assert explain_popularity_band(band).startswith(f"**{BAND_LABELS[band]}")
 
 
 def test_fuzzy_search_substring_fallback():
